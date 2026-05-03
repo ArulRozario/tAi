@@ -52,6 +52,8 @@
     "@angular/core": "^21.2.11",
     "@angular/forms": "^21.2.11",
     "@angular/platform-browser": "^21.2.11",
+    "@aws-sdk/client-s3": "^3.1041.0",
+    "@aws-sdk/lib-storage": "^3.1041.0",
     "axios": "^1.6.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1"
