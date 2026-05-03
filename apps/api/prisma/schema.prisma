@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  REVIEWER
+  MASTER
+  ADMIN
+}
+
+enum ProjectStatus {
+  DRAFT
+  PROCESSING
+  REVIEW
+  COMPLETED
+  ARCHIVED
+}
+
+enum PageStatus {
+  PENDING
+  EXTRACTING
+  EXTRACTED
+  TRANSLATING
+  TRANSLATED
+  REVIEWING
+  HUMAN_REVIEW
+  APPROVED
+  REJECTED
+  OCR_FAILED
+  TRANSLATION_TIMEOUT
+  ERROR
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum FeedbackType {
+  CORRECTION
+  APPROVAL
+  REJECTION
+  COMMENT
+  SUGGESTION
+}
+
+enum AgentType {
+  EXTRACTION
+  TRANSLATION
+  REVIEW
+  QUALITY_ROUTER
+  HUMAN_GATE
+  LEARNING
+}
+
+enum Provider {
+  OLLAMA
+  OPENAI
+  ANTHROPIC
+  GOOGLE
+}
+
+enum RuleCategory {
+  TRANSLATION
+  EXTRACTION
+  REVIEW
+  QUALITY
+  TERMINOLOGY
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String
+  role         Role      @default(REVIEWER)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  projects     Project[]
+  pages        Page[]    @relation("PageReviewer")
+  feedback     Feedback[]
+  auditLogs    AuditLog[]
+  createdRules Rule[]    @relation("RuleCreator")
+
+  @@map("users")
+}
+
+model Project {
+  id           String        @id @default(uuid())
+  name         String
+  description  String?
+  sourceLang   String        @default("en") @map("source_lang")
+  targetLang   String        @default("ta") @map("target_lang")
+  sourceFile   String?       @map("source_file")
+  totalPages   Int           @default(0) @map("total_pages")
+  status       ProjectStatus @default(DRAFT)
+  settings     Json          @default("{}")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  ownerId      String?
+  owner        User?         @relation(fields: [ownerId], references: [id])
+  pages        Page[]
+  ruleOverrides RuleOverride[]
+
+  @@map("projects")
+}
+
+model Page {
+  id              String        @id @default(uuid())
+  projectId       String        @map("project_id")
+  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pageNumber      Int           @map("page_number")
+  originalText    String?       @map("original_text")
+  translatedText  String?       @map("translated_text")
+  status          PageStatus    @default(PENDING)
+  qualityScore    Decimal?      @map("quality_score")
+  priority        Priority      @default(NORMAL)
+  retryCount      Int           @default(0) @map("retry_count")
+  maxRetries      Int           @default(3) @map("max_retries")
+  ocrData         Json?         @map("ocr_data")
+  translationData Json?         @map("translation_data")
+  reviewData      Json?         @map("review_data")
+  errorMessage    String?       @map("error_message")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  assignedReviewerId String?    @map("assigned_reviewer_id")
+  assignedReviewer   User?      @relation("PageReviewer", fields: [assignedReviewerId], references: [id])
+
+  versions    PageVersion[]
+  feedback    Feedback[]
+
+  @@unique([projectId, pageNumber])
+  @@map("pages")
+}
+
+model PageVersion {
+  id            String   @id @default(uuid())
+  pageId        String   @map("page_id")
+  page          Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  versionNumber Int      @map("version_number")
+  originalText  String?  @map("original_text")
+  translatedText String? @map("translated_text")
+  qualityScore  Decimal? @map("quality_score")
+  rulesApplied  Json?    @map("rules_applied")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([pageId, versionNumber])
+  @@map("page_versions")
+}
+
+model Rule {
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  content        String
+  frontmatter    Json          @default("{}")
+  category       RuleCategory
+  priority       Int           @default(0)
+  isGlobal       Boolean       @default(true) @map("is_global")
+  isActive       Boolean       @default(true) @map("is_active")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  createdById    String?       @map("created_by_id")
+  createdBy      User?         @relation("RuleCreator", fields: [createdById], references: [id])
+
+  overrides      RuleOverride[]
+
+  @@map("rules")
+}
+
+model RuleOverride {
+  id                 String   @id @default(uuid())
+  projectId          String   @map("project_id")
+  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ruleId             String   @map("rule_id")
+  rule               Rule     @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  overrideContent    String?  @map("override_content")
+  overrideFrontmatter Json?   @map("override_frontmatter")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@unique([projectId, ruleId])
+  @@map("rule_overrides")
+}
+
+model ModelConfig {
+  id          String   @id @default(uuid())
+  agentType   AgentType @map("agent_type")
+  provider    Provider
+  modelName   String   @map("model_name")
+  endpoint    String?
+  apiKeyEnc   String?  @map("api_key_enc")
+  config      Json     @default("{}")
+  isActive    Boolean  @default(true) @map("is_active")
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([agentType, isActive], map: "model_config_active_unique")
+  @@map("model_configs")
+}
+
+model Feedback {
+  id                String        @id @default(uuid())
+  pageId            String        @map("page_id")
+  page              Page          @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  userId            String?       @map("user_id")
+  user              User?         @relation(fields: [userId], references: [id])
+  feedbackType      FeedbackType  @map("feedback_type")
+  originalText      String?       @map("original_text")
+  correctedText     String?       @map("corrected_text")
+  feedbackText      String?       @map("feedback_text")
+  ruleIds           String[]      @map("rule_ids")
+  isUsedForLearning Boolean       @default(false) @map("is_used_for_learning")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  @@map("feedback")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?  @map("user_id")
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  details     Json     @default("{}")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
+model Setting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String?
+  valueType   String   @default("string") @map("value_type")
+  description String?
+  isPublic    Boolean  @default(false) @map("is_public")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
