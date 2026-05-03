@@ -1,35 +1,19 @@
-version: '3.9'
+version: '3.8'
 
 services:
   postgres:
     image: postgres:17-alpine
     container_name: tai-postgres
-    restart: unless-stopped
     environment:
-      POSTGRES_DB: tai_db
-      POSTGRES_USER: tai_user
-      POSTGRES_PASSWORD: tai_pass
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      POSTGRES_USER: tai
+      POSTGRES_PASSWORD: tai123
+      POSTGRES_DB: tai_dev
     ports:
       - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tai_user -d tai_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:8-alpine
-    container_name: tai-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U tai"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -37,80 +21,21 @@ services:
   minio:
     image: minio/minio:latest
     container_name: tai-minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
+    command: server /data --console-address ":9002"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9002:9000"
+      - "9003:9001"
     volumes:
       - minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: tai-ollama
-    restart: unless-stopped
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    deploy:
-      resources:
-        limits:
-          memory: 16G
-
-  api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    container_name: tai-api
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=development
-      - PORT=3000
-      - DATABASE_URL=postgresql://tai_user:tai_pass@postgres:5432/tai_db
-      - REDIS_URL=redis://redis:6379
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_BUCKET=tai-files
-      - OLLAMA_ENDPOINT=http://ollama:11434
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-      minio:
-        condition: service_started
-      ollama:
-        condition: service_started
-
-  frontend:
-    build:
-      context: .
-      dockerfile: apps/frontend/Dockerfile
-    container_name: tai-frontend
-    restart: unless-stopped
-    ports:
-      - "4200:80"
-    depends_on:
-      - api
-
 volumes:
   postgres_data:
-  redis_data:
   minio_data:
-  ollama_data:
-
-networks:
-  default:
-    name: tai-network

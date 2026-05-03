@@ -34,14 +34,6 @@
       "options": {
         "buildTarget": "api:build",
         "runBuildTargetDependencies": false
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "api:build:development"
-        },
-        "production": {
-          "buildTarget": "api:build:production"
-        }
       }
     },
     "lint": {
