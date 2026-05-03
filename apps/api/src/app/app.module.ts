@@ -4,6 +4,7 @@ import { FilesModule } from '../modules/files/files.module';
 import { AgentsModule } from '../modules/agents/agents.module';
 import { ProjectsModule } from '../modules/projects/projects.module';
 import { PagesModule } from '../modules/pages/pages.module';
+import { AuthModule } from '../modules/auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -14,6 +15,7 @@ import { AppService } from './app.service';
     AgentsModule,
     ProjectsModule,
     PagesModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
