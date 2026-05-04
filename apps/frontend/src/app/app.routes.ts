@@ -7,8 +7,12 @@ export const routes: Routes = [
   },
   {
     path: '',
-    redirectTo: 'projects',
+    redirectTo: 'dashboard',
     pathMatch: 'full',
+  },
+  {
+    path: 'dashboard',
+    loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent),
   },
   {
     path: 'projects',

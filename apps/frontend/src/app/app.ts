@@ -23,6 +23,7 @@ import { ButtonModule } from 'primeng/button';
 })
 export class App {
   menuItems = [
+    { label: 'Dashboard', routerLink: '/dashboard' },
     { label: 'Projects', routerLink: '/projects' },
     { label: 'Review Queue', routerLink: '/queue' },
   ];
