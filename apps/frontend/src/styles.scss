@@ -8,9 +8,19 @@ html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background: #0f0f23;
-  color: #eaeaea;
+  font-family: 'Inter', sans-serif;
+  background-color: theme('colors.background');
+  color: theme('colors.text-primary');
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+}
+
+code, pre {
+  font-family: 'JetBrains Mono', monospace;
 }
 
 /* Custom scrollbar */
@@ -20,14 +30,36 @@ html, body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1a2e;
+  background: theme('colors.primary');
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #e94560;
+  background: theme('colors.accent');
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #ff5a75;
+}
+
+/* PrimeNG Overrides to match Mockup */
+:host ::ng-deep .p-menubar {
+  background: theme('colors.primary') !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+:host ::ng-deep .p-card {
+  background: theme('colors.secondary') !important;
+  border: 1px solid theme('colors.border') !important;
+  border-radius: 8px !important;
+}
+
+:host ::ng-deep .p-button {
+  background: theme('colors.accent') !important;
+  border: none !important;
+}
+
+:host ::ng-deep .p-button:hover {
+  background: #ff5a75 !important;
 }

@@ -53,7 +53,7 @@ import { ApiService, Page } from '../../core/services/api.service';
               <p-tag [value]="page.status" [severity]="getStatusSeverity(page.status)"></p-tag>
             </td>
             <td>
-              <button pButton label="Review" icon="pi pi-eye" class="p-button-sm"></button>
+              <button pButton label="Review" icon="pi pi-eye" [routerLink]="['/review', page.id]"></button>
             </td>
           </tr>
         </ng-template>

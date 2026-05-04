@@ -43,8 +43,7 @@
       "options": {
         "targetName": "lint"
       }
-    },
-    
+    }
   ],
   "targetDefaults": {
     "@angular/build:application": {
@@ -64,5 +63,6 @@
       "style": "scss",
       "unitTestRunner": "vitest-angular"
     }
-  }
+  },
+  "analytics": false
 }

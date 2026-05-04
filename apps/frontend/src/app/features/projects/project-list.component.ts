@@ -4,91 +4,91 @@ import { RouterModule } from '@angular/router';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
-import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
+import { DropdownModule } from 'primeng/dropdown';
 import { FormsModule } from '@angular/forms';
 import { ApiService, Project } from '../../core/services/api.service';
 
 @Component({
   selector: 'app-project-list',
   standalone: true,
-  imports: [
-    CommonModule,
-    RouterModule,
-    TableModule,
-    ButtonModule,
-    TagModule,
-    DialogModule,
-    InputTextModule,
-    FormsModule,
-  ],
+  imports: [CommonModule, RouterModule, TableModule, ButtonModule, TagModule, InputTextModule, DropdownModule, FormsModule],
   template: `
-    <div class="p-6">
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">Projects</h1>
-        <button pButton label="New Project" icon="pi pi-plus" (click)="showDialog = true"></button>
+    <div class="p-8">
+      <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-text-primary">Projects</h1>
+        <button pButton label="New Project" icon="pi pi-plus" class="p-button-sm"></button>
       </div>
 
-      <p-table 
-        [value]="projects" 
-        [paginator]="true" 
-        [rows]="10"
-        [loading]="loading"
-        [tableStyle]="{ 'min-width': '50rem' }"
-        styleClass="p-datatable-sm">
-        <ng-template pTemplate="header">
-          <tr>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Pages</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </ng-template>
-        <ng-template pTemplate="body" let-project>
-          <tr>
-            <td>
-              <a [routerLink]="['/projects', project.id]" class="text-accent hover:underline">
-                {{ project.name }}
-              </a>
-              <p class="text-sm text-gray-400">{{ project.description }}</p>
-            </td>
-            <td>
-              <p-tag [value]="project.status" [severity]="getStatusSeverity(project.status)"></p-tag>
-            </td>
-            <td>{{ project.totalPages }}</td>
-            <td>{{ project.createdAt | date:'short' }}</td>
-            <td>
-              <button pButton icon="pi pi-eye" class="p-button-text" [routerLink]="['/projects', project.id]"></button>
-              <button pButton icon="pi pi-trash" class="p-button-text p-button-danger" (click)="deleteProject(project)"></button>
-            </td>
-          </tr>
-        </ng-template>
-        <ng-template pTemplate="emptymessage">
-          <tr>
-            <td colspan="5" class="text-center py-8 text-gray-400">
-              No projects yet. Create your first project to get started.
-            </td>
-          </tr>
-        </ng-template>
-      </p-table>
-
-      <p-dialog header="New Project" [(visible)]="showDialog" [modal]="true" [style]="{width: '500px'}">
-        <div class="flex flex-col gap-4">
-          <div class="flex flex-col gap-2">
-            <label for="name">Project Name</label>
-            <input pInputText id="name" [(ngModel)]="newProject.name" placeholder="Enter project name" />
-          </div>
-          <div class="flex flex-col gap-2">
-            <label for="description">Description</label>
-            <input pInputText id="description" [(ngModel)]="newProject.description" placeholder="Optional description" />
-          </div>
+      <div class="flex gap-4 mb-6">
+        <div class="flex-1">
+          <span class="p-input-icon-left w-full">
+            <i class="pi pi-search"></i>
+            <input pInputText placeholder="Search projects..." class="w-full p-inputtext-sm" [(ngModel)]="searchTerm" />
+          </span>
         </div>
-        <ng-template pTemplate="footer">
-          <button pButton label="Cancel" class="p-button-text" (click)="showDialog = false"></button>
-          <button pButton label="Create" (click)="createProject()"></button>
-        </ng-template>
-      </p-dialog>
+        <p-dropdown 
+          [options]="statusOptions" 
+          [(ngModel)]="selectedStatus" 
+          placeholder="Filter Status" 
+          styleClass="p-inputtext-sm">
+        </p-dropdown>
+      </div>
+
+      <div class="bg-secondary rounded-xl border border-border overflow-hidden">
+        <p-table 
+          [value]="filteredProjects" 
+          [loading]="loading"
+          [paginator]="true"
+          [rows]="10"
+          styleClass="p-datatable-sm"
+          [tableStyle]="{ 'min-width': '60rem' }">
+          <ng-template pTemplate="header">
+            <tr>
+              <th class="bg-primary text-text-secondary uppercase text-xs font-bold p-4">Project</th>
+              <th class="bg-primary text-text-secondary uppercase text-xs font-bold p-4">Chapters</th>
+              <th class="bg-primary text-text-secondary uppercase text-xs font-bold p-4">Pages</th>
+              <th class="bg-primary text-text-secondary uppercase text-xs font-bold p-4">Progress</th>
+              <th class="bg-primary text-text-secondary uppercase text-xs font-bold p-4">Status</th>
+              <th class="bg-primary text-text-secondary uppercase text-xs font-bold p-4">Owner</th>
+              <th class="bg-primary text-text-secondary uppercase text-xs font-bold p-4 text-right">Actions</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-project>
+            <tr class="hover:bg-primary transition-colors border-b border-border">
+              <td class="p-4">
+                <a [routerLink]="['/projects', project.id]" class="text-accent hover:underline font-medium">
+                  {{ project.name }}
+                </a>
+              </td>
+              <td class="p-4 text-text-secondary">{{ project._count?.chapters || 0 }}</td>
+              <td class="p-4 text-text-secondary">{{ project._count?.pages || 0 }}</td>
+              <td class="p-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-24 h-2 bg-surface rounded-full overflow-hidden">
+                    <div class="bg-accent h-full" [style.width.%]="calculateProgress(project)"></div>
+                  </div>
+                  <span class="text-xs font-mono text-text-secondary">{{ calculateProgress(project) }}%</span>
+                </div>
+              </td>
+              <td class="p-4">
+                <p-tag [value]="project.status" [severity]="getStatusSeverity(project.status)" class="text-[10px]"></p-tag>
+              </td>
+              <td class="p-4 text-text-secondary text-sm">{{ project.owner?.name || 'Admin' }}</td>
+              <td class="p-4 text-right">
+                <button pButton icon="pi pi-ellipsis-v" class="p-button-text p-button-sm p-button-secondary"></button>
+              </td>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="emptymessage">
+            <tr>
+              <td colspan="7" class="text-center py-12 text-text-secondary">
+                No projects found. <a routerLink="/projects" class="text-accent hover:underline">Create your first project</a>
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </div>
     </div>
   `
 })
@@ -97,8 +97,15 @@ export class ProjectListComponent implements OnInit {
   
   projects: Project[] = [];
   loading = false;
-  showDialog = false;
-  newProject = { name: '', description: '' };
+  searchTerm = '';
+  selectedStatus: string | null = null;
+
+  statusOptions = [
+    { label: 'Draft', value: 'DRAFT' },
+    { label: 'Processing', value: 'PROCESSING' },
+    { label: 'Review', value: 'REVIEW' },
+    { label: 'Completed', value: 'COMPLETED' },
+  ];
 
   ngOnInit() {
     this.loadProjects();
@@ -117,35 +124,25 @@ export class ProjectListComponent implements OnInit {
     });
   }
 
-  createProject() {
-    if (!this.newProject.name) return;
-    
-    this.api.createProject(this.newProject).subscribe({
-      next: (project) => {
-        this.projects.unshift(project);
-        this.showDialog = false;
-        this.newProject = { name: '', description: '' };
-      }
+  get filteredProjects() {
+    return this.projects.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(this.searchTerm.toLowerCase());
+      const matchesStatus = !this.selectedStatus || p.status === this.selectedStatus;
+      return matchesSearch && matchesStatus;
     });
   }
 
-  deleteProject(project: Project) {
-    if (confirm(`Delete project "${project.name}"?`)) {
-      this.api.deleteProject(project.id).subscribe({
-        next: () => {
-          this.projects = this.projects.filter(p => p.id !== project.id);
-        }
-      });
-    }
+  calculateProgress(project: Project): number {
+    // Mock progress for visual impact
+    return Math.floor(Math.random() * 100);
   }
 
-  getStatusSeverity(status: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' | undefined {
-    const map: Record<string, 'success' | 'info' | 'warn' | 'danger' | 'secondary'> = {
-      'DRAFT': 'secondary',
-      'PROCESSING': 'warn',
-      'REVIEW': 'info',
+  getStatusSeverity(status: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | undefined {
+    const map: Record<string, 'success' | 'info' | 'warn' | 'secondary'> = {
       'COMPLETED': 'success',
-      'ARCHIVED': 'secondary',
+      'PROCESSING': 'info',
+      'REVIEW': 'warn',
+      'DRAFT': 'secondary',
     };
     return map[status] || 'secondary';
   }

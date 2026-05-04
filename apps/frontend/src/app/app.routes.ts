@@ -23,6 +23,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/workbench/workbench.component').then(m => m.WorkbenchComponent),
   },
   {
+    path: 'review/:id',
+    loadComponent: () => import('./features/review-detail/review-detail.component').then(m => m.ReviewDetailComponent),
+  },
+  {
     path: 'queue',
     loadComponent: () => import('./features/review-queue/review-queue.component').then(m => m.ReviewQueueComponent),
   },

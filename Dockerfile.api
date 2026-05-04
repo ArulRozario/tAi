@@ -1,22 +1,19 @@
-FROM node:20-alpine AS builder
+FROM node:20-bookworm
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
+RUN apt-get update && apt-get install -y libssl3
+
+RUN npm install -g pnpm
 
 COPY . .
-RUN pnpm nx build api
 
-FROM node:20-alpine
+RUN pnpm install
 
-WORKDIR /app
-
-COPY --from=builder /app/dist/apps/api/package.json .
-COPY --from=builder /app/dist/apps/api .
-
-RUN npm install -g pm2
+RUN pnpm prisma generate --schema=apps/api/prisma/schema.prisma
 
 EXPOSE 3000
 
-CMD ["pm2", "start", "main.js", "--no-daemon"]
+WORKDIR /app/apps/api
+
+CMD ["npx", "ts-node", "--project", "tsconfig.app.json", "src/main.ts"]
