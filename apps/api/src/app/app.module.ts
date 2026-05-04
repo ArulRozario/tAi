@@ -6,6 +6,7 @@ import { ProjectsModule } from '../modules/projects/projects.module';
 import { PagesModule } from '../modules/pages/pages.module';
 import { AuthModule } from '../modules/auth/auth.module';
 import { UsersModule } from '../modules/users/users.module';
+import { ExportModule } from '../modules/export/export.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -18,6 +19,7 @@ import { AppService } from './app.service';
     PagesModule,
     AuthModule,
     UsersModule,
+    ExportModule,
   ],
   controllers: [AppController],
   providers: [AppService],
