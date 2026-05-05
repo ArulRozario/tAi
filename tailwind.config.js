@@ -1,6 +1,4 @@
 import type { Config } from 'tailwindcss';
-import tailwindcss from 'tailwindcss';
-import autoprefixer from 'autoprefixer';
 
 export default {
   content: [
@@ -9,21 +7,32 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#1a1a2e',    // Header, sidebar
-        secondary: '#16213e',  // Cards, panels
-        background: '#0f0f23', // Main content
-        surface: '#1f1f3a',    // Input fields, modals
-        accent: '#e94560',     // Primary buttons, highlights
-        success: '#4ecca3',    // Approved status
-        warning: '#ffc107',    // Pending review
-        error: '#ff6b6b',      // Critical issues
-        'text-primary': '#eaeaea',
-        'text-secondary': '#a0a0a0',
-        border: '#2a2a4a',
+        primary: {
+          DEFAULT: '#6366f1', // Indigo
+          dark: '#4f46e5',
+          light: '#818cf8',
+        },
+        background: '#0f172a', // Deep Slate/Navy
+        surface: {
+          DEFAULT: '#1e293b', // Slate 800
+          light: '#334155',  // Slate 700
+          dark: '#0f172a',   // Slate 900
+        },
+        accent: {
+          DEFAULT: '#10b981', // Emerald
+          dark: '#059669',
+          light: '#34d399',
+        },
+        'text-primary': '#f8fafc', // Slate 50
+        'text-secondary': '#94a3b8', // Slate 400
+        border: 'rgba(255, 255, 255, 0.1)',
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
+      },
+      backdropBlur: {
+        xs: '2px',
       }
     },
   },

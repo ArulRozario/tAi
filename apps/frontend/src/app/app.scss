@@ -1,0 +1,81 @@
+
+/* Global Theme Variables */
+:root {
+    --primary-color: #00bfa5;
+    --primary-color-dark: #00a391;
+    --surface-ground: #f8f9fa;
+    --surface-card: #ffffff;
+    --surface-border: #e5e7eb;
+    --text-color: #374151;
+    --text-color-secondary: #6b7280;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font-family);
+    background-color: var(--surface-ground);
+    color: var(--text-color);
+}
+
+/* Compact PrimeNG Overrides */
+:host ::ng-deep {
+    .p-datatable-sm .p-datatable-tbody > tr > td {
+        padding: 0.5rem 0.75rem !important;
+    }
+    
+    .p-dropdown, .p-calendar {
+        font-size: 0.875rem !important;
+    }
+
+    .p-inputtext {
+        padding: 0.5rem 0.75rem !important;
+    }
+
+    /* Floating Card Effect */
+    .layout-content-card {
+        background: var(--surface-card);
+        border: 1px solid var(--surface-border);
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        padding: 1.5rem;
+        margin: 1rem;
+    }
+}
+
+/* Sakai-like Layout Styles */
+.layout-wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+
+.layout-sidebar {
+    width: 250px;
+    background: #ffffff;
+    border-right: 1px solid var(--surface-border);
+    display: flex;
+    flex-direction: column;
+    transition: width 0.2s;
+}
+
+.layout-main-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--surface-ground);
+}
+
+.layout-topbar {
+    height: 60px;
+    background: #ffffff;
+    border-bottom: 1px solid var(--surface-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+}
+
+.layout-content {
+    flex: 1;
+    padding: 0;
+    overflow-y: auto;
+}

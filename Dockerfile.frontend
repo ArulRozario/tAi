@@ -10,4 +10,4 @@ RUN pnpm install
 
 EXPOSE 80
 
-CMD ["pnpm", "nx", "serve", "frontend", "--port", "80", "--host", "0.0.0.0"]
+CMD ["pnpm", "nx", "serve", "frontend", "--port", "80", "--host", "0.0.0.0", "--proxy-config", "apps/frontend/proxy.conf.json"]

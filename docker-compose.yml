@@ -1,17 +1,17 @@
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: tai-postgres
+    container_name: tai-db-postgres
     environment:
       POSTGRES_USER: tai
       POSTGRES_PASSWORD: tai123
-      POSTGRES_DB: tai_dev
+      POSTGRES_DB: tai
     ports:
-      - "7432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tai"]
+      test: ["CMD-SHELL", "pg_isready -U tai -d tai"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -50,7 +50,7 @@ services:
       dockerfile: Dockerfile.api
     container_name: tai-api
     environment:
-      DATABASE_URL: postgresql://tai:tai123@postgres:5432/tai_dev?schema=public
+      DATABASE_URL: postgresql://tai:tai123@postgres:5432/tai?schema=public
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
@@ -80,6 +80,9 @@ services:
       - "7420:80"
     depends_on:
       - api
+    volumes:
+      - .:/app
+      - /app/node_modules
     networks:
       - tai-network
 

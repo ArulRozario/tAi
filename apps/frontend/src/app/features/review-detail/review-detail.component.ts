@@ -11,144 +11,137 @@ import { ActivatedRoute } from '@angular/router';
   standalone: true,
   imports: [CommonModule, RouterModule, ButtonModule, TagModule],
   template: `
-    <div class="flex h-screen overflow-hidden bg-background">
-      <!-- LEFT SIDEBAR: Segment List -->
-      <div class="w-64 bg-primary border-r border-border flex flex-col">
-        <div class="p-4 border-b border-border">
-          <a routerLink="/queue" class="flex items-center gap-2 text-text-secondary hover:text-accent text-sm transition-colors">
-            <i class="pi pi-arrow-left"></i> Back to Queue
-          </a>
+    <div class="absolute inset-0 top-14 flex overflow-hidden bg-slate-950 animate-fade-in">
+      <!-- SEGMENT NAVIGATION (Slim) -->
+      <div class="w-64 border-r border-white/5 bg-slate-950/40 flex flex-col">
+        <div class="p-3 border-b border-white/5 flex items-center justify-between">
+           <span class="micro-label">Segment Grid</span>
+           <span class="text-[8px] font-black text-primary">{{ completedSegments }}/{{ segments.length }}</span>
         </div>
-        <div class="flex-1 overflow-y-auto p-3 space-y-2">
-          <div class="text-xs font-bold text-text-secondary uppercase tracking-widest px-2 mb-3">Segments</div>
+        <div class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
           <div *ngFor="let seg of segments; let i = index" 
                (click)="selectSegment(i)"
-               [class]="'p-3 rounded-lg cursor-pointer transition-all flex items-center justify-between ' + 
-                         (selectedSegmentIndex === i ? 'bg-accent text-white shadow-lg scale-105' : 'bg-secondary text-text-secondary hover:bg-surface')">
-            <span class="text-sm font-medium">Segment {{ i + 1 }}</span>
-            <i [class]="getSegmentIcon(seg.status)" class="text-xs"></i>
-          </div>
-        </div>
-        <div class="p-4 border-t border-border">
-          <div class="flex justify-between items-center text-xs text-text-secondary">
-            <span>Progress:</span>
-            <span>{{ completedSegments }} / {{ segments.length }}</span>
+               [class]="'p-2 rounded-lg cursor-pointer transition-all flex items-center justify-between group ' + 
+                         (selectedSegmentIndex === i ? 'bg-primary/10 border border-primary/30' : 'hover:bg-white/5 border border-transparent')">
+            <div class="flex items-center gap-2">
+               <div [class]="'w-1 h-1 rounded-full ' + (seg.status === 'GOOD' ? 'bg-emerald-500' : seg.status === 'ERROR' ? 'bg-rose-500' : 'bg-amber-500')"></div>
+               <span class="text-[10px] font-black tracking-tight" [class.text-primary]="selectedSegmentIndex === i">Unit {{ i + 1 }}</span>
+            </div>
+            <i class="pi pi-chevron-right text-[7px] text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity"></i>
           </div>
         </div>
       </div>
 
-      <!-- MAIN CONTENT: Translation Analysis -->
-      <div class="flex-1 flex flex-col bg-background">
-        <!-- Top Header -->
-        <div class="h-16 bg-primary border-b border-border flex items-center justify-between px-6">
-          <div class="flex items-center gap-4">
-            <span class="text-text-primary font-medium">Page {{ page?.pageNumber }} - {{ project?.name }}</span>
-            <span class="text-text-secondary">|</span>
-            <span class="text-text-primary font-bold">Detailed Review</span>
-          </div>
+      <!-- WORKSPACE (Central) -->
+      <div class="flex-1 flex flex-col bg-slate-950/20 relative">
+        <!-- Workbench Toolbar -->
+        <header class="h-12 border-b border-white/5 flex items-center justify-between px-4 bg-slate-950/40 backdrop-blur-xl">
           <div class="flex items-center gap-3">
-            <button pButton label="Skip" icon="pi pi-times" class="p-button-text p-button-sm"></button>
-            <button pButton label="Save Changes" icon="pi pi-save" class="p-button-sm bg-accent border-none"></button>
-            <button pButton label="Next Page" icon="pi, pi-arrow-right" class="p-button-sm bg-accent border-none"></button>
+             <div class="px-2 py-1 bg-white/5 rounded border border-white/5">
+                <span class="micro-label !text-slate-500">Unit {{ selectedSegmentIndex + 1 }}</span>
+             </div>
+             <h2 class="text-xs font-black text-white tracking-tight">{{ project?.name }} &bull; Page {{ page?.pageNumber }}</h2>
           </div>
-        </div>
+          <div class="flex items-center gap-2">
+             <button pButton icon="pi pi-chevron-left" class="!w-8 !h-8 !p-0 !bg-white/5 !border-none !text-slate-500 hover:!text-white"></button>
+             <button pButton icon="pi pi-chevron-right" class="!w-8 !h-8 !p-0 !bg-white/5 !border-none !text-slate-500 hover:!text-white"></button>
+             <div class="w-px h-4 bg-white/5 mx-2"></div>
+             <button pButton label="Save Changes" icon="pi pi-check" class="!h-8 !px-4 !bg-primary !border-none !text-[9px]"></button>
+          </div>
+        </header>
 
-        <div class="flex-1 overflow-y-auto p-8 space-y-8">
-          <!-- Side-by-Side Comparison -->
-          <div class="grid grid-cols-2 gap-6">
-            <div class="bg-secondary rounded-xl border border-border overflow-hidden">
-              <div class="bg-primary p-3 border-b border-border text-xs font-bold uppercase tracking-widest text-text-secondary">
-                English (Original)
-              </div>
-              <div class="p-6 text-text-primary leading-relaxed text-lg">
-                {{ currentSegment?.original }}
-              </div>
-            </div>
-            <div class="bg-secondary rounded-xl border border-border overflow-hidden">
-              <div class="bg-accent p-3 border-b border-border text-xs font-bold uppercase tracking-widest text-white">
-                Tamil (Translated)
-              </div>
-              <div class="p-6 text-text-primary leading-relaxed text-lg">
-                {{ currentSegment?.translated }}
-              </div>
-            </div>
+        <!-- Document Views -->
+        <div class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+          <div class="grid grid-cols-2 gap-4 h-full min-h-[400px]">
+             <!-- Source -->
+             <div class="glass-card !bg-slate-950/40 border-white/5 flex flex-col overflow-hidden">
+                <div class="p-2 border-b border-white/5 flex items-center justify-between bg-slate-950/60">
+                   <span class="micro-label">Source Transcript</span>
+                   <span class="text-[7px] font-black text-slate-700 uppercase tracking-widest">ENG-US</span>
+                </div>
+                <div class="p-6 flex-1 text-slate-200 text-base font-medium leading-relaxed selection:bg-primary/40">
+                   {{ currentSegment?.original }}
+                </div>
+             </div>
+             <!-- Synthesis -->
+             <div class="glass-card !bg-slate-950/60 border-primary/20 flex flex-col overflow-hidden shadow-2xl">
+                <div class="p-2 border-b border-white/5 flex items-center justify-between bg-slate-950/80">
+                   <span class="micro-label !text-primary">Neural Synthesis</span>
+                   <span class="text-[7px] font-black text-primary uppercase tracking-widest">TAM-IN</span>
+                </div>
+                <div class="p-6 flex-1 text-white text-base font-bold leading-relaxed selection:bg-primary/40 focus:outline-none" contenteditable="true">
+                   {{ currentSegment?.translated }}
+                </div>
+             </div>
           </div>
 
-          <!-- Detailed Error Analysis -->
-          <div class="bg-secondary rounded-xl border border-border overflow-hidden">
-            <div class="bg-primary p-3 border-b border-border text-xs font-bold uppercase tracking-widest text-text-secondary">
-              Error Analysis: Segment {{ selectedSegmentIndex + 1 }}
-            </div>
-            <div class="p-6 space-y-6">
-              <div *ngIf="currentSegment?.error" class="bg-primary p-6 rounded-lg border border-border space-y-4">
-                <div class="flex items-center gap-2 text-error font-bold uppercase text-xs">
-                  <i class="pi pi-exclamation-triangle"></i> {{ currentSegment?.error?.category }} Error
+          <!-- Diagnostic Overlay -->
+          <div class="glass-card !bg-rose-500/5 border-rose-500/20 p-4" *ngIf="currentSegment?.error">
+             <div class="flex items-center gap-3 mb-3">
+                <i class="pi pi-exclamation-triangle text-rose-500 text-xs"></i>
+                <span class="micro-label !text-rose-500">Neural Integrity Warning</span>
+             </div>
+             <div class="grid grid-cols-3 gap-6">
+                <div class="space-y-1">
+                   <span class="micro-label opacity-40">Current Token</span>
+                   <p class="text-[10px] font-black text-slate-300 italic">"{{ currentSegment?.error?.current }}"</p>
                 </div>
-                <div class="grid grid-cols-2 gap-8">
-                  <div>
-                    <div class="text-xs text-text-secondary mb-1">Current Translation:</div>
-                    <div class="text-sm text-text-primary italic">"{{ currentSegment?.error?.current }}"</div>
-                  </div>
-                  <div>
-                    <div class="text-xs text-text-secondary mb-1">Suggested:</div>
-                    <div class="text-sm text-accent font-bold italic">"{{ currentSegment?.error?.shouldBe }}"</div>
-                  </div>
+                <div class="space-y-1">
+                   <span class="micro-label opacity-40">Proposed Refinement</span>
+                   <p class="text-[10px] font-black text-emerald-400 italic">"{{ currentSegment?.error?.shouldBe }}"</p>
                 </div>
-                <div class="p-4 bg-surface rounded border border-border text-sm text-text-secondary italic">
-                  {{ currentSegment?.error?.analysis }}
+                <div class="flex items-end justify-end">
+                   <button pButton label="Apply Neural Patch" class="!h-7 !px-3 !bg-rose-500/20 !border-rose-500/40 !text-rose-400 !text-[8px] hover:!bg-rose-500 hover:!text-white"></button>
                 </div>
-                <div class="flex gap-3">
-                  <button pButton label="Apply Suggestion" class="p-button-sm bg-success border-none"></button>
-                  <button pButton label="Edit Manually" class="p-button-sm bg-secondary border-border text-text-primary"></button>
-                </div>
-              </div>
-              <div *ngIf="!currentSegment?.error" class="text-center py-12 text-text-secondary">
-                <i class="pi pi-check-circle text-3xl text-success mb-3 block"></i>
-                No critical errors detected for this segment.
-              </div>
-            </div>
+             </div>
+             <div class="mt-3 pt-3 border-t border-rose-500/10">
+                <p class="text-[9px] text-rose-500/60 leading-relaxed font-medium">Analysis: {{ currentSegment?.error?.analysis }}</p>
+             </div>
           </div>
         </div>
       </div>
 
-      <!-- RIGHT INSPECTOR PANEL -->
-      <div class="w-80 bg-secondary border-l border-border flex flex-col">
-        <div class="p-4 border-b border-border">
-          <h3 class="text-sm font-bold uppercase tracking-widest text-text-secondary">Quality Panel</h3>
+      <!-- DIAGNOSTIC RAIL (Right) -->
+      <div class="w-72 border-l border-white/5 bg-slate-950/40 flex flex-col">
+        <div class="p-3 border-b border-white/5">
+           <span class="micro-label">Quality Diagnostics</span>
         </div>
-        
-        <div class="flex-1 overflow-y-auto p-4 space-y-6">
-          <!-- Overall Score -->
-          <div class="text-center p-6 bg-primary rounded-xl border border-border">
-            <div class="text-xs text-text-secondary uppercase mb-2">Overall Quality</div>
-            <div class="text-4xl font-bold text-accent">{{ pageQuality }}%</div>
-            <div class="w-full h-2 bg-surface rounded-full mt-4 overflow-hidden">
-              <div class="bg-accent h-full" [style.width.%]="pageQuality"></div>
-            </div>
-          </div>
-
-          <!-- Breakdown -->
-          <div class="space-y-3">
-            <div class="text-xs text-text-secondary uppercase font-bold">Breakdown</div>
-            <div class="space-y-2">
-              <div *ngFor="let item of qualityBreakdown" class="flex justify-between items-center text-xs">
-                <span class="text-text-secondary">{{ item.label }}</span>
-                <span class="text-text-primary font-mono">{{ item.score }}%</span>
+        <div class="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+           <!-- Fidelity Score -->
+           <div class="text-center p-4 glass-card !bg-slate-950/40 border-white/5 relative group">
+              <div class="text-[8px] font-black text-slate-600 uppercase mb-2">Fidelity Score</div>
+              <div class="text-3xl font-black text-primary tracking-tighter">{{ pageQuality }}%</div>
+              <div class="w-full h-1 bg-slate-900 rounded-full mt-3 overflow-hidden shadow-inner">
+                 <div class="bg-primary h-full transition-all duration-1000" [style.width.%]="pageQuality"></div>
               </div>
-            </div>
-          </div>
+           </div>
 
-          <!-- Quick Actions -->
-          <div class="space-y-3 pt-4">
-            <div class="text-xs text-text-secondary uppercase font-bold">Final Action</div>
-            <button pButton label="Approve Page" icon="pi pi-check" class="w-full p-button-sm bg-success border-none"></button>
-            <button pButton label="Request Changes" icon="pi pi-refresh" class="w-full p-button-sm bg-warning border-none"></button>
-            <button pButton label="Escalate to Master" icon="pi pi-upload" class="w-full p-button-sm bg-secondary border-border text-text-primary"></button>
-          </div>
+           <!-- Multi-Vector Breakdown -->
+           <div class="space-y-3">
+              <span class="micro-label px-1">Integrity Vectors</span>
+              <div class="space-y-3">
+                 <div *ngFor="let item of qualityBreakdown" class="space-y-1.5">
+                    <div class="flex justify-between text-[8px] font-black uppercase tracking-widest">
+                       <span class="text-slate-600">{{ item.label }}</span>
+                       <span class="text-slate-300">{{ item.score }}%</span>
+                    </div>
+                    <div class="w-full h-0.5 bg-slate-900 rounded-full">
+                       <div class="bg-slate-700 h-full" [style.width.%]="item.score"></div>
+                    </div>
+                 </div>
+              </div>
+           </div>
+
+           <!-- Finalization -->
+           <div class="pt-4 space-y-2">
+              <span class="micro-label px-1">Lifecycle Action</span>
+              <button pButton label="Verify & Commit" icon="pi pi-check-circle" class="w-full !h-10 !bg-emerald-500/10 !border-emerald-500/20 !text-emerald-500 hover:!bg-emerald-500 hover:!text-white"></button>
+              <button pButton label="Escalate to Master" icon="pi pi-shield" class="w-full !h-10 !bg-slate-900 !border-white/5 !text-slate-600 hover:!text-white"></button>
+           </div>
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class ReviewDetailComponent implements OnInit {
   private api = inject(ApiService);

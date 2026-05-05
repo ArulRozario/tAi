@@ -35,6 +35,9 @@ importers:
       '@nestjs/jwt':
         specifier: ^11.0.2
         version: 11.0.2(@nestjs/common@11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))
+      '@primeng/themes':
+        specifier: ^21.0.4
+        version: 21.0.4
       axios:
         specifier: ^1.6.0
         version: 1.15.0
@@ -44,6 +47,9 @@ importers:
       class-validator:
         specifier: ^0.15.1
         version: 0.15.1
+      primeflex:
+        specifier: ^4.0.0
+        version: 4.0.0
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
@@ -2632,6 +2638,10 @@ packages:
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
+  '@primeng/themes@21.0.4':
+    resolution: {integrity: sha512-WDF8pj91K3ItGmUJB91T1mRj6ut3dCMz4/5rb1sZR6sjxP7jX06PT/uXkKF8sz60ewEEBbh3yK98Js/mKxev3A==}
+    deprecated: 'Deprecated. This package is no longer maintained. Please migrate to @primeuix/themes: https://www.npmjs.com/package/@primeuix/themes'
+
   '@primeuix/motion@0.0.10':
     resolution: {integrity: sha512-PsZwOPq79Scp7/ionshRcQ5xKVf9+zuLcyY5mf6onK8chHT5C9JGphmcIZ4CzcqxuGEpsm8AIbTGy+zS3RtzLA==}
     engines: {node: '>=12.11.0'}
@@ -2642,6 +2652,9 @@ packages:
 
   '@primeuix/styles@2.0.3':
     resolution: {integrity: sha512-2ykAB6BaHzR/6TwF8ShpJTsZrid6cVIEBVlookSdvOdmlWuevGu5vWOScgIwqWwlZcvkFYAGR/SUV3OHCTBMdw==}
+
+  '@primeuix/themes@2.0.3':
+    resolution: {integrity: sha512-3fS1883mtCWhgUgNf/feiaaDSOND4EBIOu9tZnzJlJ8QtYyL6eFLcA6V3ymCWqLVXQ1+lTVEZv1gl47FIdXReg==}
 
   '@primeuix/utils@0.6.4':
     resolution: {integrity: sha512-pZ5f+vj7wSzRhC7KoEQRU5fvYAe+RP9+m39CTscZ3UywCD1Y2o6Fe1rRgklMPSkzUcty2jzkA0zMYkiJBD1hgg==}
@@ -6656,6 +6669,9 @@ packages:
   pretty-format@30.3.0:
     resolution: {integrity: sha512-oG4T3wCbfeuvljnyAzhBvpN45E8iOTXCU/TD3zXW80HA3dQ4ahdqMkWGiPWZvjpQwlbyHrPTWUAqUzGzv4l1JQ==}
     engines: {node: ^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0}
+
+  primeflex@4.0.0:
+    resolution: {integrity: sha512-UOEZCRjR36+sm5bUpDhS1xbA068l9VC6y1aTNVqQPtXuKIdPTqAWHRUxj3mKAoPrQ9W373ooJJMgNVXfiaw04g==}
 
   primeicons@7.0.0:
     resolution: {integrity: sha512-jK3Et9UzwzTsd6tzl2RmwrVY/b8raJ3QZLzoDACj+oTJ0oX7L9Hy+XnVwgo4QVKlKpnP/Ur13SXV/pVh4LzaDw==}
@@ -11307,6 +11323,11 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
+  '@primeng/themes@21.0.4':
+    dependencies:
+      '@primeuix/styled': 0.7.4
+      '@primeuix/themes': 2.0.3
+
   '@primeuix/motion@0.0.10':
     dependencies:
       '@primeuix/utils': 0.6.4
@@ -11316,6 +11337,10 @@ snapshots:
       '@primeuix/utils': 0.6.4
 
   '@primeuix/styles@2.0.3':
+    dependencies:
+      '@primeuix/styled': 0.7.4
+
+  '@primeuix/themes@2.0.3':
     dependencies:
       '@primeuix/styled': 0.7.4
 
@@ -15894,6 +15919,8 @@ snapshots:
       '@jest/schemas': 30.0.5
       ansi-styles: 5.2.0
       react-is: 18.3.1
+
+  primeflex@4.0.0: {}
 
   primeicons@7.0.0: {}
 

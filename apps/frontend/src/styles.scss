@@ -1,65 +1,117 @@
-/* Tailwind CSS */
+/* High-Density Workbench Typography */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=JetBrains+Mono:wght@100..800&family=Inter:wght@100..900&display=swap');
+@import "primeflex/primeflex.css";
+@import "primeicons/primeicons.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Global Styles */
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  font-family: 'Inter', sans-serif;
-  background-color: theme('colors.background');
-  color: theme('colors.text-primary');
+/* Intelligence Core Design Tokens */
+:root {
+  --primary: #6366f1;
+  --primary-dark: #4338ca;
+  --primary-glow: rgba(99, 102, 241, 0.4);
+  --emerald: #10b981;
+  --bg-core: #06080f;
+  --surface-1: rgba(15, 23, 42, 0.4);
+  --surface-2: rgba(15, 23, 42, 0.7);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-active: rgba(99, 102, 241, 0.3);
 }
 
-/* Typography */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
+@layer base {
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-core);
+    color: #cbd5e1;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: #f8fafc;
+  }
+
+  /* Micro-labels */
+  .micro-label {
+    @apply text-[9px] font-black uppercase tracking-[0.3em] text-slate-500;
+  }
 }
 
-code, pre {
-  font-family: 'JetBrains Mono', monospace;
+@layer components {
+  /* Ultra-Slim Glass Card */
+  .glass-card {
+    background: var(--surface-1);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    
+    &.hoverable:hover {
+      border-color: var(--border-active);
+      background: var(--surface-2);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+  }
+
+  /* High-Density Input */
+  .glass-input {
+    @apply bg-slate-950/40 border border-white/5 rounded-xl px-4 text-xs font-medium text-slate-200 outline-none transition-all placeholder:text-slate-800;
+    &:focus {
+      @apply border-primary/40 bg-slate-950/60 ring-0 shadow-[0_0_15px_rgba(99,102,241,0.1)];
+    }
+  }
+
+  /* Workbench Buttons */
+  .p-button {
+    @apply rounded-xl font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 !important;
+    &.p-button-primary {
+      @apply bg-primary border-none shadow-lg shadow-primary/10 !important;
+      &:hover { @apply shadow-xl shadow-primary/20 -translate-y-0.5 !important; }
+    }
+    &.p-button-text {
+      @apply hover:bg-white/5 !important;
+    }
+  }
+
+  /* Data Density Tables */
+  .p-datatable-custom {
+    .p-datatable-thead > tr > th {
+      @apply !bg-transparent !border-b !border-white/5 !p-4;
+      @extend .micro-label;
+    }
+    .p-datatable-tbody > tr {
+      @apply !bg-transparent !transition-all !duration-300;
+      &:hover { @apply !bg-primary/[0.03]; }
+      > td { @apply !p-4 !border-none !text-xs !font-medium !text-slate-400 !important; }
+    }
+    .p-paginator {
+      @apply !bg-transparent !border-t !border-white/5 !p-4 !important;
+      .p-paginator-page { @apply !text-[10px] !font-black !min-w-[2rem] !h-[2rem] !rounded-lg !important; }
+    }
+  }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Animations */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-::-webkit-scrollbar-track {
-  background: theme('colors.primary');
+.animate-fade-in {
+  animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-::-webkit-scrollbar-thumb {
-  background: theme('colors.accent');
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #ff5a75;
-}
-
-/* PrimeNG Overrides to match Mockup */
-:host ::ng-deep .p-menubar {
-  background: theme('colors.primary') !important;
-  border: none !important;
-  border-radius: 0 !important;
-}
-
-:host ::ng-deep .p-card {
-  background: theme('colors.secondary') !important;
-  border: 1px solid theme('colors.border') !important;
-  border-radius: 8px !important;
-}
-
-:host ::ng-deep .p-button {
-  background: theme('colors.accent') !important;
-  border: none !important;
-}
-
-:host ::ng-deep .p-button:hover {
-  background: #ff5a75 !important;
-}
+/* Custom Scrollbar (Slim) */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
