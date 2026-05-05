@@ -332,16 +332,22 @@ Full-page layout. Three columns: **15%** left sidebar (Page Navigation) | **35%*
 - Clicking a source sentence highlights it and scrolls the right column to the corresponding translated sentence.
 
 ### Right Column — Target Document Editor
-- Displays the translated text continuously, looking like a standard document editor (e.g., Google Docs).
-- **Inline Highlights:** Sentences with AI-detected errors or suggestions have colored underlines (e.g., red for critical/high severity, yellow for style/low severity).
-- **Sentence Approval:** Next to each sentence in the source document, there is an approval toggle. Unapproved sentences show a hollow box `[ ]`, and approved sentences show a filled green checkmark `[✓]`.
-  - When the user clicks `[✓ Accept suggestion]` or performs an inline chat rewrite, the sentence is automatically marked as approved.
-  - The reviewer can also manually click the toggle `[ ]` -> `[✓]` to mark a sentence as approved after manually editing it or deciding it requires no changes.
-- **Inline Chat Popover:** Clicking on any sentence opens a floating popover directly below it.
-  - **Suggestion List:** If the AI has found errors, they are listed here with a `[✓ Accept suggestion]` button.
-  - **Inline Chat:** An input box allows the reviewer to type a prompt (e.g., "Make it more poetic", "Use the word 'abogado'"). Sending this calls the Chat Agent in BUILD mode to rewrite the specific sentence.
-- **Inline Diff:** When a sentence is replaced (either by accepting a suggestion or via a chat rewrite), the editor displays the change inline using standard diff colors (`<mark class="diff-bad">` with strikethrough for removed words, `<mark class="diff-good">` for added words).
-- **Manual Editing:** The reviewer can click into the text and type freely to make manual adjustments at any time.
+- Displays the translated text continuously as a rich document editor.
+- **Inline Highlights:** Sentences with AI-detected errors/suggestions have subtle colored underlines (red for critical, yellow for style).
+- **Sentence Approval:** Next to each sentence in the source document, there is an approval toggle (`[ ]` hollow or `[✓]` filled green).
+  - When the user accepts an inline edit or suggestion, the sentence is automatically marked as approved.
+  - Reviewers can manually toggle `[ ]` ↔ `[✓]` to bypass AI or confirm manual modifications.
+- **Cursor-Style Inline Prompt (Cmd+K / Ctrl+K):**
+  - Selecting any sentence or paragraph and pressing `Cmd+K` (or clicking a floating `[Prompt AI]` button) opens a sleek, capsule-shaped input pill directly over the selection (matching Cursor's inline prompt bar).
+  - The input bar supports typing prompts with `@`-mentions (`@genre`, `@glossary`, `@page`) for context indexing.
+  - On submit, it calls the AI Agent in **Build (Composer)** mode to rewrite the selection.
+  - **Live Inline Diff:** The editor renders red/green inline diff blocks inside the document body (`<mark class="diff-bad">` red strikethrough for removals, `<mark class="diff-good">` green highlight for additions).
+  - **Inline Actions Bar:** A small floating toolbar hovers below the active diff, providing `[Accept (Y)]`, `[Reject (N)]`, `[Retry]`, and an input to refine the prompt.
+- **Cursor Chat Panel (Cmd+I / Right Sidebar):**
+  - Toggle tabs: **Chat** (Plan mode for discussion/explanation) and **Composer** (Build mode for direct page editing).
+  - Supports full context search and `@`-mentions.
+  - Displays whole-page diffs that can be accepted or rejected incrementally.
+- **Manual Editing:** Reviewers can click anywhere and type freely; debounced auto-saves trigger in the background.
 
 ### Actions
 | Element | Endpoint |
@@ -405,10 +411,10 @@ Full-layout screen (`.genre-editor`, not `page`). No top nav — its own header.
 │  Preserve the author's narrative voice…               │ └────────────────────────────────┘│
 │                                                       │                                   │
 │  ## Core Terminology                                  │ 👤 You                            │
-│  | protagonist | protagonista |                       │ "What terminology gaps exist?"    │
-│  | narrator    | narrador/a   |                       │                                   │
-│  | metaphor    | metáfora     |                       │ ✦ Assistant          [📝 plan]    │
-│  | irony       | ironía       |                       │ Here's what I'd propose:          │
+│  | protagonist | கதாநாயகன்   |                       │ "What terminology gaps exist?"    │
+│  | narrator    | கதைசொல்லி    |                       │                                   │
+│  | metaphor    | உருவகம்      |                       │ ✦ Assistant          [📝 plan]    │
+│  | irony       | முரண்        |                       │ Here's what I'd propose:          │
 │                                                       │ 1. Add a new section under        │
 │  (Preview pane shown in Split mode on right half)     │    **Core Terminology**            │
 │                                                       │ 2. Cross-reference glossary #042   │
@@ -445,28 +451,33 @@ Full-layout screen (`.genre-editor`, not `page`). No top nav — its own header.
 **Preview mode:** Rendered markdown (`md-preview` + `md-preview__inner`) — headings, tables, lists, blockquotes, bold/italic/code
 **Split mode:** Editor left + Preview right side by side
 
-### Chat panel (`.genre-chat`)
+### Cursor AI Assistant Panel (`.genre-chat`)
 
-**Header:** ✦ sparkles icon + "Genre assistant" brand + ⋮ more button
+The sidebar panel is organized with a scrollable conversation thread on top and a powerful, floating composer box anchored at the very bottom.
 
-**Mode pills:** Two buttons with icon + label + hint text:
-- 📝 Plan — "Discuss"
-- ⚡ Build — "Edit doc"
+**Header:** ✦ sparkles icon + "Genre Assistant" brand + ⋮ more options button
 
-**Thread (`.genre-chat__thread`):** Scrollable. Messages:
-- User: right-aligned, no avatar header
-- Assistant: left-aligned, shows "Assistant" label + mode badge (plan/build) with icon
+**Thread (`.genre-chat__thread`):** Scrollable. Automatically scrolls to bottom on new replies.
+- User messages: right-aligned, speech bubble. Supports `@`-mentions for linking other glossary sections or pages.
+- Assistant responses: left-aligned, branded badge, with icon. Shows `.chat-diff` blocks when editing code/markdown.
 
-Build-mode assistant messages include a `.chat-diff` block showing what changed. When the stream ends with `{revisedContent}`, the editor content is automatically replaced with `revisedContent` — the user sees the result immediately in the editor. They review it, then click **Save** to create a new version (no auto-save). If they discard, they can restore from version history.
+**Composer Mode Interaction (Write / Composer):**
+- When triggered in **Write (Build)** mode, the assistant streams edits directly.
+- **Visual Diffs:** Displays changes inline using red strikethroughs and green background highlight blocks.
+- **Floating Accept/Reject:** The editor displays a floating panel: `[Accept All]`, `[Reject All]` or lets the user incrementally accept chunks of the generated changes (matching Cursor's inline accept bar).
+- No auto-save on assistant edits: after accepting, the user must click the main **Save** button to create a new version (`POST /genres/:id/versions`).
 
-**Quick prompts (`.genre-chat__quick`):** 4 buttons that populate composer. Change by mode:
-- Plan: "Suggest improvements", "Review terminology coverage", "Find inconsistencies", "Compare with previous version"
-- Build: "Add missing domain terms", "Tighten tone consistency", "Generate example sentences", "Add common pitfall"
+**Quick prompts (`.genre-chat__quick`):** Hover-state quick pills appearing directly above the input box:
+- "Suggest improvements", "Review terminology", "Find inconsistencies", "Add domain terms", "Generate example sentences", "Add common pitfall"
 
-**Composer:**
-- Mode indicator line: icon + "Plan mode — discuss before editing" | "Build mode — edits will write to the doc"
-- Textarea (2 rows) + ⌘↵ hint + Send button
-- Cmd+Enter / Ctrl+Enter sends
+**Bottom Chat Input Box (`.genre-chat__composer`):**
+- Anchored to the very bottom of the sidebar.
+- **Input Textarea:** Multi-line text input (2-3 rows) with support for autocomplete on `@`-mentions (`@page`, `@glossary`, `@genre`).
+- **Control Bar (inside input box, bottom row):**
+  - Left-aligned: Keyboard shortcut hint (e.g. `⌘↵ Write · ⌥↵ Plan`)
+  - Right-aligned: Two primary execution buttons:
+    *   **`[Plan 📝]` (Chat Mode):** Send the prompt to discuss guidelines, ask questions, or retrieve context *without modifying* files.
+    *   **`[Write ⚡]` (Composer Mode):** Send the prompt to directly edit the guidelines or terms with live inline diffs.
 
 ### Version History Drawer (`.drawer`)
 

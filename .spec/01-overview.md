@@ -81,10 +81,11 @@ An AI-detected issue on a sentence with a suggested correction and explanation. 
 ### Job
 A background task (PDF extraction, page translation, AI review, export). Tracked in DB with status and progress. Frontend polls for updates.
 
-### Chat Assistant
-A context-aware AI assistant embedded in the genre editor and review screen. Supports two modes:
-- **Plan mode** — read-only advice (suggests edits, explains decisions)
-- **Build mode** — writes changes directly (updates genre content, applies error fixes)
+### AI Assistant (Cursor-inspired)
+A context-aware AI assistant modeled directly after Cursor's AI Chat and Composer interface. It supports:
+- **Chat mode (Plan)** — Conversation panel on the right sidebar for asking questions, retrieving context, and discussing translations using `@`-mentions (`@page`, `@glossary`, `@genre`).
+- **Composer mode (Build)** — Edits text files directly, generating red/green inline diff blocks inside the editor with interactive `[Accept]` and `[Reject]` controls.
+- **Inline Prompting (Cmd+K / Ctrl+K)** — Quick floating editor prompt pill to rewrite active sentence selections with live inline diffs.
 
 ---
 
