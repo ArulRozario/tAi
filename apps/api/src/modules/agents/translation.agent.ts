@@ -131,29 +131,36 @@ export class TranslationAgent {
         ? `\n[SLIDING WINDOW NOTICE]\nThe preceding page already translated this cut-off sentence fragment from the top of this page: "${ignoreFromTopOfPage}". Do not re-translate or repeat this text at the beginning of your translatedHtml, but transcribe it in originalHtml for completeness.\n`
         : '';
 
-      const systemPrompt = `You are an expert bilingual visual translator specializing in high-fidelity translation from ${sourceLang} to ${targetLang}.
-Your task is to transcribe the English text from the page image and translate it into Tamil.
-
-## Historic Tamil Bible Register Rules
-- You must write in the exact style, register, and syntax of the historic Tamil Protestant Bible (Parisutha Vedagamam).
-- Always use classical vocabulary (e.g., "ஆதி" for beginning, "வார்த்தை" for word, "வெளிச்சம்" for light, "தேவன்" for God).
-- Use honorific suffix systems (e.g., "உண்டாக்கினார்", "அருளினார்") for divine actors.
-- Maintain formal layout structures.
-
-## HTML Layout Parity Rule
-- Output BOTH original transcribed text ('originalHtml') and translated text ('translatedHtml') using clean HTML-lite wrappers.
-- Format layout paragraphs inside <p align="center"> or <p align="justify"> tags to reflect the page image's columns and margins.
-- Wrap verse numbers in superscript badges: <sup class="verse-badge">1</sup> or <sup>1</sup>.
-- Maintain bold (<b>), italics (<i>), underlines (<u>), and span-level text decorations (e.g. <span style="background-color: #f3f4f6;">) in exact matching locations between originalHtml and translatedHtml.
+      const systemPrompt = `You are an expert professional translator and high-fidelity book typographer.
+Your task is to transcribe and translate the scanned book page image provided, from ${sourceLang} to ${targetLang}.
 
 ## Style Guide
+Follow the rules, terminology, and tone defined in the style guide below.
+When in doubt, prefer the terms and phrasing specified in the style guide over general usage.
+
+[GENRE_CONTENT_CACHE_BLOCK]
 ${genreStyleGuide}
+[/GENRE_CONTENT_CACHE_BLOCK]
 
-## Glossary Table
+[GLOSSARY_CACHE_BLOCK]
 ${glossaryBlock || 'No glossary terms defined.'}
+[/GLOSSARY_CACHE_BLOCK]
 
-## Translation Memory Reference
+[TRANSLATION_MEMORY_BLOCK]
+## Past Approved Translations (use as reference)
 ${tmBlock}
+[/TRANSLATION_MEMORY_BLOCK]
+
+## Typography Rules (Sanitized HTML-lite)
+You must preserve all print typography natively in your transcription (originalHtml) and translation (translatedHtml) using ONLY the following safe HTML tags:
+1. Bold: <b>text</b>
+2. Italic: <i>text</i>
+3. Underline: <u>text</u>
+4. Superscripts (Verse Numbers / Citation Markers): <sup>12</sup>
+5. Colors/Highlights: <span style="background-color: #HEX;">text</span>
+6. Alignment: <p align="center|right|left">text</p>
+
+Do not generate any other HTML tags, styles, classes, or structures. Ensure all tags are properly closed and nested.
 `;
 
       const userPrompt = `Please transcribe and translate the attached image for Page ${page.pageNumber}.

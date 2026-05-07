@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SegmentUnit } from '@prisma/client';
@@ -10,8 +9,10 @@ import { SegmentUnit } from '@prisma/client';
 export class GenresService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(q?: string, limit?: number) {
     return this.prisma.genre.findMany({
+      where: q ? { name: { contains: q, mode: 'insensitive' } } : undefined,
+      take: limit,
       include: {
         createdBy: { select: { id: true, name: true, email: true } },
         currentVersion: { select: { id: true, version: true, createdAt: true } },
@@ -41,33 +42,23 @@ export class GenresService {
     userId: string,
     data: {
       name: string;
-      key: string;
       description?: string;
-      systemPrompt?: string;
-      userPromptTemplate?: string;
       icon?: string;
       color?: string;
     },
   ) {
-    const normalizedKey = data.key.toLowerCase().trim();
-    const existing = await this.prisma.genre.findUnique({ where: { key: normalizedKey } });
-    if (existing) throw new ConflictException(`Genre key '${data.key}' already exists.`);
-
     return this.prisma.$transaction(async (tx) => {
       const genre = await tx.genre.create({
         data: {
           name: data.name,
-          key: normalizedKey,
           description: data.description,
-          systemPrompt: data.systemPrompt,
-          userPromptTemplate: data.userPromptTemplate,
           icon: data.icon,
           color: data.color,
           createdById: userId,
         },
       });
 
-      const content = `# ${data.name}\n\n${data.description ?? ''}\n\n## System Prompt\n${data.systemPrompt ?? ''}\n\n## User Prompt Template\n${data.userPromptTemplate ?? ''}`;
+      const content = `# ${data.name}\n\n${data.description ?? ''}\n`;
       const v = await tx.genreVersion.create({
         data: { genreId: genre.id, version: '1.0', content, note: 'Initial version', createdById: userId },
       });
@@ -82,10 +73,7 @@ export class GenresService {
 
   async update(id: string, data: {
     name?: string;
-    key?: string;
     description?: string;
-    systemPrompt?: string;
-    userPromptTemplate?: string;
     icon?: string;
     color?: string;
     segmentUnit?: SegmentUnit;
@@ -93,23 +81,11 @@ export class GenresService {
     const genre = await this.prisma.genre.findUnique({ where: { id } });
     if (!genre) throw new NotFoundException(`Genre '${id}' not found.`);
 
-    if (data.key !== undefined) {
-      const norm = data.key.toLowerCase().trim();
-      if (norm !== genre.key) {
-        const dup = await this.prisma.genre.findUnique({ where: { key: norm } });
-        if (dup) throw new ConflictException(`Genre key '${data.key}' already exists.`);
-        data.key = norm;
-      }
-    }
-
     return this.prisma.genre.update({
       where: { id },
       data: {
         ...(data.name !== undefined && { name: data.name }),
-        ...(data.key !== undefined && { key: data.key }),
         ...(data.description !== undefined && { description: data.description }),
-        ...(data.systemPrompt !== undefined && { systemPrompt: data.systemPrompt }),
-        ...(data.userPromptTemplate !== undefined && { userPromptTemplate: data.userPromptTemplate }),
         ...(data.icon !== undefined && { icon: data.icon }),
         ...(data.color !== undefined && { color: data.color }),
         ...(data.segmentUnit !== undefined && { segmentUnit: data.segmentUnit }),
@@ -125,6 +101,15 @@ export class GenresService {
   }
 
   // ── Versions ────────────────────────────────────────────────────────────────
+
+  async findVersion(genreId: string, versionId: string) {
+    const version = await this.prisma.genreVersion.findFirst({
+      where: { id: versionId, genreId },
+      include: { createdBy: { select: { id: true, name: true, email: true } } },
+    });
+    if (!version) throw new NotFoundException(`Version '${versionId}' not found for genre '${genreId}'.`);
+    return version;
+  }
 
   async listVersions(genreId: string) {
     const genre = await this.prisma.genre.findUnique({ where: { id: genreId } });

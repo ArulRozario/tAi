@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -196,22 +197,32 @@ export class PagesService {
 
     const page = await this.findOne(id);
 
+    if (page.retryCount >= page.maxRetries) {
+      throw new UnprocessableEntityException({
+        statusCode: 422,
+        error: 'Unprocessable Entity',
+        message: `Page has reached the maximum retry limit of ${page.maxRetries}. A MASTER or ADMIN must override via POST /admin/pages/:id/override.`,
+        code: 'MAX_RETRIES_EXCEEDED',
+      });
+    }
+
     const updatedPage = await this.prisma.page.update({
       where: { id },
       data: {
         status: PageStatus.REJECTED,
+        retryCount: page.retryCount + 1,
         notes: `${page.notes || ''}\nChange request note from ${user.name || 'reviewer'}: ${note}`.trim(),
       },
     });
 
-    // Enqueue new TRANSLATE_BATCH job
+    // Enqueue new TRANSLATE_BATCH job with correct pageIds array payload
     await this.prisma.job.create({
       data: {
         type: JobType.TRANSLATE_BATCH,
         status: JobStatus.QUEUED,
         projectId: page.projectId,
         pageId: id,
-        payload: { pageId: id, projectId: page.projectId, rejectNote: note },
+        payload: { projectId: page.projectId, pageIds: [id] },
       },
     });
 

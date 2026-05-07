@@ -44,13 +44,10 @@ model RefreshToken {
 model Genre {
   id               String       @id @default(uuid())
   name             String
-  key              String?      @unique
   description      String?
   icon             String?      // emoji or icon name
   color            String?      // hex color for card
-  systemPrompt     String?      @db.Text
-  userPromptTemplate String?    @db.Text
-  segmentUnit      SegmentUnit  @default(SENTENCE)  // how sentences are grouped for display in the workbench
+  segmentUnit      SegmentUnit  @default(PAGE)       // visual grouping layout
   pdfTemplate      Json?        // export typography/layout settings (see 07-architecture.md § PDF Export)
   docxTemplate     Json?        // export Word document styles (see 07-architecture.md § DOCX Export)
   currentVersionId String?      @unique
@@ -142,7 +139,7 @@ model Page {
   updatedAt          DateTime   @updatedAt
 
   errors           Error[]
-  translationMemory TranslationMemory[]
+  memories         TranslationMemory[]
   jobs             Job[]
   reviewers        PageReviewer[]
 
@@ -210,8 +207,8 @@ model TranslationMemory {
   genre          Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
   projectId      String
   project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  pageId         String
-  page           Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  pageId         String?
+  page           Page?    @relation(fields: [pageId], references: [id], onDelete: SetNull)
   sourceLang     String
   targetLang     String
   originalText   String
@@ -419,6 +416,5 @@ enum Priority {
 enum SegmentUnit {
   VERSE
   PARAGRAPH
-  SENTENCE
   PAGE
 }

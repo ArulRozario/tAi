@@ -100,7 +100,7 @@ export class ProjectsService {
             select: { id: true, name: true, email: true },
           },
           genre: {
-            select: { id: true, name: true, key: true },
+            select: { id: true, name: true },
           },
           _count: {
             select: { pages: true },
@@ -132,7 +132,7 @@ export class ProjectsService {
           select: { id: true, name: true, email: true },
         },
         genre: {
-          select: { id: true, name: true, key: true },
+          select: { id: true, name: true },
         },
         pages: {
           orderBy: { pageNumber: 'asc' },
@@ -174,7 +174,7 @@ export class ProjectsService {
           select: { id: true, name: true, email: true },
         },
         genre: {
-          select: { id: true, name: true, key: true },
+          select: { id: true, name: true },
         },
       }
     });

@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Patch, Delete, Body, Param,
+  Controller, Get, Post, Patch, Delete, Body, Param, Query,
   UseGuards, ParseUUIDPipe, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { IsNotEmpty, IsString, IsOptional } from 'class-validator';
@@ -11,20 +11,14 @@ import { CurrentUser } from '../auth/current-user.decorator';
 
 export class CreateGenreDto {
   @IsString() @IsNotEmpty() name!: string;
-  @IsString() @IsNotEmpty() key!: string;
   @IsString() @IsOptional() description?: string;
-  @IsString() @IsOptional() systemPrompt?: string;
-  @IsString() @IsOptional() userPromptTemplate?: string;
   @IsString() @IsOptional() icon?: string;
   @IsString() @IsOptional() color?: string;
 }
 
 export class UpdateGenreDto {
   @IsString() @IsOptional() name?: string;
-  @IsString() @IsOptional() key?: string;
   @IsString() @IsOptional() description?: string;
-  @IsString() @IsOptional() systemPrompt?: string;
-  @IsString() @IsOptional() userPromptTemplate?: string;
   @IsString() @IsOptional() icon?: string;
   @IsString() @IsOptional() color?: string;
   @IsString() @IsOptional() segmentUnit?: string;
@@ -46,8 +40,8 @@ export class GenresController {
 
   @Get()
   @Roles('ADMIN', 'MASTER', 'REVIEWER')
-  findAll() {
-    return this.genresService.findAll();
+  findAll(@Query('q') q?: string, @Query('limit') limit?: string) {
+    return this.genresService.findAll(q, limit ? parseInt(limit, 10) : undefined);
   }
 
   @Get(':id')
@@ -61,12 +55,6 @@ export class GenresController {
   @HttpCode(HttpStatus.CREATED)
   create(@CurrentUser() user: { id: string }, @Body() dto: CreateGenreDto) {
     return this.genresService.create(user.id, dto);
-  }
-
-  @Put(':id')
-  @Roles('ADMIN', 'MASTER')
-  updateFull(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateGenreDto) {
-    return this.genresService.update(id, dto as any);
   }
 
   @Patch(':id')
@@ -101,6 +89,15 @@ export class GenresController {
     return this.genresService.addVersion(id, user.id, dto.content, dto.note);
   }
 
+  @Get(':id/versions/:versionId')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  findVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+  ) {
+    return this.genresService.findVersion(id, versionId);
+  }
+
   @Get(':id/versions/:versionId/diff')
   @Roles('ADMIN', 'MASTER', 'REVIEWER')
   diffVersion(
@@ -122,7 +119,7 @@ export class GenresController {
   }
 
   @Post(':id/test')
-  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  @Roles('ADMIN', 'MASTER')
   testTranslation(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: TestGenreDto,

@@ -35,7 +35,6 @@ interface ChatMessage {
 const SEGMENT_OPTIONS = [
   { label: 'Verse', value: 'VERSE' },
   { label: 'Paragraph', value: 'PARAGRAPH' },
-  { label: 'Sentence', value: 'SENTENCE' },
   { label: 'Page', value: 'PAGE' },
 ];
 
@@ -511,7 +510,7 @@ export class GenreEditorComponent implements OnInit {
   aiDraftContent = signal<string | null>(null);
 
   editName = '';
-  segmentUnit = 'SENTENCE';
+  segmentUnit = 'PAGE';
   activeVersionId = '';
   editorContent = '';
   unsaved = false;
@@ -623,7 +622,7 @@ export class GenreEditorComponent implements OnInit {
       next: (g) => {
         this.genre.set(g);
         this.editName = g.name;
-        this.segmentUnit = (g as any).segmentUnit ?? 'SENTENCE';
+        this.segmentUnit = (g as any).segmentUnit ?? 'PAGE';
         const versionsList = (g as any).versions ?? [];
         this.versions.set(versionsList);
         if (g.currentVersion) {

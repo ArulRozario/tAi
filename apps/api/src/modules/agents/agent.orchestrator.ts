@@ -291,28 +291,27 @@ export class AgentOrchestrator {
         where: { pageId: page.id },
       });
 
-      let pageQuality = 100;
+      let criticalCount = 0, highCount = 0, medCount = 0, lowCount = 0;
       let worstSeverity: ErrorSeverity | null = null;
 
       for (const err of errorsOnPage) {
-        // Quality score penalty deduction calculations
         if (err.severity === ErrorSeverity.CRITICAL) {
-          pageQuality -= 25;
+          criticalCount++;
           worstSeverity = ErrorSeverity.CRITICAL;
         } else if (err.severity === ErrorSeverity.HIGH) {
-          pageQuality -= 15;
+          highCount++;
           if (worstSeverity !== ErrorSeverity.CRITICAL) worstSeverity = ErrorSeverity.HIGH;
         } else if (err.severity === ErrorSeverity.MEDIUM) {
-          pageQuality -= 10;
+          medCount++;
           if (worstSeverity !== ErrorSeverity.CRITICAL && worstSeverity !== ErrorSeverity.HIGH) worstSeverity = ErrorSeverity.MEDIUM;
         } else if (err.severity === ErrorSeverity.LOW) {
-          pageQuality -= 5;
+          lowCount++;
           if (!worstSeverity) worstSeverity = ErrorSeverity.LOW;
         }
       }
 
-      // Constrain quality score within [0, 100] bounds
-      pageQuality = Math.max(0, pageQuality);
+      // Spec formula: max(0, round(100 − (critical×5 + high×2 + medium×1 + low×0.5)))
+      const pageQuality = Math.max(0, Math.round(100 - (criticalCount * 5 + highCount * 2 + medCount * 1 + lowCount * 0.5)));
 
       // Map worst severity to page Priority
       let priority: Priority = Priority.MEDIUM;
@@ -380,16 +379,18 @@ export class AgentOrchestrator {
       });
 
       // 6. Check and aggregate overall project status completion
+      // PROCESSING → REVIEW when all pages are HUMAN_REVIEW or APPROVED (per spec)
+      // REVIEW → COMPLETED when all pages are APPROVED
       const totalPageCount = await this.prisma.page.count({ where: { projectId: page.projectId } });
       const approvedCount = await this.prisma.page.count({ where: { projectId: page.projectId, status: PageStatus.APPROVED } });
-      const reviewPendingCount = await this.prisma.page.count({ where: { projectId: page.projectId, status: { in: [PageStatus.HUMAN_REVIEW, PageStatus.REJECTED] } } });
+      const humanReviewCount = await this.prisma.page.count({ where: { projectId: page.projectId, status: PageStatus.HUMAN_REVIEW } });
 
       if (approvedCount === totalPageCount) {
         await this.prisma.project.update({
           where: { id: page.projectId },
           data: { status: 'COMPLETED' },
         });
-      } else if (approvedCount + reviewPendingCount === totalPageCount) {
+      } else if (approvedCount + humanReviewCount === totalPageCount) {
         await this.prisma.project.update({
           where: { id: page.projectId },
           data: { status: 'REVIEW' },
