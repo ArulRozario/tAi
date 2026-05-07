@@ -333,6 +333,18 @@ export class ApiService {
     return this.http.patch<Sentence>(`${this.base}/sentences/${id}`, data);
   }
 
+  resetSentenceTranslation(id: string): Observable<Sentence> {
+    return this.http.post<Sentence>(`${this.base}/sentences/${id}/reset-translation`, {});
+  }
+
+  addReviewer(pageId: string, userId: string): Observable<Page> {
+    return this.http.post<Page>(`${this.base}/pages/${pageId}/add-reviewer`, { userId });
+  }
+
+  reassignReviewers(pageId: string, userIds: string[]): Observable<Page> {
+    return this.http.post<Page>(`${this.base}/pages/${pageId}/reassign`, { reviewerIds: userIds });
+  }
+
   // ── Genres ────────────────────────────────────────────────────────────────
 
   getGenres(q?: string, limit = 50): Observable<Genre[]> {

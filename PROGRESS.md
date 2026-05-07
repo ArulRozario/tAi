@@ -1,11 +1,11 @@
 # tAI — Build Progress
 
-Last updated: 2026-05-07 (session 25)
+Last updated: 2026-05-07 (session 26)
 
 ## Current Status
 
-**Active phase:** Phase 22 — Review Screen  
-**Next up:** Phase 23 — Genres Screen (editor + version drawer)
+**Active phase:** Phase 23 — Genres Screen (editor + version drawer)  
+**Next up:** Phase 24 — Admin Screens (Team + Settings + Rules)
 
 ---
 
@@ -36,7 +36,7 @@ Last updated: 2026-05-07 (session 25)
 | 19 | Projects Screen | ✅ | 2026-05-07 |
 | 20 | Workbench Screen | ✅ | 2026-05-07 |
 | 21 | Queue Screen | ✅ | 2026-05-07 |
-| 22 | Review Screen | ☐ | — |
+| 22 | Review Screen | ✅ | 2026-05-07 |
 | 23 | Genres Screen (editor + version drawer) | ☐ | — |
 | 24 | Admin Screens (Team + Settings + Rules) | ☐ | — |
 | 25 | Polish (themes, toasts, empty states) | ☐ | — |
@@ -73,6 +73,7 @@ Last updated: 2026-05-07 (session 25)
 | 2026-05-07 | 23 | Phase 18+19: Dashboard wired to real API (getDashboardStats 30s poll, throughput toggle, activity feed, greeting from auth user); Projects table (status tabs, live search, actions), New Project modal (ISO-639-1 language dropdowns, genre radio cards, PDF dropzone), ProjectDetailComponent (stat cards, chapter accordion, page status grid); fixed projects/:id route; StatusDot + PriorityPill accept uppercase API values | dashboard + projects screens |
 | 2026-05-07 | 24 | Phase 20: WorkbenchComponent full-page 3-column (240px sidebar + dual pdf-panes + 360px inspector); sentence approval toggles; error cards with apply-fix; approve/request-changes/escalate actions with dialogs; queue mode auto-advance via next-in-queue; reviewer notes debounce-save; workbench/review routes moved outside AppLayout; SentenceError interface + patchPage + escalatePage + getNextInQueue + applyError added to ApiService | workbench screen |
 | 2026-05-07 | 25 | Phase 21: ReviewQueueComponent — filterable queue table (sort by priority/quality/waitTime, low-quality toggle, error-type filter), quality progress bars (red/warning/success), error count tags, priority pills, wait time, error distribution card with proportional bars and quick-filter pills, escalations "Needs attention" card for MASTER/ADMIN with Resolve dialog; typed QueuePage/ErrorStat/Escalation interfaces + getEscalations + resolveEscalation added to ApiService | queue screen |
+| 2026-05-07 | 26 | Phase 22: WorkbenchComponent review-mode additions — goBack() routes to /queue in queue mode; queue-mode sidebar loads GET /queue?reviewerId=me; MASTER/ADMIN Add reviewer + Reassign buttons in inspector footer with user-picker dialogs; Reset to AI translation confirmation dialog on selected sentence; resetSentenceTranslation + addReviewer + reassignReviewers added to ApiService | review screen |
 
 ---
 

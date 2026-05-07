@@ -13,7 +13,9 @@ import { AvatarModule } from 'primeng/avatar';
 import { TagModule } from 'primeng/tag';
 import { MenuItem } from 'primeng/api';
 import { debounceTime, Subject } from 'rxjs';
-import { ApiService, PageDetail, Sentence, SentenceError, Page } from '../../core/services/api.service';
+import { SelectModule } from 'primeng/select';
+import { ApiService, PageDetail, Sentence, SentenceError, Page, User } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { StatusDotComponent } from '../../shared/ui/status-dot/status-dot.component';
 
 interface DocBlock {
@@ -44,7 +46,7 @@ function severityOrder(s: string): number {
   imports: [
     CommonModule, RouterModule, FormsModule,
     ButtonModule, KnobModule, MenuModule, TextareaModule,
-    TooltipModule, DialogModule, AvatarModule, TagModule,
+    TooltipModule, DialogModule, AvatarModule, TagModule, SelectModule,
     StatusDotComponent,
   ],
   template: `
@@ -284,14 +286,32 @@ function severityOrder(s: string): number {
           </div>
 
           <!-- Reviewers -->
-          <div *ngIf="page?.reviewers && page!.reviewers!.length > 0">
+          <div *ngIf="page">
             <hr class="border-border my-1">
-            <div class="text-xs font-semibold text-text-3 uppercase tracking-wider mb-2">Reviewers</div>
-            <div class="row flex-wrap gap-2">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs font-semibold text-text-3 uppercase tracking-wider">Reviewers</div>
+              <div class="flex gap-1" *ngIf="isMasterOrAdmin()">
+                <button pButton icon="pi pi-user-plus" [text]="true" size="small"
+                        pTooltip="Add reviewer" (click)="openAddReviewer()"></button>
+                <button pButton icon="pi pi-users" [text]="true" size="small"
+                        pTooltip="Reassign" (click)="openReassign()"></button>
+              </div>
+            </div>
+            <div class="row flex-wrap gap-2" *ngIf="page!.reviewers && page!.reviewers!.length > 0">
               <p-avatar *ngFor="let r of page!.reviewers"
                         [label]="initials(r.name)" shape="circle"
                         [pTooltip]="r.name"></p-avatar>
             </div>
+            <div *ngIf="!page!.reviewers || page!.reviewers!.length === 0"
+                 class="text-xs text-text-3">No reviewers assigned</div>
+          </div>
+
+          <!-- Reset to AI translation (selected sentence) -->
+          <div *ngIf="selectedSentence">
+            <hr class="border-border my-1">
+            <button pButton label="Reset to AI translation" icon="pi pi-refresh"
+                    [text]="true" size="small" severity="secondary" class="w-full text-xs"
+                    (click)="confirmResetTranslation()"></button>
           </div>
         </div>
       </div>
@@ -324,12 +344,70 @@ function severityOrder(s: string): number {
                 (click)="submitEscalate()"></button>
       </ng-template>
     </p-dialog>
+
+    <!-- Reset to AI translation confirmation -->
+    <p-dialog header="Reset translation" [(visible)]="showResetConfirm"
+              [modal]="true" [style]="{width: '380px'}" [closable]="true">
+      <p class="text-sm text-text-2">
+        Reset sentence {{ selectedSentenceNum }} to the original AI translation? Manual edits will be lost and the sentence will be marked as not approved.
+      </p>
+      <ng-template pTemplate="footer">
+        <button pButton label="Cancel" [text]="true" (click)="showResetConfirm = false"></button>
+        <button pButton label="Reset" severity="warn" [loading]="resettingTranslation"
+                (click)="submitResetTranslation()"></button>
+      </ng-template>
+    </p-dialog>
+
+    <!-- Add reviewer dialog (MASTER+) -->
+    <p-dialog header="Add reviewer" [(visible)]="showAddReviewer"
+              [modal]="true" [style]="{width: '420px'}" [closable]="true">
+      <div class="flex flex-col gap-3 py-2">
+        <p class="text-sm text-text-2">Select a user to add as a reviewer for this page.</p>
+        <p-select
+          [options]="availableUsers"
+          [(ngModel)]="selectedAddUserId"
+          optionLabel="name"
+          optionValue="id"
+          placeholder="Select reviewer…"
+          styleClass="w-full !bg-surface-2 !border-border !text-text-1">
+        </p-select>
+      </div>
+      <ng-template pTemplate="footer">
+        <button pButton label="Cancel" [text]="true" (click)="showAddReviewer = false"></button>
+        <button pButton label="Add" severity="primary" [loading]="addingReviewer"
+                [disabled]="!selectedAddUserId"
+                (click)="submitAddReviewer()"></button>
+      </ng-template>
+    </p-dialog>
+
+    <!-- Reassign dialog (MASTER+) -->
+    <p-dialog header="Reassign reviewers" [(visible)]="showReassign"
+              [modal]="true" [style]="{width: '420px'}" [closable]="true">
+      <div class="flex flex-col gap-3 py-2">
+        <p class="text-sm text-text-2">Replace all current reviewers with the selected user.</p>
+        <p-select
+          [options]="availableUsers"
+          [(ngModel)]="selectedReassignUserId"
+          optionLabel="name"
+          optionValue="id"
+          placeholder="Select reviewer…"
+          styleClass="w-full !bg-surface-2 !border-border !text-text-1">
+        </p-select>
+      </div>
+      <ng-template pTemplate="footer">
+        <button pButton label="Cancel" [text]="true" (click)="showReassign = false"></button>
+        <button pButton label="Reassign" severity="primary" [loading]="reassigning"
+                [disabled]="!selectedReassignUserId"
+                (click)="submitReassign()"></button>
+      </ng-template>
+    </p-dialog>
   `,
 })
 export class WorkbenchComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private api = inject(ApiService);
+  private auth = inject(AuthService);
   private destroyRef = inject(DestroyRef);
 
   pageId = '';
@@ -364,6 +442,21 @@ export class WorkbenchComponent implements OnInit {
   showEscalate = false;
   requestChangesNote = '';
   escalateReason = '';
+
+  showResetConfirm = false;
+  resettingTranslation = false;
+
+  showAddReviewer = false;
+  showReassign = false;
+  availableUsers: User[] = [];
+  selectedAddUserId: string | null = null;
+  selectedReassignUserId: string | null = null;
+  addingReviewer = false;
+  reassigning = false;
+
+  isMasterOrAdmin() {
+    return this.auth.hasRole('MASTER', 'ADMIN');
+  }
 
   overflowItems: MenuItem[] = [
     { label: 'Request changes', icon: 'pi pi-refresh', command: () => (this.showRequestChanges = true) },
@@ -411,12 +504,18 @@ export class WorkbenchComponent implements OnInit {
 
   private loadSidebar(projectId: string, chapterId?: string) {
     this.loadingSidebar = true;
-    const params: Record<string, string> = { projectId, limit: '200' };
-    if (chapterId) params['chapterId'] = chapterId;
-    this.api.getPages(projectId, chapterId, undefined, 200, 0).subscribe({
-      next: (res) => { this.sidebarPages = res.data; this.loadingSidebar = false; },
-      error: () => { this.loadingSidebar = false; },
-    });
+    if (this.mode === 'queue') {
+      // Queue mode: show only the reviewer's assigned HUMAN_REVIEW pages
+      this.api.getQueue({ reviewerId: 'me', limit: '200' }).subscribe({
+        next: (res) => { this.sidebarPages = res.data as unknown as Page[]; this.loadingSidebar = false; },
+        error: () => { this.loadingSidebar = false; },
+      });
+    } else {
+      this.api.getPages(projectId, chapterId, undefined, 200, 0).subscribe({
+        next: (res) => { this.sidebarPages = res.data; this.loadingSidebar = false; },
+        error: () => { this.loadingSidebar = false; },
+      });
+    }
   }
 
   getSentence(num: number): Sentence | undefined {
@@ -547,8 +646,76 @@ export class WorkbenchComponent implements OnInit {
   }
 
   goBack() {
-    if (this.page?.projectId) this.router.navigate(['/projects', this.page.projectId]);
-    else this.router.navigate(['/dashboard']);
+    if (this.mode === 'queue') {
+      this.router.navigate(['/queue']);
+    } else if (this.page?.projectId) {
+      this.router.navigate(['/projects', this.page.projectId]);
+    } else {
+      this.router.navigate(['/dashboard']);
+    }
+  }
+
+  confirmResetTranslation() {
+    this.showResetConfirm = true;
+  }
+
+  submitResetTranslation() {
+    const s = this.selectedSentence;
+    if (!s) return;
+    this.resettingTranslation = true;
+    this.api.resetSentenceTranslation(s.id).subscribe({
+      next: (updated) => {
+        this.resettingTranslation = false;
+        this.showResetConfirm = false;
+        if (this.selectedSentenceNum != null) {
+          this.sentenceMap.set(this.selectedSentenceNum, { ...s, ...updated });
+        }
+      },
+      error: () => { this.resettingTranslation = false; },
+    });
+  }
+
+  openAddReviewer() {
+    this.selectedAddUserId = null;
+    this.showAddReviewer = true;
+    if (this.availableUsers.length === 0) {
+      this.api.getUsers().subscribe({ next: (u) => { this.availableUsers = u; }, error: () => {} });
+    }
+  }
+
+  submitAddReviewer() {
+    if (!this.selectedAddUserId || !this.page) return;
+    this.addingReviewer = true;
+    this.api.addReviewer(this.pageId, this.selectedAddUserId).subscribe({
+      next: (updated) => {
+        this.addingReviewer = false;
+        this.showAddReviewer = false;
+        this.page = { ...this.page!, reviewers: (updated as any).reviewers ?? this.page!.reviewers };
+        this.loadPage();
+      },
+      error: () => { this.addingReviewer = false; },
+    });
+  }
+
+  openReassign() {
+    this.selectedReassignUserId = null;
+    this.showReassign = true;
+    if (this.availableUsers.length === 0) {
+      this.api.getUsers().subscribe({ next: (u) => { this.availableUsers = u; }, error: () => {} });
+    }
+  }
+
+  submitReassign() {
+    if (!this.selectedReassignUserId || !this.page) return;
+    this.reassigning = true;
+    this.api.reassignReviewers(this.pageId, [this.selectedReassignUserId]).subscribe({
+      next: () => {
+        this.reassigning = false;
+        this.showReassign = false;
+        this.loadPage();
+      },
+      error: () => { this.reassigning = false; },
+    });
   }
 
   initials(name: string): string {
