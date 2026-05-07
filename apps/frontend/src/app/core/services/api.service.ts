@@ -164,6 +164,37 @@ export interface GlossaryTerm {
   notes?: string;
 }
 
+export interface QueuePage {
+  id: string;
+  pageNumber: number;
+  project: { id: string; name: string };
+  chapter?: { id: string; number: number; title?: string };
+  status: string;
+  priority: string;
+  quality?: number;
+  assignedAt?: string;
+  errorCount: number;
+  reviewers: User[];
+}
+
+export interface ErrorStat {
+  category: string;
+  count: number;
+  severity: string | null;
+  exampleText: string | null;
+  resolvedCount: number;
+}
+
+export interface Escalation {
+  pageId: string;
+  project: { id: string; name: string };
+  chapter?: { id: string; number: number; title?: string };
+  errorCategory: string | null;
+  escalatedAt: string;
+  escalatedById: string | null;
+  summary: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
@@ -350,14 +381,22 @@ export class ApiService {
 
   // ── Queue ─────────────────────────────────────────────────────────────────
 
-  getQueue(params?: Record<string, string>): Observable<{ data: Page[]; total: number }> {
+  getQueue(params?: Record<string, string>): Observable<{ data: QueuePage[]; total: number }> {
     let hp = new HttpParams();
     if (params) Object.entries(params).forEach(([k, v]) => (hp = hp.set(k, v)));
-    return this.http.get<{ data: Page[]; total: number }>(`${this.base}/queue`, { params: hp });
+    return this.http.get<{ data: QueuePage[]; total: number }>(`${this.base}/queue`, { params: hp });
   }
 
-  getQueueErrorStats(): Observable<unknown[]> {
-    return this.http.get<unknown[]>(`${this.base}/queue/error-stats`);
+  getQueueErrorStats(): Observable<ErrorStat[]> {
+    return this.http.get<ErrorStat[]>(`${this.base}/queue/error-stats`);
+  }
+
+  getEscalations(): Observable<Escalation[]> {
+    return this.http.get<Escalation[]>(`${this.base}/escalations`);
+  }
+
+  resolveEscalation(id: string, resolution: string): Observable<Page> {
+    return this.http.post<Page>(`${this.base}/pages/${id}/resolve-escalation`, { resolution });
   }
 
   // ── Users ─────────────────────────────────────────────────────────────────
