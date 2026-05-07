@@ -4,8 +4,8 @@ Last updated: 2026-05-07
 
 ## Current Status
 
-**Active phase:** Phase 14 — Models Module (API)  
-**Next up:** Phase 15 — Export Module (API)
+**Active phase:** Phase 15 — Export Module (API)  
+**Next up:** Phase 16 — Health Endpoint
 
 ---
 
@@ -28,7 +28,7 @@ Last updated: 2026-05-07
 | 11 | Glossary Module (API) | ✅ | 2026-05-06 |
 | 12 | Chat Module (API — SSE streaming) | ✅ | 2026-05-06 |
 | 13 | Dashboard, Queue & Admin Modules (API) | ✅ | 2026-05-07 |
-| 14 | Models Module (API) | ☐ | — |
+| 14 | Models Module (API) | ✅ | 2026-05-07 |
 | 15 | Export Module (API) | ☐ | — |
 | 16 | Activity Logging & Health | ☐ | — |
 | 17 | Frontend Foundation (auth + layout shell) | ✅ | 2026-05-06 |
@@ -66,6 +66,7 @@ Last updated: 2026-05-07
 | 2026-05-06 | 16 | Built complete Glossary REST API, including filter searches, duplicate term blocks, term edits, and bulk import upserts | glossary module API |
 | 2026-05-07 | 17 | Built secure, context-enriched Chat REST API, featuring full Server-Sent Events (SSE) streaming, build-mode version suggestions, and quick suggestion lists | chat module API with SSE streaming |
 | 2026-05-07 | 18 | Built Dashboard (30s cached stats/throughput/queue/activity), Queue (filterable HUMAN_REVIEW list + error stats + escalations), and Admin (bulk reassign/approve + page override) API modules | dashboard, queue, admin modules |
+| 2026-05-07 | 19 | Audited and patched Models module: updated Anthropic model list to Claude 4.x, replaced simulated test with real HTTP ping to api.anthropic.com, fixed bad Ollama seed endpoint, stripped doc comments | models module audit |
 
 ---
 
