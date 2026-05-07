@@ -39,7 +39,7 @@ Role abbreviations: R = REVIEWER+, M = MASTER+, A = ADMIN only.
 | GET | `/genres` | `?q=&limit=` | `GenreListItem[]` | R |
 | POST | `/genres` | `{name, description?, icon?, color?}` | `Genre` | M |
 | GET | `/genres/:id` | — | `Genre + currentVersion` | R |
-| PATCH | `/genres/:id` | `{name?, description?, icon?, color?}` | `Genre` | M |
+| PATCH | `/genres/:id` | `{name?, description?, icon?, color?, segmentUnit?}` | `Genre` | M |
 | DELETE | `/genres/:id` | — | 204 | A |
 | GET | `/genres/:id/versions` | — | `GenreVersion[]` | R |
 | POST | `/genres/:id/versions` | `{content, note?}` | `GenreVersion` | M |
@@ -48,7 +48,7 @@ Role abbreviations: R = REVIEWER+, M = MASTER+, A = ADMIN only.
 | GET | `/genres/:id/versions/:versionId/diff` | — | `{diff: string}` (unified diff) | R |
 | POST | `/genres/:id/test` | `{sampleText, modelProvider?, modelName?}` | `{translation: string, tokensUsed: number}` | M |
 
-`GenreListItem` includes: `id, name, description, icon, color, currentVersion, projectCount, lastUpdatedBy`.
+`GenreListItem` includes: `id, name, description, icon, color, segmentUnit, currentVersion, projectCount, lastUpdatedBy`.
 
 ---
 
@@ -65,15 +65,15 @@ Role abbreviations: R = REVIEWER+, M = MASTER+, A = ADMIN only.
 | POST | `/projects/:id/resume` | — | 204 (Resumes PAUSED extraction/translation jobs) | M |
 | POST | `/projects/:id/cancel-jobs` | — | 204 (Cancels all pending jobs without deleting project) | M |
 | GET | `/projects/:id/stats` | — | `ProjectStats` | R |
-| GET | `/projects/:id/team` | — | `{reviewers: User[], master: User}` | R |
+| GET | `/projects/:id/team` | — | `{reviewers: User[], owner: User?}` | R |
 
 `sourceLang` and `targetLang` are required strings (e.g. `"en"`, `"es"`, `"fr"`, `"ta"`). Use ISO 639-1 codes. The frontend presents a searchable dropdown of common languages.
 
-`ProjectListItem` includes: `id, name, status, chapterCount, pageCount, completedCount, progress (0-100), owner, sourceLang, targetLang`.
+`ProjectListItem` includes: `id, name, status, chapterCount, pageCount, completedCount, progress (0-100), avgQuality, owner, sourceLang, targetLang`.
 
 `ProjectDetail` includes: full project + chapters array with page status summary grid.
 
-After `POST /projects`, trigger `POST /jobs` with `{type: EXTRACT_PDF, projectId}` automatically (atomic: if job creation fails, rollback project).
+After `POST /projects`, trigger `POST /jobs` with `{type: PROCESS_DOCUMENT, projectId, sourceFileId}` automatically (atomic: if job creation fails, rollback project).
 
 ---
 
@@ -97,16 +97,21 @@ After `POST /projects`, trigger `POST /jobs` with `{type: EXTRACT_PDF, projectId
 | PATCH | `/pages/:id` | `{notes?, priority?, status?}` | `Page` | R |
 | POST | `/pages/:id/approve` | `{notes?}` | `Page` | R |
 | POST | `/pages/:id/request-changes` | `{note}` | `Page` | R |
-| POST | `/pages/:id/reassign` | `{reviewerId}` | `Page` | M |
+| POST | `/pages/:id/reassign` | `{reviewerIds: string[]}` | `Page` | M |
+| POST | `/pages/:id/add-reviewer` | `{reviewerId}` | `Page` | M |
+| POST | `/pages/:id/remove-reviewer` | `{reviewerId}` | `Page` | M |
 | POST | `/pages/:id/escalate` | `{reason}` | `Page` | R |
 | POST | `/pages/:id/resolve-escalation` | `{resolution}` | `Page` | M |
 | GET | `/pages/:id/next-in-queue` | — | `{pageId: string} \| null` | R |
 
-`approve` is blocked if the page has any `OPEN` errors (unless caller is MASTER/ADMIN). It is also blocked if any sentence on the page has `isApproved = false`. Sets `page.status = APPROVED`.
-`request-changes` requires a non-empty note. Sets `page.status = REJECTED`. Enqueues a new TRANSLATE_PAGE job (which will move status to TRANSLATING when it starts).
+`approve` is blocked if the page has any `OPEN` errors (unless caller is MASTER/ADMIN). It is also blocked if any sentence on the page has `isApproved = false` (unless caller is MASTER/ADMIN). Sets `page.status = APPROVED`.
+`request-changes` requires a non-empty note. Sets `page.status = REJECTED`. Enqueues a new TRANSLATE_BATCH job (which will move status to TRANSLATING when it starts).
 `escalate`: sets `page.status = ESCALATED`.
-`resolve-escalation`: sets `page.status = HUMAN_REVIEW`. Re-assigns to the original reviewer if still active, otherwise round-robin.
-`next-in-queue`: returns the next `HUMAN_REVIEW` page assigned to the caller, ordered by priority then assignedAt. Returns `null` if the queue is empty. Used by "Save & next" on the review screen.
+`resolve-escalation`: sets `page.status = HUMAN_REVIEW`. Re-assigns to the primary reviewer (isPrimary=true in PageReviewer) if still active, otherwise round-robin a new primary reviewer.
+`reassign`: replaces the entire PageReviewer list; first entry in reviewerIds is set isPrimary=true.
+`add-reviewer`: adds a reviewer to the page's PageReviewer list without removing existing reviewers.
+`remove-reviewer`: removes a reviewer from the PageReviewer list. Cannot remove the last reviewer; use reassign instead.
+`next-in-queue`: returns the next `HUMAN_REVIEW` page where the caller is in the PageReviewer list, ordered by priority then assignedAt. Returns `null` if the queue is empty. Used by "Save & next" on the review screen.
 
 ---
 
@@ -117,6 +122,8 @@ After `POST /projects`, trigger `POST /jobs` with `{type: EXTRACT_PDF, projectId
 | GET | `/sentences?pageId=` | — | `Sentence[]` with errors | R |
 | PATCH | `/sentences/:id` | `{translatedText?, isApproved?}` | `Sentence` | R |
 | POST | `/sentences/:id/apply-all-fixes` | — | `Sentence` (with all OPEN errors set to APPLIED) + `Error[]` | R |
+| POST | `/sentences/:id/assign` | `{reviewerId}` | `Sentence` | M |
+| POST | `/sentences/:id/reset-translation` | — | `Sentence` | R |
 
 ---
 
@@ -135,6 +142,10 @@ After `POST /projects`, trigger `POST /jobs` with `{type: EXTRACT_PDF, projectId
 `apply-all-fixes`: applies all OPEN errors on the sentence in `createdAt` order. For each error: sets `error.status = APPLIED` and performs the same string replacement on `sentence.translatedText` as single `apply`. Returns the final Sentence state and all updated Error records.
 
 `exception`: sets `error.status = EXCEPTION`. If `sourceTerm` is provided, creates a `GlossaryTerm` with `sourceTerm` (source language term), `targetTerm = error.currentText` (the non-standard target-language text being accepted), `notes = note`, linked to the project's genre. If `sourceTerm` is omitted, marks EXCEPTION only — no GlossaryTerm created.
+
+`assign` (sentence-level): sets `sentence.assignedReviewerId`. Only that reviewer (or MASTER+) may then edit `translatedText`. Pass `reviewerId: null` to clear the assignment.
+
+`reset-translation`: sets `sentence.translatedText = sentence.aiTranslatedText`, clears `sentence.isApproved = false`. Returns the updated Sentence. No-op if `aiTranslatedText` is null.
 
 ---
 
@@ -171,13 +182,17 @@ After `POST /projects`, trigger `POST /jobs` with `{type: EXTRACT_PDF, projectId
 
 Job types and required payload fields:
 
-| Type | Required |
-|------|---------|
+| Type | Required payload fields |
+|------|------------------------|
 | PROCESS_DOCUMENT | projectId, sourceFileId |
 | EXTRACT_PAGE | pageId |
-| TRANSLATE_PAGE | pageId |
+| DETECT_CHAPTERS | projectId |
+| TRANSLATE_BATCH | projectId, pageIds (array of page IDs in the batch) |
 | REVIEW_PAGE | pageId |
-| EXPORT_PROJECT | projectId |
+| INDEX_MEMORY | pageId |
+| EXPORT_PROJECT | projectId, format |
+| EXPORT_PAGE_REPORT | pageId |
+| EXPORT_ADMIN_REPORT | projectIds (optional array), format |
 
 ---
 
@@ -232,7 +247,9 @@ In **BUILD** mode for `GENRE` context: after sending, the response includes `{ge
   pendingReviewDelta: number;
   userQueueCount: number;
   escalationCount: number;
-  lastSyncAt: string; // ISO datetime — most recent Page.lastAiRunAt across all accessible projects
+  avgQuality: number;        // 0-100; average page.quality across all HUMAN_REVIEW + APPROVED pages
+  avgQualityDelta: number;   // change from 7 days ago (positive = improved)
+  lastSyncAt: string;        // ISO datetime — most recent Page.lastAiRunAt across all accessible projects
 }
 ```
 
@@ -248,7 +265,7 @@ All dashboard endpoints share a 30s in-memory cache (per user for my-queue/stats
 | GET | `/queue/error-stats` | `ErrorStatsByCategory[]` | R |
 | GET | `/escalations` | `Escalation[]` | M |
 
-`PageListItem` (queue view) includes: `id, pageNumber, project, chapter, errorCount, priority, status, assignedAt, assignedReviewer`.
+`PageListItem` (queue view) includes: `id, pageNumber, project, chapter, errorCount, quality, priority, status, assignedAt, reviewers` (all assigned reviewers as User array).
 
 `ErrorStatsByCategory`: `{category, count, severity, exampleText, resolvedCount}`.
 
@@ -260,10 +277,13 @@ All dashboard endpoints share a 30s in-memory cache (per user for my-queue/stats
 
 | Method | Path | Body | Response | Auth |
 |--------|------|------|----------|------|
-| POST | `/export/project/:id` | `{format: pdf\|text\|html, scope: all\|approved}` | `{jobId}` | R |
+| POST | `/export/project/:id` | `{format: pdf\|docx\|text\|html, scope: all\|approved, templateOverride?: Partial<PdfTemplate>}` | `{jobId}` | R |
 | POST | `/export/page/:id/report` | — | `{jobId}` | R |
+| POST | `/export/admin-report` | `{projectIds?: string[], format?: pdf\|xlsx}` | `{jobId}` | M |
 
 All export endpoints return a `jobId`. Poll `GET /jobs/:id` until `status === "DONE"`, then fetch `result.fileUrl` for a signed download link.
+
+PDF export uses `genre.pdfTemplate` (if set) combined with each `page.layoutMetadata` to produce a typeset document. `templateOverride` allows one-off adjustments without modifying the genre template. See `07-architecture.md` § PDF Export Layer for accuracy expectations.
 
 ---
 

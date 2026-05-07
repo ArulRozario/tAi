@@ -10,17 +10,23 @@ import { CommonModule } from '@angular/common';
   `
 })
 export class StatusDotComponent {
-  @Input() status: 'approved' | 'review' | 'pending' | 'changes' | 'processing' | 'error' | 'good' = 'pending';
+  @Input() status: string = 'pending';
 
   get statusClass(): string {
-    switch (this.status) {
-      case 'approved': 
-      case 'good': return 'bg-success shadow-success/20';
-      case 'review': return 'bg-warning shadow-warning/20';
-      case 'pending': return 'bg-surface-2 border border-border';
-      case 'changes': return 'bg-error shadow-error/20';
-      case 'processing': return 'bg-primary shadow-primary/20 animate-pulse';
-      case 'error': return 'bg-error shadow-error/20';
+    switch (this.status?.toUpperCase()) {
+      case 'APPROVED':
+      case 'GOOD': return 'bg-success shadow-success/20';
+      case 'HUMAN_REVIEW':
+      case 'REVIEW': return 'bg-warning shadow-warning/20';
+      case 'PENDING':
+      case 'DRAFT': return 'bg-surface-2 border border-border';
+      case 'REJECTED':
+      case 'CHANGES': return 'bg-error shadow-error/20';
+      case 'PROCESSING':
+      case 'TRANSLATING':
+      case 'REVIEWING':
+      case 'EXTRACTING': return 'bg-primary shadow-primary/20 animate-pulse';
+      case 'ERROR': return 'bg-error shadow-error/20';
       default: return 'bg-surface-2';
     }
   }

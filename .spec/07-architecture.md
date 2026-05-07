@@ -12,9 +12,12 @@
 | File storage | MinIO | S3-compatible, self-hosted |
 | LLM (local) | Ollama | Default 2 concurrent requests |
 | LLM (cloud) | Anthropic Claude (`@anthropic-ai/sdk`) | With prompt caching; supports many language pairs |
-| PDF extraction | `pdf-parse` | No OCR; text PDFs only |
+| PDF extraction | LlamaParse / Marker (Surya) | Vision OCR; layout-aware Markdown output |
+| Sentence segmentation | spaCy 3 (FastAPI sidecar) | Accurate sentence boundary detection; `en_core_web_sm` default |
 | Email (dev) | `maildev` + `nodemailer` | Dev SMTP on :1080 |
 | PDF export | `pdfkit` | Embed Unicode/language-appropriate fonts (e.g. Noto Sans) |
+| DOCX export | `docx` (npm) | Generates .docx from paragraph/heading styles; no external dependencies |
+| XLSX export | `exceljs` (npm) | Generates .xlsx for admin-report export |
 | Diff | `diff` library | Inline diff highlighting |
 | Concurrency | `p-limit` | Per-provider semaphores |
 | Auth | JWT (access 15m + refresh 7d) | Refresh stored in DB |
@@ -55,7 +58,8 @@
 | Async strategy | **Polling** (DB-backed jobs) | Simpler than WebSockets; translation timescales allow it |
 | Database | Wipe + fresh schema | New domain too different from v1 |
 | Queue | **No BullMQ/Redis** — DB polling + `SELECT FOR UPDATE` | Fewer dependencies; sufficient throughput |
-| OCR | **No PaddleOCR** — `pdf-parse` only | Defer OCR until explicitly needed |
+| OCR | **Vision OCR** — LlamaParse or Marker/Surya | Scanned PDFs require layout-aware extraction |
+| Sentence segmentation | **spaCy** (Python FastAPI sidecar) | JS NLP libraries insufficient for production-quality boundary detection across document types |
 
 ---
 
@@ -63,28 +67,28 @@
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Angular SPA (PrimeNG + Tailwind)               │
-│  Polling: /jobs/:id every 2s during active jobs  │
-│  SSE: /chat/stream for assistant responses       │
+│  Angular SPA (PrimeNG + Tailwind)  :12008       │
+│  Polling: /jobs/:id every 2s during active jobs │
+│  SSE: /chat/stream for assistant responses      │
 └────────────────────┬────────────────────────────┘
                      │ HTTPS
 ┌────────────────────▼────────────────────────────┐
-│  NestJS API  (Port 3000)                        │
+│  NestJS API  :12007                             │
 │  Modules: auth, users, genres, projects,        │
 │  chapters, pages, sentences, errors, glossary,  │
 │  jobs, chat, export, models, dashboard,         │
 │  queue, admin, health                           │
-└──┬─────────────┬─────────────┬──────────────────┘
-   │             │             │
-┌──▼──┐     ┌───▼───┐    ┌────▼─────┐
-│ PG  │     │ MinIO │    │  Ollama  │
-│ :5432│    │ :9000 │    │  :11434  │
-└─────┘     └───────┘    └──────────┘
-                              │
-                    ┌─────────▼────────┐
-                    │ Anthropic Claude  │
-                    │ (external API)    │
-                    └──────────────────┘
+└──┬──────────┬──────────┬──────────┬─────────────┘
+   │          │          │          │
+┌──▼───┐ ┌───▼───┐ ┌────▼───┐ ┌───▼────┐
+│  PG  │ │ MinIO │ │ Ollama │ │  NLP   │
+│:12000│ │:12001 │ │ :12003 │ │ :12004 │
+└──────┘ └───────┘ └────────┘ └────────┘
+                        │
+              ┌─────────▼────────┐
+              │ Anthropic Claude │
+              │ (external API)   │
+              └──────────────────┘
 ```
 
 ---
@@ -130,7 +134,7 @@ src/
 │   └── embedding.service.ts # nomic-embed-text via Ollama
 └── agents/
     ├── extraction.service.ts   # OCR/Vision extractor (Marker/LlamaParse) + image extraction
-    ├── segmentation.service.ts # Split into sentences
+    ├── segmentation.service.ts # Two-level split: Markdown structure → spaCy HTTP call per paragraph
     ├── translation.agent.ts    # Sentence-level, glossary + genre-aware
     ├── review.agent.ts         # Structured errors (generic)
     └── orchestrator.ts         # Wires agents to job pipeline
@@ -138,10 +142,202 @@ src/
 
 ---
 
+## sourceMarkdown — The Structural Spine
+
+`page.sourceMarkdown` is the authoritative record of a page's document structure. It is produced during `EXTRACT_PAGE` and has one controlled modification window: the `DETECT_CHAPTERS` job may remove a `{{SENTENCE_X}}` placeholder when a cross-page sentence fragment is merged into the preceding page (stitching). After `DETECT_CHAPTERS` completes, `sourceMarkdown` is frozen and never modified again. It looks like:
+
+```markdown
+# {{SENTENCE_1}}
+
+{{SENTENCE_2}} {{SENTENCE_3}}
+
+- {{SENTENCE_4}}
+- {{SENTENCE_5}}
+
+![image](minio_url)
+```
+
+Everything downstream uses it:
+
+| Consumer | How |
+|---|---|
+| Translation Agent (user prompt) | Reconstructed with `originalText` substituted — gives model full structural context |
+| Workbench (source column) | Rendered with `SentenceComponent(originalText)` at each placeholder |
+| Workbench (target column) | Rendered with `SentenceComponent(translatedText)` at each placeholder |
+| Export module | Plain string replace: `{{SENTENCE_X}}` → `sentence.translatedText` → final Markdown → PDF/HTML |
+
+No `sentenceType` field is needed on the `Sentence` model — structural role (heading, bullet, paragraph, caption) is always derivable from the placeholder's position in `sourceMarkdown`.
+
+---
+
 ## Extraction & OCR Layer
 
 Since PDFs are predominantly scanned images, extraction MUST utilize a Vision-based OCR service (e.g., LlamaParse or Marker/Surya) to accurately convert scanned pixels into layout-aware Markdown.
 - **Image Cropping:** Illustrations and diagrams within scans must be cropped, uploaded to MinIO, and referenced in the markdown (`![Image](url)`).
+- **Layout Metadata:** Alongside the Markdown, the extractor captures and stores `page.layoutMetadata`:
+
+```json
+{
+  "pageWidth": 148,
+  "pageHeight": 210,
+  "unit": "mm",
+  "columns": 2,
+  "columnGutter": 6,
+  "margins": { "top": 16, "bottom": 20, "inner": 18, "outer": 12 },
+  "fontBands": {
+    "body": { "sizePt": 10, "family": "serif" },
+    "heading": { "sizePt": 14, "family": "serif" },
+    "caption": { "sizePt": 8, "family": "sans-serif" },
+    "verseNumber": { "sizePt": 7, "family": "serif", "position": "superscript" }
+  },
+  "hasRunningHeader": true,
+  "hasFooter": true,
+  "hasDropCap": false
+}
+```
+
+This metadata is detected once per page during EXTRACT_PAGE and never modified. The export module reads it alongside `genre.pdfTemplate` to produce a typeset PDF.
+
+---
+
+## PDF Export Layer
+
+### How it works
+
+The export module reconstructs the translated document in three steps:
+
+1. **Substitute** — replace each `{{SENTENCE_X}}` in `page.sourceMarkdown` with `sentence.translatedText` to produce translated Markdown per page
+2. **Template** — apply `genre.pdfTemplate` for typography (fonts, sizes, line height, column layout)
+3. **Layout hints** — use `page.layoutMetadata` to inform column count, margins, running headers, and image regions
+
+Output is generated via `pdfkit` with Noto font family for Unicode/multilingual support.
+
+### Accuracy expectations
+
+| Element | Accuracy |
+|---|---|
+| Page size | Exact — detected from source |
+| Column layout | High — detected from source |
+| Heading hierarchy | High — preserved in sourceMarkdown |
+| Font size ratios | Moderate — body/heading/caption bands detected, exact pt values approximated |
+| Margins | Moderate — estimated from OCR bounding boxes |
+| Image placement | Approximate — positioned in correct region, not pixel-exact |
+| Running headers/footers | Yes — genre template defines format |
+| Font families | Substituted — proprietary fonts replaced with Noto equivalents |
+| Decorative elements | Partial — captured as images if OCR detects them |
+| Page-by-page content match | **No** — Tamil text is 20–40% longer than English; page breaks shift throughout |
+| Total page count | Higher than source — inherent to translation, not a bug |
+
+### `genre.pdfTemplate` schema
+
+```json
+{
+  "pageSize": "A5",
+  "columns": 2,
+  "columnGutter": 6,
+  "margins": { "top": 16, "bottom": 20, "inner": 18, "outer": 12 },
+  "fonts": {
+    "body": { "family": "Noto Serif Tamil", "sizePt": 10, "lineHeight": 1.4 },
+    "heading": { "family": "Noto Serif Tamil", "sizePt": 14, "weight": "bold" },
+    "caption": { "family": "Noto Sans Tamil", "sizePt": 8 },
+    "verseNumber": { "sizePt": 7, "position": "superscript" }
+  },
+  "runningHeader": { "enabled": true, "format": "{chapterTitle} · {pageNumber}" },
+  "footer": { "enabled": true, "format": "{pageNumber}" },
+  "justify": true,
+  "chapterDropCap": false
+}
+```
+
+The seed script sets this template on the "Tamil Bible (Parisutha Vedagamam)" genre. For new genres created by users, `pdfTemplate` is null and the export falls back to a single-column, Noto Sans, non-justified default.
+
+---
+
+## DOCX Export Layer
+
+The export module generates Word documents (`.docx`) alongside PDF using the `docx` npm package.
+
+### How it works
+
+1. **Substitute** — same as PDF: replace each `{{SENTENCE_X}}` in `page.sourceMarkdown` with `sentence.translatedText` per page
+2. **Structure mapping** — convert Markdown structure to Word paragraph styles:
+
+   | Markdown | Word style |
+   |----------|-----------|
+   | `# heading` | `Heading1` |
+   | `## heading` | `Heading2` |
+   | `### heading` | `Heading3` |
+   | Regular paragraph | `Normal` |
+   | `- list item` | `ListBullet` |
+   | `> blockquote` | `Quote` |
+   | `![img](url)` | Inline image (fetched from MinIO at export time) |
+
+3. **Typography** — apply `genre.docxTemplate` if set; fallback to single-column, A4, Times New Roman/Arial default
+
+### `genre.docxTemplate` schema
+
+```json
+{
+  "pageSize": "A5",
+  "margins": { "top": 1440, "bottom": 1440, "left": 1800, "right": 1800 },
+  "fonts": {
+    "body":     { "family": "Noto Serif Tamil", "sizePt": 10 },
+    "heading1": { "family": "Noto Serif Tamil", "sizePt": 14, "bold": true },
+    "heading2": { "family": "Noto Serif Tamil", "sizePt": 12, "bold": true },
+    "heading3": { "family": "Noto Serif Tamil", "sizePt": 11, "bold": true }
+  },
+  "lineSpacing": 276
+}
+```
+
+(Margins in twips: 1440 twips = 1 inch.)
+
+The seed script does **not** set `docxTemplate` on the Bible genre — DOCX is secondary output; PDF is the primary typeset format. For new genres, `docxTemplate` is null and the fallback default applies.
+
+---
+
+## NLP Segmentation Service
+
+A lightweight Python FastAPI sidecar (`apps/nlp/`) handles sentence boundary detection using spaCy.
+
+### Why a sidecar
+JS NLP libraries (compromise, sbd) lack the accuracy needed for production document types — they fail on abbreviations, OCR noise, and domain-specific terminology. spaCy's statistical models handle these correctly and support multiple source languages.
+
+### Endpoint
+```
+POST http://nlp:8001/segment
+Content-Type: application/json
+
+{ "text": "paragraph text here", "lang": "en" }
+
+→ { "sentences": ["Sentence one.", "Sentence two."] }
+```
+
+### Implementation
+```python
+# apps/nlp/main.py  (~20 lines)
+import spacy
+from fastapi import FastAPI
+
+nlp_models = { "en": spacy.load("en_core_web_sm") }
+app = FastAPI()
+
+@app.post("/segment")
+def segment(body: dict):
+    model = nlp_models.get(body["lang"], nlp_models["en"])
+    doc = model(body["text"])
+    return { "sentences": [s.text.strip() for s in doc.sents] }
+```
+
+### How `segmentation.service.ts` uses it
+1. Split page Markdown on structural boundaries (`\n\n`, headings `#`, list items) → paragraphs
+2. For each paragraph: POST to `http://nlp:8001/segment` with the paragraph text and `sourceLang`
+3. Collect all returned sentences, assign `{{SENTENCE_X}}` placeholders in order
+4. Save rebuilt skeleton to `page.sourceMarkdown`
+
+### Models
+- `en_core_web_sm` — English (default, included in Docker image, ~12MB)
+- Additional language models installed on demand; `lang` param in request selects the model
 
 ---
 
@@ -153,8 +349,10 @@ interface LLMProvider {
   generate(prompt: string, options?: GenerateOptions): Promise<string>;
   generateStructured<T>(prompt: string, schema: ZodSchema<T>): Promise<T>;
   stream(prompt: string): AsyncGenerator<string>;
-  embed(text: string): Promise<number[]>;
 }
+
+// EmbeddingService calls OllamaProvider directly — not via LLMProvider.
+// Anthropic has no embedding API, so embed() is NOT part of the shared interface.
 ```
 
 ### Concurrency
@@ -171,14 +369,39 @@ Cache `cache_control` breakpoints on:
 
 ---
 
+## Translation Memory (RAG)
+
+tAI includes a Retrieval-Augmented Generation (RAG) layer that learns from human reviewer corrections.
+
+### Indexing (On Page Approval — async)
+When a human reviewer approves a page, the approve endpoint enqueues an `INDEX_MEMORY` job (see `05-agents.md` § Agent Pipeline) and returns immediately — the approve response is never blocked by embedding calls. The `INDEX_MEMORY` job generates a 768-dimensional vector embedding of the `originalText` for each sentence via `EmbeddingService` (nomic-embed-text via Ollama) and upserts each into the `TranslationMemory` table, scoped to `genreId`, `sourceLang`, and `targetLang`.
+
+### Retrieval (At Translation Time)
+When the `TRANSLATE_BATCH` job processes a batch of pages:
+1. Generate an embedding for each sentence's `originalText`.
+2. Cosine similarity search via pgvector against `TranslationMemory` (filtered by same genre and language pair).
+3. Retrieve up to 3 past approved sentences with similarity ≥ 0.75.
+4. Inject retrieved pairs into the Translation Agent's system prompt as `[TRANSLATION_MEMORY_BLOCK]` (see `05-agents.md` § Translation Agent).
+
+This allows the system to learn implicitly from past human edits without model fine-tuning.
+
+### Storage
+- Vector dimensions: 768 (nomic-embed-text)
+- pgvector index type: `ivfflat` with cosine distance
+- Scoped per `(genreId, sourceLang, targetLang)` — no cross-genre retrieval
+
+---
+
 ## Job Worker
 
-- One `JobWorker` singleton running in the NestJS process
+- One `JobWorker` singleton running in the NestJS process (no `workerId` — horizontal scaling not in scope)
 - Polls `jobs` table every 2s for `QUEUED` jobs
 - `SELECT FOR UPDATE SKIP LOCKED` prevents double-processing
-- Updates `progress` field in real time
-- Graceful shutdown: waits for running jobs to finish
-- On restart: resumes `RUNNING` jobs that weren't completed (marks as FAILED → re-queues)
+- Updates `job.progress` (0–100) incrementally during long jobs (e.g., after each page image in PROCESS_DOCUMENT)
+- Graceful shutdown: waits for in-flight job step to finish before stopping
+- **Retry cap**: on restart, RUNNING jobs are marked FAILED. If `job.retryCount < 3`, increment and re-queue. If `retryCount >= 3`, leave as FAILED — do not re-queue. Prevents infinite loops on corrupt assets.
+- **Pause semantics**: `POST /projects/:id/pause` sets `project.status = PAUSED` and updates all QUEUED jobs for that project to `status = PAUSED`. The worker finishes any currently in-flight LLM call (does not abort mid-call) and then skips PAUSED jobs. On `POST /projects/:id/resume`, `project.status` returns to PROCESSING and all PAUSED jobs for the project are set back to QUEUED so the worker picks them up.
+- **Cancel semantics**: cancelling a job sets `job.status = CANCELLED`. If the job has children (via `parentJobId`), all QUEUED child jobs are also set to CANCELLED. In-flight child jobs complete but their results are discarded (page status not advanced).
 
 ---
 
@@ -201,12 +424,13 @@ Cache `cache_control` breakpoints on:
 
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
-| postgres | pgvector/pgvector:pg17 | 5432 | Primary DB + pgvector extension |
-| minio | minio/minio | 9000, 9001 | File storage + console |
-| ollama | ollama/ollama | 11434 | Local LLM |
-| maildev | maildev/maildev | 1080, 1025 | Dev SMTP UI |
-| api | ./Dockerfile.api | 3000 | NestJS backend |
-| frontend | ./Dockerfile.frontend | 4200 | Angular dev server |
+| postgres | pgvector/pgvector:pg17 | 12000→5432 | Primary DB + pgvector extension |
+| minio | minio/minio | 12001→9000, 12002→9001 | File storage + console |
+| ollama | ollama/ollama | 12003→11434 | Local LLM |
+| nlp | ./Dockerfile.nlp | 12004→8001 | spaCy sentence segmentation (FastAPI) |
+| maildev | maildev/maildev | 12005→1080, 12006→1025 | Dev SMTP UI + SMTP |
+| api | ./Dockerfile.api | 12007→3000 | NestJS backend |
+| frontend | ./Dockerfile.frontend | 12008→4200 | Angular dev server |
 
 ---
 
@@ -227,6 +451,12 @@ OLLAMA_ENDPOINT=http://ollama:11434
 OLLAMA_TIMEOUT=120000
 EMBEDDING_MODEL=nomic-embed-text
 
+# NLP segmentation
+NLP_ENDPOINT=http://nlp:8001
+
+# Translation batching
+MAX_TRANSLATION_BATCH_TOKENS=6000  # max tokens per TRANSLATE_BATCH job; tune per model context window
+
 # Anthropic
 ANTHROPIC_API_KEY=sk-ant-...
 
@@ -244,5 +474,5 @@ EMAIL_FROM=noreply@tai.local
 # App
 NODE_ENV=development
 PORT=3000
-CORS_ORIGIN=http://localhost:4200
+CORS_ORIGIN=http://localhost:12008
 ```

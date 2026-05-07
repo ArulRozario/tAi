@@ -38,6 +38,24 @@
     },
     "lint": {
       "executor": "@nx/eslint:lint"
+    },
+    "prisma-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx prisma generate --schema=apps/api/prisma/schema.prisma"
+      }
+    },
+    "prisma-migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx prisma migrate dev --schema=apps/api/prisma/schema.prisma"
+      }
+    },
+    "prisma-seed": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node -r @swc-node/register apps/api/prisma/seed.ts"
+      }
     }
   }
 }

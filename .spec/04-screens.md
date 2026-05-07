@@ -4,6 +4,29 @@
 
 ---
 
+## General Design Language & Tokens
+
+The application strictly adheres to the high-density "Intelligence Core" design language extracted from the React mockups, implemented natively in the wireframes via **Angular 21**, **PrimeNG 21**, and **Tailwind CSS**.
+
+### Colors & Hierarchy
+- **Surfaces & Borders:** `var(--bg)`, `var(--surface-1)`, `var(--surface-2)`, `var(--border)`
+- **Text Hierarchy:** `var(--text-1)` (primary), `var(--text-2)` (dim), `var(--text-3)` (muted)
+- **Status Severities:** Mapped natively to PrimeNG severities (`success`, `info`, `warn`, `danger`).
+- **Typography:** `--font-sans` for main UI elements, `--font-mono` (with `tabular-nums`) for data grids, percentages, and segment counts.
+
+### Global CSS Utilities
+- `.card` → `@apply bg-surface-1 border border-border rounded-lg shadow-sm p-4;`
+- `.card-eyebrow` → `@apply text-xs font-semibold text-color-secondary uppercase tracking-wider mb-2;`
+- `.page-pill` → `@apply flex items-center p-2 rounded-md hover:bg-surface-2 cursor-pointer transition-colors;`
+
+### PrimeNG Component Mappings
+- **Buttons (`<Btn>`):** `<p-button>` (use `[text]="true"` for ghost variants).
+- **Badges/Pills (`<Pill>`):** `<p-tag>` or `<p-badge>` with `[rounded]="true"`.
+- **Progress (`<Progress>`, `<QualityRing>`):** `<p-progressBar>` or `<p-knob [readonly]="true">`.
+- **Icons (`<Icon>`):** `<i class="pi pi-..."></i>` (PrimeIcons).
+
+---
+
 ## Navigation Shell
 
 Top bar present on all non-workbench screens:
@@ -93,6 +116,7 @@ Good morning, Ravi
 ```
 
 ### Components
+- **Layout:** Top section uses `grid-cols-4 gap-6`. Bottom section uses `grid-cols-2 gap-6`.
 - 4 stat cards: value + delta with arrow icon (up/down colored)
 - Throughput: bar chart with bar heights proportional to weekly pages; `[Pages]` (active pill) / `[Words]` (default pill) toggle; last-bar label shown
 - My queue rows: `StatusDot` + page name + project (ellipsis) + error tag + `PriorityPill`
@@ -156,7 +180,7 @@ Genre
 │              Drop PDF here                             │
 │                   or                                   │
 │              [Browse files]                            │
-│     PDF, text-based · up to 200MB                      │
+│     Scanned PDF · up to 500MB                          │
 └────────────────────────────────────────────────────────┘
 
 [Cancel]                              [Create project]
@@ -165,7 +189,7 @@ Genre
 - Source and target language selects are fully functional; present a searchable dropdown of common languages (ISO 639-1 names)
 - Genre: radio card list — icon in colored circle, name bold, description dim ellipsis, version pill
 - Dropzone: drag-over state adds `is-active` class
-- Create project → POST /projects then auto-trigger EXTRACT_PDF job → navigate to /projects/:id
+- Create project → POST /files/upload → POST /projects → auto-triggers PROCESS_DOCUMENT job → navigate to /projects/:id
 
 ---
 
@@ -204,7 +228,7 @@ Genre  [● Literary Translation  v1.0  ▼]
 ```
 
 - Genre picker: colored dot + name + version pill + chevron; click navigates to `/genres/:id`
-- Export button: split button — default label "Export PDF"; dropdown reveals "Export as Text" and "Export as HTML"; all scopes default to approved-only; clicking any option opens a small confirm dialog: "Export N approved pages as {format}? [Cancel] [Export]" → POST /export/project/:id
+- Export button: split button — default label "Export PDF"; dropdown reveals "Export as DOCX", "Export as Text", and "Export as HTML"; all scopes default to approved-only; clicking any option opens a small confirm dialog: "Export N approved pages as {format}? [Cancel] [Export]" → POST /export/project/:id
 - 4 stat cards: Approved/InReview/Pending show count + `Progress` bar; Avg quality shows `QualityRing` + "across N approved pages" + reviewer avatar row
 - Chapter rows: expand icon + "Chapter N" + page count (dim) + progress bar (100px) + "done/total" (mono) + status pill (Done/In progress/Queued)
 - Page grid: each cell is `page-grid__cell` with status class (`s-approved`, `s-review`, `s-pending`, `s-changes`, `s-processing`, `s-error`); click navigates to `/workbench/:pageId`
@@ -271,9 +295,15 @@ Resolve → POST /pages/:id/resolve-escalation (modal with resolution note field
 
 ---
 
-## Screen 6: Workbench (`workbench.jsx`)
+## Screen 6: Workbench / Review (`workbench.jsx`)
 
-Full-page layout. Three columns: **15%** left sidebar (Page Navigation) | **35%** middle column (Source Document) | **50%** main editor (Target Document).
+> **One component, two routes:** `/workbench/:pageId` and `/review/:pageId` use the same `WorkbenchComponent`. The component detects its context from the route:
+> - **`/workbench/:pageId`** (browse mode) — navigated from project detail page grid; "Back" returns to `/projects/:id`; no "Save & next" flow; all pages in the chapter visible in sidebar.
+> - **`/review/:pageId`** (queue mode) — navigated from the review queue; "Back" returns to `/queue`; "Complete" calls `GET /pages/:id/next-in-queue` and navigates to the next queued page; sidebar shows only the reviewer's assigned queue pages.
+>
+> The toolbar and three-column layout are identical; only the back-navigation target, sidebar filter, and the Complete button behavior differ.
+
+Full-page layout. Three columns defined strictly by CSS Grid (`gridTemplateColumns: "240px 1fr 360px"`): **240px** left sidebar (Page Navigation) | **1fr** middle column (PDF panes & translation diffs) | **360px** right inspector (Quality, Errors, Guidelines).
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -320,21 +350,24 @@ Full-page layout. Three columns: **15%** left sidebar (Page Navigation) | **35%*
 - Progress bar: "Progress: X / Y accepted" with visual bar
 - Prev/next buttons
 - Zoom: `−` / `100%` tag / `+`
-- Action buttons: Skip, Complete
+- Action buttons: **Skip**, **Complete**, and a `[⋮]` overflow menu containing **Request changes** (opens modal — note required; `POST /pages/:id/request-changes`) and **Escalate** (opens modal — reason required; `POST /pages/:id/escalate`). The overflow menu is always visible; these actions are available to all REVIEWER+ users.
 
 ### Left Sidebar — Page Navigation
 - Eyebrow: "Chapter 8 · 15 pages"
 - Page pill list: `StatusDot` + `P{nn}` (mono) + active class on current; click switches page
 
 ### Middle Column — Source Document
-- Displays the original text, broken visually into numbered sentences.
-- Read-only.
-- Clicking a source sentence highlights it and scrolls the right column to the corresponding translated sentence.
+- Renders `page.sourceMarkdown` as a structured document — headings render as headings, bullets as bullets, paragraphs as paragraphs.
+- Each `{{SENTENCE_X}}` placeholder is replaced by an interactive **SentenceComponent** showing `sentence.originalText`.
+- Each SentenceComponent has a numbered badge and an approval toggle (`[ ]` hollow / `[✓]` filled green).
+- Read-only — no editing in this column.
+- Clicking a SentenceComponent highlights it and scrolls the right column to the same sentence.
 
 ### Right Column — Target Document Editor
-- Displays the translated text continuously as a rich document editor.
-- **Inline Highlights:** Sentences with AI-detected errors/suggestions have subtle colored underlines (red for critical, yellow for style).
-- **Sentence Approval:** Next to each sentence in the source document, there is an approval toggle (`[ ]` hollow or `[✓]` filled green).
+- Renders the same `page.sourceMarkdown` structure but each `{{SENTENCE_X}}` placeholder is replaced by an editable **SentenceComponent** showing `sentence.translatedText`.
+- Structural formatting (headings, bullets, paragraphs) is identical to the source column — the translated document looks like the original, not a flat sentence list.
+- **Inline Highlights:** SentenceComponents with AI-detected errors have colored underlines (red for CRITICAL/HIGH, yellow for MEDIUM/LOW).
+- **Sentence Approval:** The approval toggle lives on the source column SentenceComponent; toggling it calls `PATCH /sentences/:id {isApproved}` and reflects on both columns.
   - When the user accepts an inline edit or suggestion, the sentence is automatically marked as approved.
   - Reviewers can manually toggle `[ ]` ↔ `[✓]` to bypass AI or confirm manual modifications.
 - **Cursor-Style Inline Prompt (Cmd+K / Ctrl+K):**
@@ -349,6 +382,13 @@ Full-page layout. Three columns: **15%** left sidebar (Page Navigation) | **35%*
   - Displays whole-page diffs that can be accepted or rejected incrementally.
 - **Manual Editing:** Reviewers can click anywhere and type freely; debounced auto-saves trigger in the background.
 
+### Reviewer Panel
+The right column footer (below the last sentence) shows the list of assigned reviewers for the page as Avatar chips. MASTER+ sees an **Add reviewer** button (opens a user-picker modal → `POST /pages/:id/add-reviewer`) and a **Reassign** button (opens multi-select user picker → `POST /pages/:id/reassign`). Individual sentence rows have a small `[👤 Assign]` icon in the gutter — clicking opens a single reviewer picker → `POST /sentences/:id/assign`.
+
+Each SentenceComponent in the right column has a context menu (⋮ or right-click) with:
+- **Reset to AI translation** → `POST /sentences/:id/reset-translation` (clears manual edits; prompts for confirmation)
+- **Assign to reviewer** (MASTER+) → `POST /sentences/:id/assign`
+
 ### Actions
 | Element | Endpoint |
 |---------|----------|
@@ -358,8 +398,12 @@ Full-page layout. Three columns: **15%** left sidebar (Page Navigation) | **35%*
 | Inline Chat Rewrite | POST /chat/sessions/:id/stream (with BUILD mode) |
 | Toggle sentence approval | PATCH /sentences/:id {isApproved} |
 | Manual Edit | PATCH /sentences/:id {translatedText} (debounced) |
+| Reset to AI translation | POST /sentences/:id/reset-translation |
 | Request changes | POST /pages/:id/request-changes (modal, note required) |
 | Escalate | POST /pages/:id/escalate |
+| Add reviewer (MASTER+) | POST /pages/:id/add-reviewer |
+| Reassign (MASTER+) | POST /pages/:id/reassign |
+| Assign sentence (MASTER+) | POST /sentences/:id/assign |
 
 ---
 
@@ -436,9 +480,10 @@ Full-layout screen (`.genre-editor`, not `page`). No top nav — its own header.
 ### Header
 - Back button + breadcrumb (Genres / {name})
 - Editable name input (`.genre-editor__title` — inline, not a bordered input)
-- Segment unit select: Verse / Paragraph / Sentence / Page
+- Segment unit select: Verse / Paragraph / Sentence / Page — persisted to `genre.segmentUnit`; controls how sentences are grouped for display in the workbench (verse-by-verse, paragraph-by-paragraph, etc.). Change saved via `PATCH /genres/:id`.
 - Version select (shows versions with "· current" suffix on active)
 - History button (icon="history")
+- Glossary button (icon="book") → toggles left pane between Markdown editor and Glossary table (see § Glossary Panel below)
 - Test button (icon="play") → modal with sample text input + shows translation output
 - Save button (primary, icon="check") → POST /genres/:id/versions
 
@@ -504,8 +549,72 @@ Literary Translation                                [×]
 
 - Each row: version tag (mono) + Current pill (if active) + date (right) | note | "by author" (dim 11px)
 - Clicking a row selects it (highlighted background)
+- Each row has a `[↔ Diff]` button (icon-only, ghost) — clicking it switches the main editor pane to Diff mode (see § Diff Mode below) comparing the selected version against the current version
 - Footer: Close + "Restore {selected}" (primary)
 - Restore → POST /genres/:id/restore/:versionId
+
+---
+
+### Diff Mode (`.genre-editor--diff`)
+
+Triggered by the `[↔ Diff]` button in the Version History Drawer. The main editor pane switches from the Markdown editor to an inline diff view. The Version History Drawer stays open.
+
+```
+← Back  /  Genres  /  [Literary Translation]
+                        [Paragraph ▼]  [v1.0 ▼]  [History]  [Glossary]  [Test]  [Save]
+
+[Split] [Edit] [Preview] [↔ Diff ← v1.1]        Showing changes v1.1 → v1.2
+
+┌──────────────────────────────────────────────────────┬───────────────────────┐
+│  Showing changes from v1.1 → v1.2 (current)  [Close] │ ✦ Genre assistant     │
+│                                                       │                       │
+│  # Translation Guidelines                             │  ...                  │
+│  Use formal literary register throughout.             │                       │
+│                                                       │                       │
+│  ~~## Core Terminology~~                              │                       │
+│  ## Core Terminology (expanded)                       │                       │
+│  | protagonist | கதாநாயகன்   |                       │                       │
+│  | narrator    | கதைசொல்லி    |                       │                       │
+│+ | metaphor    | உருவகம்      |  (green — added)      │                       │
+│+ | irony       | முரண்        |  (green — added)      │                       │
+│- | archetype   | முன்னோடி     |  (red — removed)      │                       │
+└──────────────────────────────────────────────────────┴───────────────────────┘
+```
+
+- Added lines: green left-border + green background highlight (`diff-add`)
+- Removed lines: red left-border + red background highlight + strikethrough text (`diff-del`)
+- Unchanged lines: normal styling
+- The `[↔ Diff ← v1.1]` tab appears in the view mode bar alongside Split/Edit/Preview; clicking it or clicking `[Close]` banner returns to the previous edit mode
+- Data source: `GET /genres/:id/versions/:versionId/diff` → unified diff string; rendered client-side as line-level colored blocks
+
+---
+
+### Glossary Panel (`.genre-editor__glossary`)
+
+Triggered by the Glossary button in the header. Replaces the Markdown editor in the left pane; the chat assistant panel remains on the right.
+
+```
+[+ Add term]       [Search terms________________________]      57 terms
+
+┌─────────────────┬──────────────────────────────────┬──────────────────────┬──────────┐
+│ Source term     │ Target term                       │ Context              │          │
+├─────────────────┼──────────────────────────────────┼──────────────────────┼──────────┤
+│ God             │ தேவன்                            │ theological — never  │ [✎] [🗑] │
+│                 │                                   │ கடவுள்              │          │
+│ Lord            │ கர்த்தர்                          │ Protestant term      │ [✎] [🗑] │
+│ Faith           │ விசுவாசம்                        │ never நம்பிக்கை    │ [✎] [🗑] │
+└─────────────────┴──────────────────────────────────┴──────────────────────┴──────────┘
+```
+
+- MASTER+ sees `[+ Add term]` and `[✎]` / `[🗑]` action icons; REVIEWER sees the table read-only
+- ADMIN additionally sees `[↑ Import CSV]` button — opens a file-picker accepting `.csv` with columns `sourceTerm,targetTerm,context`; on confirm calls `POST /glossary/bulk`
+- **Add term**: opens an inline form row at the top of the table — Source term, Target term, Context (optional) fields + `[Save]` / `[Cancel]`
+- **Edit**: inline row editing — same fields, `[Save]` / `[Cancel]`
+- **Delete**: confirmation toast before deleting
+- Search: live client-side filter on sourceTerm
+- Pagination: "Load more" button when > 50 terms (matches global pagination spec)
+- Endpoints: `GET /glossary?genreId=`, `POST /glossary`, `PUT /glossary/:id`, `DELETE /glossary/:id`, `POST /glossary/bulk` (ADMIN, via CSV import)
+- Clicking the Glossary button again (or Edit/Split/Preview tabs) returns to the Markdown editor
 
 ---
 
@@ -517,27 +626,27 @@ Master view across every project · override and resolve escalations
 
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ [All projects ▼]  [All chapters ▼]  [All statuses ▼]  [All reviewers ▼]     │
-│ [Apply filters]                         [Reassign selected]  [Batch approve] │
+│ [Apply filters]    [Export report ↓]    [Reassign selected]  [Batch approve] │
 └──────────────────────────────────────────────────────────────────────────────┘
 
-┌──┬──────────────────┬───┬──────┬──────────────┬──────────┬────────┬──────────────────┐
-│☐ │ Project          │Ch.│ Page │ Reviewer     │ Status   │Quality │ Actions          │
-├──┼──────────────────┼───┼──────┼──────────────┼──────────┼────────┼──────────────────┤
-│☑ │ Pilgrim's Progr. │ 3 │ P45  │ 👤 Selvi     │ Pending  │   78%  │ [View] [Override]│
-│☑ │ Pilgrim's Progr. │ 3 │ P46  │ 👤 Daniel    │ Changes  │   65%  │ [View] [Override]│
-│  │ Imitation Christ │ 1 │ P12  │ 👤 Mary      │ Approved │   92%  │ [View]           │
-│  │ Mere Christianity│ 8 │ P78  │ 👤 Selvi     │ Escalated│   45%  │ [View] [Resolve] │
-│  │ Confessions      │ 2 │ P23  │ 👤 Daniel    │ Pending  │   71%  │ [View] [Override]│
-└──┴──────────────────┴───┴──────┴──────────────┴──────────┴────────┴──────────────────┘
+┌──┬──────────────────┬───┬──────┬──────────────────────┬──────────┬────────┬──────────────────┐
+│☐ │ Project          │Ch.│ Page │ Reviewers            │ Status   │Quality │ Actions          │
+├──┼──────────────────┼───┼──────┼──────────────────────┼──────────┼────────┼──────────────────┤
+│☑ │ Pilgrim's Progr. │ 3 │ P45  │ 👤 Selvi 👤 Daniel   │ Pending  │   78%  │ [View] [Override]│
+│☑ │ Pilgrim's Progr. │ 3 │ P46  │ 👤 Daniel            │ Changes  │   65%  │ [View] [Override]│
+│  │ Imitation Christ │ 1 │ P12  │ 👤 Mary              │ Approved │   92%  │ [View]           │
+│  │ Mere Christianity│ 8 │ P78  │ 👤 Selvi             │ Escalated│   45%  │ [View] [Resolve] │
+│  │ Confessions      │ 2 │ P23  │ 👤 Daniel            │ Pending  │   71%  │ [View] [Override]│
+└──┴──────────────────┴───┴──────┴──────────────────────┴──────────┴────────┴──────────────────┘
 ```
 
 - Filters card above table (not inline)
 - Checkbox column; row highlight when checked (`is-selected` class)
-- Reviewer: avatar + name inline
+- Reviewers: all assigned reviewer avatars inline (from `PageReviewer` list); if more than 3, show `+N` overflow
 - Quality: colored mono value (<60 error, <80 warning, ≥80 success)
 - Actions: always "View" (ghost) + "Override" (default) unless status = Escalated → "Resolve" (primary)
 - Bulk actions: "Reassign selected" + "Batch approve" (success) — in filter card, right-aligned
-- Export report → POST /export/admin-report → jobId → download
+- Export report → POST /export/admin-report → jobId → download (MASTER+; generates aggregate quality report across selected projects)
 
 ---
 
@@ -576,6 +685,8 @@ Role
 
 Send invite → POST /users/invite (sends email)
 
+> **Design decision**: The invite modal exposes only `REVIEWER` and `MASTER` roles. `ADMIN` accounts are provisioned exclusively via the seed script or direct database access — they cannot be invited through the UI. This prevents accidental privilege escalation.
+
 ---
 
 ## Screen 12: Settings (`admin.jsx::Settings`)
@@ -604,7 +715,15 @@ Model configuration, languages, and system defaults
 │ Provider [Anthropic ▼] Model [claude-3-haiku ▼]  Endpoint [—]              │
 │ [⚡ Test connection]  [⌨ View logs]                               [Save]   │
 └────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│ EMBEDDING agent                                             Online ●         │
+│ nomic-embed-text  [Translation Memory indexing]                              │
+│ Provider [Ollama ▼]   Model [nomic-embed-text ▼]  Endpoint [http://ollama:11434]│
+│ [⚡ Test connection]  [⌨ View logs]                               [Save]   │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
+
+- EMBEDDING agent only supports Ollama (Anthropic has no embedding API). Changing provider to ANTHROPIC shows an inline warning: "Anthropic does not support embeddings. Only Ollama is supported."
 
 Non-Models tabs (Languages, System) show an empty-state placeholder: settings icon (32px) + "{tab} settings — coming soon".
 

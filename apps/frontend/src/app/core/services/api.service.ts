@@ -69,6 +69,8 @@ export interface Page {
   assignedAt?: string;
   lastAiRunAt?: string;
   reviewers?: User[];
+  project?: { id: string; name: string; sourceLang: string; targetLang: string };
+  chapter?: { id: string; number: number; title?: string };
 }
 
 export interface Sentence {
@@ -110,6 +112,30 @@ export interface Job {
   result?: { fileUrl?: string };
   errorMessage?: string;
   createdAt: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  entityHref?: string;
+  createdAt: string;
+  user?: { id: string; name: string; email: string };
+}
+
+export interface ProjectStats {
+  total: number;
+  pending: number;
+  extracting: number;
+  extracted: number;
+  translating: number;
+  translated: number;
+  reviewing: number;
+  humanReview: number;
+  approved: number;
+  rejected: number;
+  error: number;
 }
 
 export interface GlossaryTerm {
@@ -156,8 +182,8 @@ export class ApiService {
     });
   }
 
-  getActivityFeed(limit = 10): Observable<unknown[]> {
-    return this.http.get<unknown[]>(`${this.base}/dashboard/activity`, {
+  getActivityFeed(limit = 10): Observable<ActivityLog[]> {
+    return this.http.get<ActivityLog[]>(`${this.base}/dashboard/activity`, {
       params: new HttpParams().set('limit', limit),
     });
   }
@@ -185,6 +211,26 @@ export class ApiService {
 
   deleteProject(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/projects/${id}`);
+  }
+
+  getProjectStats(id: string): Observable<ProjectStats> {
+    return this.http.get<ProjectStats>(`${this.base}/projects/${id}/stats`);
+  }
+
+  getChapters(projectId: string): Observable<Chapter[]> {
+    return this.http.get<Chapter[]>(`${this.base}/projects/${projectId}/chapters`);
+  }
+
+  pauseProject(id: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/projects/${id}/pause`, {});
+  }
+
+  resumeProject(id: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/projects/${id}/resume`, {});
+  }
+
+  cancelProjectJobs(id: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/projects/${id}/cancel-jobs`, {});
   }
 
   // ── Files ─────────────────────────────────────────────────────────────────

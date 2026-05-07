@@ -92,7 +92,7 @@ A context-aware AI assistant modeled directly after Cursor's AI Chat and Compose
 ## Non-Goals (v1)
 
 - Mobile support (tablet minimum: 1024px)
-- Real-time collaboration (multiple reviewers on the same page simultaneously)
+- Real-time simultaneous editing (Google Docs-style live cursors; multiple reviewers making conflicting edits at the exact same instant — multiple reviewers *assigned* to the same page is supported, but concurrent write conflicts are not)
 - LoRA fine-tuning
 - Webhooks or external integrations
 - Cmd+K global search palette

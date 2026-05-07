@@ -28,7 +28,7 @@
 
 ## What This Project Is
 
-tAI (Translation AI) is a multi-agent platform for translating English Protestant Christian books into Tamil using the **Thiruviviliam** (திருவிவிலியம்) Bible style. NestJS 11 API + Angular 21 frontend, NX 22 monorepo.
+tAI (Translation AI) is a multi-agent document translation platform. It translates source documents into a target language following domain-specific style and terminology rules, then routes the output through a structured human review workflow. It supports any language pair and any domain — the translation rules are defined in a **Genre** document injected into every AI prompt. NestJS 11 API + Angular 21 frontend, NX 22 monorepo.
 
 **Read these before touching any code:**
 - `.spec/01-overview.md` — product brief, roles, non-goals
@@ -36,7 +36,6 @@ tAI (Translation AI) is a multi-agent platform for translating English Protestan
 - `.spec/03-api.md` — all REST endpoints
 - `.spec/04-screens.md` — UI screens derived from Claude JSX designs (authoritative)
 - `.spec/05-agents.md` — LLM agent prompts and pipeline
-- `.spec/06-glossary.md` — Thiruviviliam terminology (seeded into DB)
 - `.spec/07-architecture.md` — tech stack, module structure, Docker, env vars
 - `.spec/IMPLEMENTATION.md` — 26-phase build plan (the work queue)
 
@@ -89,17 +88,17 @@ Do not re-litigate these:
 | File storage | MinIO (S3-compatible) |
 | LLM local | Ollama (default 2 concurrent via p-limit) |
 | LLM cloud | Anthropic Claude SDK (p-limit 50) |
-| PDF extraction | `pdf-parse` only — no OCR |
+| PDF extraction | Vision-based OCR (LlamaParse/Marker) — produces layout-aware Markdown |
 | Email (dev) | nodemailer + maildev |
 | Async jobs | DB polling + SELECT FOR UPDATE SKIP LOCKED — no BullMQ/Redis |
 | Frontend | Angular 21 + PrimeNG 21 (Lara theme) + Tailwind CSS 3 |
 | State management | RxJS 7 + Angular Signals — no NgRx |
 | Auth | JWT access (15m) + refresh token (7d) stored in DB, rotated on use |
-| Language | Source: English (en), Target: Tamil/Thiruviviliam (ta) — hardcoded |
+| Language | Configurable per project (ISO 639-1 codes); searchable dropdown in New Project modal |
 | Rules system | **Removed** — Genres only; no Rules screen, no rules module |
 | Genre system | Genre markdown injected into every translation prompt for that genre |
-| Overlay mode | Implemented in workbench — not deferred |
-| Chat modes | "Discuss" = Plan mode, "Edit doc" = Build mode |
+| Translation Memory | RAG layer: approved sentences indexed as pgvector embeddings; retrieved at translation time |
+| Chat modes | Plan mode (discuss) + Build mode (edit doc with inline diffs) |
 
 ---
 
@@ -112,10 +111,12 @@ apps/
     src/
       common/       guards, interceptors, decorators, pipes, filters
       modules/      auth, users, genres, projects, chapters, pages,
-                    segments, errors, glossary, files, jobs, chat,
+                    sentences, errors, glossary, memory, files, jobs, chat,
                     export, models, dashboard, queue, admin, email, health
-      llm/          LLMProvider interface, ollama.provider, anthropic.provider
-      agents/       extraction, translation.agent, review.agent, orchestrator
+      llm/          LLMProvider interface, ollama.provider, anthropic.provider,
+                    llm.service, embedding.service
+      agents/       extraction.service, segmentation.service,
+                    translation.agent, review.agent, orchestrator
   frontend/         Angular 21 (port 4200)
     src/app/
       core/         services (auth, api), interceptors, guards
@@ -165,31 +166,20 @@ pnpm nx affected -t build,test,lint
 
 ## Key Domain Rules (never violate)
 
-- A `Genre`'s `segmentUnit` cannot change if any project using that genre has segments
 - A `Page` cannot be `APPROVED` if it has any `OPEN` errors — unless the caller is MASTER or ADMIN
-- Deleting a `Project` cascades: Project → Chapter → Page → Segment → Error
+- A `Page` cannot be `APPROVED` if any sentence has `isApproved = false` — unless MASTER/ADMIN override
+- Deleting a `Project` cascades: Project → Chapter → Page → Sentence → Error
 - Deleting a `Genre` is blocked if any project references it
 - `RefreshToken` rotation: every use deletes the old token and issues a new one
 - `ActivityLog` is append-only — no updates, no deletes
-- Thiruviviliam terminology is non-negotiable in all translation prompts (see `.spec/06-glossary.md`)
-- `POST /errors/:id/apply` MUST also update `segment.translatedText` (replace currentText with suggestedText) — marking APPLIED without fixing the text is a bug
-- Auto-pipeline: EXTRACT_PDF automatically enqueues one TRANSLATE_PAGE per page; TRANSLATE_PAGE automatically enqueues REVIEW_PAGE — no user action needed between stages
+- `POST /errors/:id/apply` MUST also update `sentence.translatedText` (replace currentText with suggestedText) — marking APPLIED without fixing the text is a bug
+- `POST /sentences/:id/apply-all-fixes` applies each OPEN error in sequence, updating `translatedText` for each
+- Auto-pipeline: PROCESS_DOCUMENT → one EXTRACT_PAGE per page → TRANSLATE_PAGE → REVIEW_PAGE — no user action needed between stages
+- Translation Memory: when a page is approved, embed each sentence and save to `TranslationMemory`; retrieved at translation time via pgvector cosine similarity (threshold 0.75, top 3)
 - Reviewer assignment: round-robin among active REVIEWERs ordered by fewest current HUMAN_REVIEW assignments
-- Project status transitions: DRAFT→PROCESSING (EXTRACT_PDF starts), PROCESSING→REVIEW (all pages reach HUMAN_REVIEW/APPROVED), REVIEW→COMPLETED (all pages APPROVED)
-
----
-
-## Thiruviviliam Terminology — Critical Terms
-
-Never use the wrong term in prompts or seed data:
-
-| Correct | Wrong | English |
-|---------|-------|---------|
-| தேவன் | கடவுள் | God |
-| விசுவாசம் | நம்பிக்கை | Faith |
-| சபை / தேவாலயம் | கூடு | Church |
-| வாக்கு | மந்திரம் | Word (of God) |
-| அன்பு | நேசி | Love |
+- Project status transitions: DRAFT→PROCESSING (extraction starts), PROCESSING→REVIEW (all pages reach HUMAN_REVIEW/APPROVED), REVIEW→COMPLETED (all pages APPROVED)
+- `request-changes` sets page.status = REJECTED then enqueues a new TRANSLATE_PAGE job
+- `resolve-escalation` sets page.status = HUMAN_REVIEW; re-assigns to original reviewer if active, else round-robin
 
 ---
 
@@ -216,10 +206,9 @@ Never use the wrong term in prompts or seed data:
 
 - Do not use `NgRx` — use RxJS + Signals
 - Do not add BullMQ, Redis, or any queue broker — job system uses DB polling
-- Do not add PaddleOCR or any OCR library — pdf-parse only
-- Do not add a language selector UI — en→ta is hardcoded
 - Do not add a user profile screen — not in scope for v1
 - Do not add a Rules screen, rules module, or any rules-related endpoints — Rules is removed
+- Do not hardcode source/target language — both are configurable ISO 639-1 strings per project
 - Do not add autosave to the genre editor — content saves only on explicit "Save" button (POST /genres/:id/versions)
 - Do not add mobile breakpoints — tablet minimum (1024px)
 - Do not modify the v1 Prisma schema to patch it — replace it entirely in Phase 1

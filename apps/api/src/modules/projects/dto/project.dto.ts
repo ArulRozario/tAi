@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsUUID, MinLength, MaxLength } from 'class-validator';
 import { ProjectStatus } from '@prisma/client';
 
 export class CreateProjectDto {
@@ -13,14 +13,21 @@ export class CreateProjectDto {
   description?: string;
 
   @IsString()
-  @IsOptional()
+  @MinLength(2, { message: 'sourceLang must be a valid language code' })
   @MaxLength(10)
-  sourceLang?: string = 'en';
+  sourceLang!: string;
+
+  @IsString()
+  @MinLength(2, { message: 'targetLang must be a valid language code' })
+  @MaxLength(10)
+  targetLang!: string;
+
+  @IsUUID('4', { message: 'genreId must be a valid UUID' })
+  genreId!: string;
 
   @IsString()
   @IsOptional()
-  @MaxLength(10)
-  targetLang?: string = 'ta';
+  sourceFileId?: string;
 }
 
 export class UpdateProjectDto {
@@ -35,10 +42,7 @@ export class UpdateProjectDto {
   @MaxLength(1000)
   description?: string;
 
-  @IsEnum(ProjectStatus)
+  @IsEnum(ProjectStatus, { message: 'Status must be a valid ProjectStatus enum value' })
   @IsOptional()
   status?: ProjectStatus;
-
-  @IsOptional()
-  settings?: Record<string, unknown>;
 }

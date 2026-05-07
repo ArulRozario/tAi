@@ -1,11 +1,11 @@
 # tAI — Build Progress
 
-Last updated: 2026-05-07
+Last updated: 2026-05-07 (session 23)
 
 ## Current Status
 
-**Active phase:** Phase 19 — Projects Screen  
-**Next up:** Phase 20 — Workbench Screen (rebuild from spec)
+**Active phase:** Phase 20 — Workbench Screen  
+**Next up:** Phase 21 — Queue Screen
 
 ---
 
@@ -32,8 +32,8 @@ Last updated: 2026-05-07
 | 15 | Export Module (API) | ✅ | 2026-05-07 |
 | 16 | Activity Logging & Health | ✅ | 2026-05-07 |
 | 17 | Frontend Foundation (auth + layout shell) | ✅ | 2026-05-07 |
-| 18 | Dashboard Screen | 🔄 | — |
-| 19 | Projects Screen | ☐ | — |
+| 18 | Dashboard Screen | ✅ | 2026-05-07 |
+| 19 | Projects Screen | ✅ | 2026-05-07 |
 | 20 | Workbench Screen | ☐ | — |
 | 21 | Queue Screen | ☐ | — |
 | 22 | Review Screen | ☐ | — |
@@ -70,6 +70,7 @@ Last updated: 2026-05-07
 | 2026-05-07 | 20 | Rewrote Export module: POST endpoints enqueue jobs and return jobId; job worker runs actual PDF (pdfkit), DOCX (docx), text, HTML generation from page.sourceMarkdown with sentence substitution; uploads to MinIO | export module rewrite |
 | 2026-05-07 | 21 | Health endpoint: GET /health checks DB (SELECT 1), MinIO (listFiles probe), Ollama (GET /api/tags), Anthropic (GET /v1/models if key configured); returns {status, db, minio, ollama, anthropic} | health module |
 | 2026-05-07 | 22 | Phase 17 frontend foundation: AuthService (signal-based, JWT+refresh), authInterceptor (401→refresh→retry), authGuard, roleGuard, real LoginComponent, ResetPasswordComponent, updated app.routes with guards + all routes, ApiService rewritten to /api/v1 contract; workbench/projects/queue/review stubs; build passes | frontend foundation |
+| 2026-05-07 | 23 | Phase 18+19: Dashboard wired to real API (getDashboardStats 30s poll, throughput toggle, activity feed, greeting from auth user); Projects table (status tabs, live search, actions), New Project modal (ISO-639-1 language dropdowns, genre radio cards, PDF dropzone), ProjectDetailComponent (stat cards, chapter accordion, page status grid); fixed projects/:id route; StatusDot + PriorityPill accept uppercase API values | dashboard + projects screens |
 
 ---
 

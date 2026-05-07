@@ -1,13 +1,13 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     container_name: tai-db-postgres
     environment:
       POSTGRES_USER: tai
       POSTGRES_PASSWORD: tai123
       POSTGRES_DB: tai
     ports:
-      - "5434:5432"
+      - "12000:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -26,7 +26,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "7900:9000"
+      - "12002:9000"
+      - "12003:9001"
     volumes:
       - minio_data:/data
     networks:
@@ -36,7 +37,7 @@ services:
     image: ollama/ollama:latest
     container_name: tai-ollama
     ports:
-      - "7114:11434"
+      - "12005:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:
@@ -44,45 +45,13 @@ services:
     networks:
       - tai-network
 
-  api:
+  nlp:
     build:
       context: .
-      dockerfile: Dockerfile.api
-    container_name: tai-api
-    environment:
-      DATABASE_URL: postgresql://tai:tai123@postgres:5432/tai?schema=public
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: tai-uploads
-      OLLAMA_BASE_URL: http://ollama:11434
-      JWT_SECRET: tai-dev-secret
-      NODE_ENV: development
-      PORT: 3000
+      dockerfile: Dockerfile.nlp
+    container_name: tai-nlp
     ports:
-      - "7300:3000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_started
-      ollama:
-        condition: service_started
-    networks:
-      - tai-network
-
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: tai-frontend
-    ports:
-      - "7420:80"
-    depends_on:
-      - api
-    volumes:
-      - .:/app
-      - /app/node_modules
+      - "12004:8001"
     networks:
       - tai-network
 

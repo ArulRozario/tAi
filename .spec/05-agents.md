@@ -47,8 +47,12 @@ Do NOT copy them verbatim — apply them only where the source text is genuinely
 }
 [/TRANSLATION_MEMORY_BLOCK]
 
-Output a strict JSON array containing the translated sentences. Do not output anything else.
-You MUST preserve any markdown formatting tags (e.g., `**`, `*`, `#`) present in the source text. Do not remove or alter the structure of these tags.
+The user message will include a [DOCUMENT_CONTEXT] block for each source page in the batch.
+Use it to understand each sentence's structural role (heading, bullet, paragraph, caption) and
+to maintain coherence and terminology consistency across all pages in the batch.
+Translate only the sentences listed in the JSON array — do not translate the context block itself.
+
+Output a strict JSON array. Do not output anything else.
 
 Format:
 ```json
@@ -59,14 +63,19 @@ Format:
 
 ### User Prompt
 ```
-Translate the following {sourceLang} sentences into {targetLang}:
+[DOCUMENT_CONTEXT]
+{page.sourceMarkdown with each {{SENTENCE_X}} placeholder replaced by sentence.originalText}
+[/DOCUMENT_CONTEXT]
+
+Translate the following {sourceLang} sentences into {targetLang}.
+Use the document context above to inform register, structural role, and terminology consistency:
 
 ```json
-{sentences_json_array}
+[{"id": "sent-1", "text": "..."}, ...]
 ```
 ```
 
-If the genre's content includes a `## Examples` section, prepend those examples in the user turn before the sentences JSON.
+If the genre's content includes a `## Examples` section, prepend those examples before the [DOCUMENT_CONTEXT] block.
 
 ### Parameters
 | Param | Value |
@@ -83,7 +92,7 @@ If the genre's content includes a `## Examples` section, prepend those examples 
 
 ```
 You are a professional translation quality reviewer.
-Evaluate the {targetLang} translation of the provided {sourceLang} source text.
+Evaluate the {targetLang} translations of the provided {sourceLang} source sentences.
 Apply the terminology and style rules from the style guide when assessing quality.
 
 ## Style Guide Reference
@@ -92,28 +101,44 @@ Apply the terminology and style rules from the style guide when assessing qualit
 ## Glossary Reference
 {top 50 glossary terms: source → target}
 
-## Output Format (strict JSON)
-{
-  "errors": [
-    {
-      "severity": "CRITICAL|HIGH|MEDIUM|LOW",
-      "category": "TERMINOLOGY|ACCURACY|FLUENCY|STYLE|GRAMMAR",
-      "location": "<text snippet where error occurs>",
-      "currentText": "<what was translated>",
-      "suggestedText": "<what it should be>",
-      "issueDescription": "<why it is wrong>",
-      "reference": "<glossary term or style guide rule if applicable>",
-      "aiNote": "<model's explanation of why this error occurred>"
-    }
-  ]
-}
+## Output Format (strict JSON array — one entry per input sentence)
+[
+  {
+    "sentenceId": "<id from input>",
+    "errors": [
+      {
+        "severity": "CRITICAL|HIGH|MEDIUM|LOW",
+        "category": "TERMINOLOGY|ACCURACY|FLUENCY|STYLE|GRAMMAR",
+        "location": "<text snippet where error occurs>",
+        "currentText": "<what was translated>",
+        "suggestedText": "<what it should be>",
+        "issueDescription": "<why it is wrong>",
+        "reference": "<glossary term or style guide rule if applicable>",
+        "aiNote": "<model's explanation of why this error occurred>"
+      }
+    ]
+  }
+]
+Output an empty errors array for sentences with no errors. Do not omit any sentence from the output.
+```
+
+### User Prompt
+```
+Review the following {sourceLang} → {targetLang} sentence translations:
+
+```json
+[
+  {"id": "sent-1", "source": "...", "translation": "..."},
+  ...
+]
+```
 ```
 
 ### Parameters
 | Param | Value |
 |-------|-------|
 | Temperature | 0.1 |
-| Max tokens | 2048 |
+| Max tokens | 4096 |
 
 ---
 
@@ -155,16 +180,32 @@ Source language: {sourceLang}. Target language: {targetLang}.
 Original ({sourceLang}):
 {page.originalText truncated to 2000 chars}
 
-Current translation ({targetLang}):
-{sentence.translatedText}
+Current translations ({targetLang}):
+{all sentences on the page, numbered: "1. {sentence.translatedText}\n2. ..."}
 
 Detected errors:
-{errors formatted as list}
+{all OPEN errors on the page, formatted as: "Sentence {n} [{severity}] {category}: {issueDescription} — current: '{currentText}', suggested: '{suggestedText}'"}
 
 In PLAN mode: Explain errors, suggest corrections, answer questions.
 In BUILD mode: Produce corrected translations for specific sentences when asked.
 When in BUILD mode, format corrections as:
 SENTENCE {n}: {corrected target-language text}
+```
+
+**GLOSSARY context:**
+```
+You are a terminology assistant for the "{genre.name}" translation genre.
+Source language: {sourceLang}. Target language: {targetLang}.
+
+Current glossary ({termCount} terms):
+{top 50 glossary terms formatted as: "{sourceTerm} → {targetTerm}" with context appended if present}
+
+In PLAN mode: Answer terminology questions, explain term choices, identify gaps or inconsistencies.
+  Suggest missing terms but do not create them — the user must confirm via the UI.
+In BUILD mode: When asked to add or update terms, respond with a structured list only:
+  ADD: {sourceTerm} → {targetTerm} [context: {context}]
+  UPDATE: {sourceTerm} → {newTargetTerm} [context: {context}]
+  The frontend will parse this list and call POST /glossary or PUT /glossary/:id for each entry.
 ```
 
 ### Quick Prompts by Context/Mode
@@ -189,6 +230,17 @@ SENTENCE {n}: {corrected target-language text}
 - "Rewrite sentence 3 to be more poetic"
 - "Apply the suggested corrections"
 
+**GLOSSARY + PLAN:**
+- "What terms are missing from this glossary?"
+- "Are there any inconsistent translations?"
+- "What is the correct term for X in this genre?"
+- "Which terms conflict with each other?"
+
+**GLOSSARY + BUILD:**
+- "Add the top 10 missing theological terms"
+- "Standardise all verb forms to match the noun entries"
+- "Add context notes to ambiguous terms"
+
 ### Sliding Window
 Keep the last 20 messages in context (sliding window). On session creation, inject the full system prompt. Older messages are truncated from the start.
 
@@ -210,64 +262,110 @@ data: {"done": true, "revisedContent": "# Translation Guidelines\n..."}
 
 ## Default Genre Template
 
-When the seed script creates the demo "Literary Translation" genre, use this content as v1.0:
+When the seed script creates the "Tamil Bible (Parisutha Vedagamam)" genre, use this content as v1.0:
 
 ```markdown
-# Literary Translation Style Guide
-English → Tamil (illustrative example — adjust for your language pair)
+# Tamil Bible (Parisutha Vedagamam) Translation Style Guide
+English → Tamil (Parisutha Vedagamam Protestant Tamil Bible style)
 
 ## Purpose
-This genre defines the rules for translating literary fiction from English into Tamil.
-Adjust terminology, register, and examples for your specific domain.
+This genre defines the rules for translating English Protestant Christian texts into Tamil following
+the Parisutha Vedagamam (பரிசுத்த வேதாகமம்) tradition — the authoritative Tamil Protestant Bible
+used by Protestant churches. All translations must conform to the register, terminology, and
+theological precision of the Parisutha Vedagamam text.
 
 ## Core Rules
-1. Preserve the author's voice, sentence rhythm, and narrative register.
-2. Use formal (வட்டார வழக்கு / முறைசார்ந்த மொழி) or informal register as established by the source text.
-3. Do not domesticate cultural references unless comprehension fails.
-4. Maintain paragraph and chapter structure exactly.
-5. Preserve formatting like italics and punctuation styles.
+1. Use ONLY Parisutha Vedagamam terminology as defined in the Terminology section below.
+2. Maintain formal, dignified Old Tamil literary register (செந்தமிழ் நடை) throughout.
+3. Preserve verse and paragraph structure exactly — do not merge or split.
+4. Keep proper nouns (place names, people names) in their established Parisutha Vedagamam transliteration.
+5. Preserve the original meaning without adding interpretation, commentary, or paraphrase.
+6. Translate idioms and figures of speech into equivalent Tamil literary forms, not literally.
+7. Reflect the grammatical weight of Hebrew/Greek source structures where the English preserves them.
 
-## Terminology
-| English | Tamil | Notes |
-|---------|-------|-------|
-| protagonist | கதாநாயகன் | match context for female/male protagonism |
-| narrator | கதைசொல்லி | preserve point of view |
-| irony | முரண் | preserve narrative ambiguity |
-| metaphor | உருவகம் | translate the literary image, not word-for-word |
-| flashback | பின்னோக்குக் காட்சி | standard cinematic/literary term |
+## Terminology — Non-Negotiable Terms
+
+These terms are fixed. Any deviation is a CRITICAL error.
+
+| English | Correct Tamil | Incorrect (never use) |
+|---------|--------------|----------------------|
+| God | தேவன் | கடவுள், இறைவன் |
+| Lord | கர்த்தர் | ஆண்டவர் (Catholic/Thiruviviliam term), இறைவர் |
+| Jesus | இயேசு | ஏசு |
+| Christ | கிறிஸ்து | — |
+| Holy Spirit | பரிசுத்த ஆவி | தூய ஆவி (Catholic term) |
+| Father (God) | பிதா | தந்தை (for God) |
+| Faith | விசுவாசம் | நம்பிக்கை (when meaning theological faith) |
+| Believe | விசுவாசி | நம்பு (in theological context) |
+| Grace | கிருபை | அருள் (in theological context) |
+| Salvation | இரட்சிப்பு | மீட்பு (Catholic/Thiruviviliam term), விடுதலை |
+| Gospel | சுவிசேஷம் | நற்செய்தி (in theological context) |
+| Scripture | வேதவசனம் | திருவசனம் (Catholic term) |
+| Bible | பரிசுத்த வேதாகமம் | திருவிவிலியம் (Catholic Bible) |
+| Word (of God) | வாக்கு | மந்திரம், சொல் |
+| Church (assembly) | சபை | கூட்டம், திருச்சபை (Catholic term) |
+| Church (building) | தேவாலயம் | — |
+| Prayer | ஜெபம் | வேண்டுதல் (for personal prayer) |
+| Righteousness | நீதி | — |
+| Sin | பாவம் | தவறு (in theological context) |
+| Repentance | மனந்திரும்புதல் | மனமாற்றம் |
+| Covenant | உடன்படிக்கை | — |
+| Resurrection | உயிர்த்தெழுதல் | — |
+| Baptism | ஞானஸ்நானம் | திருமுழுக்கு (Catholic term) |
+| Love (agape) | அன்பு | நேசம், நேசி |
+| Peace | சமாதானம் | அமைதி (in theological context) |
+| Eternal life | நித்திய ஜீவன் | — |
+| Heaven | பரலோகம் | வான், சொர்க்கம் |
+| Kingdom | ராஜ்யம் | அரசாட்சி (acceptable), நாடு |
+| Lamb (of God) | ஆட்டுக்குட்டி | — |
+| Cross | சிலுவை | — |
+| Blood | இரத்தம் | குருதி (in theological context) |
+| Blessing | ஆசீர்வாதம் | வாழ்த்து (in theological context) |
+| Prophet | தீர்க்கதரிசி | — |
+| Apostle | அப்போஸ்தலன் | — |
+| Disciple | சீஷன் | — |
 
 ## Register
-- Dialogue: match colloquial level of source (வட்டார வழக்கு)
-- Narration: formal literary register (முறைசார்ந்த எழுத்து மொழி)
-- Internal monologue: match intimacy level of source
+- All prose: formal Old Tamil literary register (செந்தமிழ் நடை)
+- Dialogue (speech of characters): maintain the formality level appropriate to the speaker's role
+- Narration: elevated, reverent register throughout
+- Doxologies and poetry (Psalms, Revelation): heightened poetic form; preserve parallelism
+- Do not use spoken/colloquial Tamil (வட்டார வழக்கு) under any circumstances
+
+## Sentence Structure
+- Mirror the syntactic weight of the English source where Tamil grammar permits
+- Preserve emphatic constructions (e.g., "truly, truly I say to you" → "மெய்யாகவே மெய்யாகவே")
+- Do not simplify complex subordinate clauses for readability — preserve theological precision
+
+## Proper Nouns
+Use the established Parisutha Vedagamam transliterations:
+- Abraham → ஆபிரகாம், Moses → மோசே, David → தாவீது, Jerusalem → எருசலேம்
+- Israel → இஸ்ரவேல், Egypt → எகிப்து, Jordan → யோர்தான்
 
 ## Common Pitfalls
-- Avoid over-literal translation of idioms
-- Do not add explanatory phrases not in the source
-- Preserve sentence fragmentation where used for stylistic effect
+- Using கடவுள் instead of தேவன் — CRITICAL error
+- Using ஆண்டவர் instead of கர்த்தர் — Catholic/Thiruviviliam term, not Protestant
+- Using மீட்பு instead of இரட்சிப்பு for salvation — CRITICAL error
+- Using திருவசனம் instead of வேதவசனம் — Catholic term
+- Using நம்பிக்கை for theological faith — use விசுவாசம்
+- Using modern Tamil equivalents for any term in the Terminology table
+- Adding explanatory words not present in the source text
+- Softening theological statements for readability
 
 ## Examples
-English: She left without a word, the door clicking shut behind her.
-Tamil: அவள் ஒரு வார்த்தையும் பேசாமல் வெளியேறினாள், கதவு அவளுக்குப் பின்னால் லேசான சத்தத்துடன் மூடிக்கொண்டது.
+
+English: In the beginning God created the heavens and the earth.
+Tamil: ஆதியிலே தேவன் வானத்தையும் பூமியையும் சிருஷ்டித்தார்.
+
+English: For God so loved the world that he gave his one and only Son.
+Tamil: தேவன், தம்முடைய ஒரேபேறான குமாரனை விசுவாசிக்கிறவன் எவனோ அவன் கெட்டுப்போகாமல் நித்தியஜீவனை அடையும்படிக்கு, அவரை அளித்தார்; ஏனெனில் அவர் உலகத்தை இவ்வளவாய் அன்புகூர்ந்தார்.
+
+English: The righteous will live by faith.
+Tamil: நீதிமான் விசுவாசத்தினால் பிழைப்பான்.
+
+English: Grace and peace to you from God our Father and the Lord Jesus Christ.
+Tamil: நம்முடைய பிதாவாகிய தேவனாலும் கர்த்தராகிய இயேசுகிறிஸ்துவினாலும் உங்களுக்கு கிருபையும் சமாதானமும் உண்டாவதாக.
 ```
-
----
-
-## Translation Memory (RAG)
-
-tAI includes a Retrieval-Augmented Generation (RAG) layer to learn from human corrections.
-
-### 1. Indexing (On Approval)
-When a human reviewer approves a page, the `MemoryService` generates a 768-dimensional vector embedding of the `originalText` for each sentence on that page. It stores the `(originalText, translatedText, embedding)` in the `TranslationMemory` table, scoped to the specific `genreId`, `sourceLang`, and `targetLang`.
-
-### 2. Retrieval (At Translation Time)
-When the `TRANSLATE_PAGE` job processes a new sentence, it:
-1. Generates an embedding for the new sentence's `originalText`.
-2. Performs a cosine similarity search (`pgvector`) against the `TranslationMemory` table (filtered by the same genre and language pair).
-3. Retrieves up to 3 past approved sentences that have a similarity score ≥ 0.75.
-4. Injects these retrieved pairs into the Translation Agent's system prompt in the `[TRANSLATION_MEMORY_BLOCK]`.
-
-This allows the AI to learn implicitly from past human edits without requiring model fine-tuning.
 
 ---
 
@@ -286,44 +384,91 @@ This caches ~80% of each prompt, reducing cost and latency for repeated calls on
 
 ```
 PROCESS_DOCUMENT job (runs once per file):
-  1. Download PDF from MinIO
-  2. Split PDF into page images (`pdf2image` or `poppler`)
-  3. Upload images to MinIO
-  4. Create Page records
-  5. Enqueue one EXTRACT_PAGE job per page image
-  6. Set project.status = PROCESSING
+  Idempotency: check existing Page records for this project before creating.
+  1. Set project.status = PROCESSING
+  2. Stream-split PDF — for each page in order (do not wait for all pages before enqueueing):
+     a. Extract page image (pdf2image / poppler)
+     b. Upload page image to MinIO
+     c. Create Page record (status: PENDING) — skip if record already exists for this pageNumber
+     d. Enqueue EXTRACT_PAGE job (parentJobId: this job's id)
+  Progress: update job.progress after each page image uploaded (0 → 100 across all pages)
 
 EXTRACT_PAGE job (parallel per page):
-  1. Download page image from MinIO
-  2. OCR & Vision-aware extraction (e.g., LlamaParse/Marker) → Markdown string
-  3. Image Extraction: Crop illustrations/diagrams, upload to MinIO, and embed `![image](minio_url)` in Markdown
-  4. SegmentationService.detectChapters() → create Chapter records
+  Idempotency: if page.status != PENDING, exit immediately (already extracted or beyond).
+  1. Set page.status = EXTRACTING
+  2. Download page image from MinIO
+  3. OCR & Vision-aware extraction (LlamaParse/Marker) → Markdown string
+  4. Image Extraction: crop illustrations/diagrams, upload to MinIO, embed `![image](/api/v1/files/public/<objectKey>)` in Markdown.
+     Use the backend proxy path (`GET /files/public/:path`), NOT a direct MinIO URL — the browser cannot reach MinIO directly and MinIO URLs require credentials.
   5. SegmentationService.extractSentences() →
-     a. Split Markdown text into Sentence records
-     b. Save markdown skeleton to `page.sourceMarkdown` with `{{SENTENCE_X}}` placeholders
+     a. Split page Markdown on structural boundaries (double newlines, headings, list items) → paragraphs
+     b. For each paragraph: POST to NLP service (http://nlp:8001/segment) with paragraph text + sourceLang
+     c. Collect returned sentences; create Sentence records in order
+     d. Save markdown skeleton to page.sourceMarkdown with {{SENTENCE_X}} placeholders
   6. Set page.status = EXTRACTED
-  7. Enqueue TRANSLATE_PAGE job for this page
+  7. Check: are all EXTRACT_PAGE sibling jobs for this project DONE?
+     If yes: enqueue one DETECT_CHAPTERS job for the project
 
-TRANSLATE_PAGE job (per page):
-  1. Load project.sourceLang, project.targetLang, genre content, top 50 glossary terms
-  2. Fetch all Sentence records for this page
-  3. Build translation prompt (system + genre cache block + glossary cache block)
-  4. Call TranslationAgent.translate(page_sentences) with the array of sentences
-  5. Parse JSON array response and save `translatedText` + `confidence` to each Sentence
-  6. Set page.status = TRANSLATED
-  7. Enqueue REVIEW_PAGE job
+DETECT_CHAPTERS job (runs once per document, after all EXTRACT_PAGE jobs complete):
+  Idempotency: if any Chapter records already exist for this project, delete them and all
+  page.chapterId assignments before re-running (safe to re-run on retry — produces same result).
+  1. Load all Pages for project in pageNumber order
+  2. Cross-page sentence stitching (detects sentence fragments split across page boundaries):
+     a. For each adjacent page pair (page N, page N+1):
+        - If the last sentence of page N has no terminal punctuation (.!?:;) AND
+          the first sentence of page N+1 starts with a lowercase letter or a conjunction/preposition:
+          → Merge: append the first sentence of page N+1 to the last sentence of page N
+            (update page N's last Sentence.originalText; delete page N+1's first Sentence record;
+             renumber remaining sentences on page N+1; update page N+1's sourceMarkdown to remove
+             the merged {{SENTENCE_X}} placeholder)
+     b. Repeat pass until no fragments are detected (handles runs of 3+ consecutive fragments)
+  3. SegmentationService.detectChapters() across all pages' sourceMarkdown in sequence
+     → create Chapter records with correct start/end page spans; assign page.chapterId
+  4. Token-budget batch planner:
+     - budget = min(contextWindow × 0.75 − estimatedSystemPromptTokens, MAX_TRANSLATION_BATCH_TOKENS)
+     - tokenEstimate(page) = sum of (sentence.originalText.length / 4) across all sentences on the page
+     - Walk pages in order, accumulating token estimates; cut a new batch when adding the next page
+       would exceed budget (a single page that alone exceeds budget becomes its own batch)
+  5. For each batch: enqueue one TRANSLATE_BATCH job with payload = {projectId, pageIds: [...]}
+
+TRANSLATE_BATCH job (1+ pages, grouped by token budget):
+  Idempotency: skip any page in the batch where page.status is not EXTRACTED or REJECTED.
+  (REJECTED pages are valid re-translation targets from the request-changes flow.)
+  1. For each page in batch: set page.status = TRANSLATING
+  2. Load project.sourceLang, project.targetLang, genre content, top 50 glossary terms
+  3. Collect all Sentence records across all pages in the batch (ordered by pageNumber, sentenceNumber)
+  4. TM Retrieval: for each sentence, generate embedding via EmbeddingService and query
+     TranslationMemory (cosine similarity ≥ 0.75, top 3, scoped to genreId + sourceLang + targetLang)
+  5. Build translation prompt (system + genre cache block + glossary cache block + TM block).
+     User prompt includes [DOCUMENT_CONTEXT] for each page in the batch.
+  6. Call TranslationAgent.translate(all_batch_sentences) — returns [{id, translatedText, confidence}]
+  7. Parse JSON array response (Zod validation).
+     On parse failure: split batch in half and retry each half independently (max 2 retries per half — 3 total attempts per half including the first).
+  8. For each sentence: save sentence.translatedText, sentence.aiTranslatedText = translatedText, sentence.confidence
+  9. For each page in batch: set page.status = TRANSLATED; enqueue REVIEW_PAGE job
 
 REVIEW_PAGE job (per page):
-  1. Load project.sourceLang, project.targetLang, genre content, glossary
-  2. For each sentence in page:
-     a. Build review prompt
-     b. Call ReviewAgent.review(sentence) → structured JSON
-     c. Create Error records from errors array
-     d. Set sentence.status = REVIEWED
-  3. Set page.status = HUMAN_REVIEW
-  4. Set page.lastAiRunAt = now()
-  5. Determine Priority based on highest error severity found (CRITICAL > HIGH > MEDIUM > LOW).
-  6. Assign reviewer: round-robin among active REVIEWER users ordered by fewest currently assigned HUMAN_REVIEW pages; set page.assignedReviewerId + page.assignedAt
-  7. If all pages in the project are now HUMAN_REVIEW or APPROVED: set project.status = REVIEW
-  8. If all pages in the project are APPROVED: set project.status = COMPLETED
+  Idempotency: filter to only sentences where sentence.status != REVIEWED before calling agent.
+  1. Set page.status = REVIEWING
+  2. Load project.sourceLang, project.targetLang, genre content, top 50 glossary terms
+  3. Fetch all unreviewed Sentence records for this page
+  4. Call ReviewAgent.review(sentences_batch) with all (id, originalText, translatedText) pairs in one call
+  5. Parse JSON array response; for each sentence entry:
+     a. Create Error records from errors array
+     b. Set sentence.status = REVIEWED
+  6. Set page.status = HUMAN_REVIEW
+  7. Set page.lastAiRunAt = now()
+  8. Determine Priority: highest severity across all errors on this page (CRITICAL > HIGH > MEDIUM > LOW)
+  9. Assign primary reviewer: round-robin among active REVIEWER users ordered by fewest current
+     HUMAN_REVIEW assignments; create PageReviewer record (isPrimary=true); set page.assignedAt = now()
+  10. Check project completion (via aggregate DB count — do not load all pages into memory):
+      - If all pages are HUMAN_REVIEW or APPROVED: set project.status = REVIEW
+      - If all pages are APPROVED: set project.status = COMPLETED
+
+INDEX_MEMORY job (per page, enqueued on page approval):
+  1. Fetch all Sentence records for this page
+  2. For each sentence:
+     a. Generate 768-dim embedding of originalText via EmbeddingService (nomic-embed-text)
+     b. Upsert TranslationMemory (genreId, sourceLang, targetLang, originalText, translatedText, embedding)
+  — Runs async so approval response is not blocked by embedding calls
 ```

@@ -1,177 +1,186 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OllamaService } from './ollama.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { PageStatus } from '@prisma/client';
+import { ModelsService } from '../models/models.service';
+import { AgentType, ErrorSeverity, ErrorCategory } from '@prisma/client';
 
-interface QualityScore {
-  totalScore: number;
-  breakdown: {
-    terminology: number;
-    grammar: number;
-    meaning: number;
-    style: number;
-  };
-  errors: {
-    type: string;
-    location: string;
-    issue: string;
-    suggestion: string;
-  }[];
-  recommendation: 'approve' | 'human_review' | 'retry';
+export interface ReviewInput {
+  id: string;
+  source: string;
+  translation: string;
+}
+
+export interface ReviewErrorOutput {
+  severity: ErrorSeverity;
+  category: ErrorCategory;
+  location: string;
+  currentText: string;
+  suggestedText: string;
+  issueDescription: string;
+  reference?: string;
+  aiNote?: string;
+}
+
+export interface SentenceReviewOutput {
+  sentenceId: string;
+  errors: ReviewErrorOutput[];
 }
 
 @Injectable()
 export class ReviewAgent {
   private readonly logger = new Logger(ReviewAgent.name);
 
-  private readonly reviewPrompt = `You are a Tamil Bible translation quality reviewer. Your task is to evaluate translations for accuracy, quality, and adherence to Thiruviviliam style.
-
-## Evaluation Criteria
-
-### 1. Terminology Accuracy (0-30 points)
-- Correct use of Thiruviviliam terms
-- Consistent terminology throughout
-- Proper transliteration of proper nouns
-
-### 2. Grammar & Syntax (0-25 points)
-- Correct Tamil grammar
-- Proper sentence structure
-- Appropriate use of Tamil inflections
-
-### 3. Meaning Preservation (0-25 points)
-- Accurate representation of original meaning
-- No omissions or additions
-- Correct handling of idioms and metaphors
-
-### 4. Style & Readability (0-20 points)
-- Appropriate formal tone
-- Natural Tamil phrasing
-- Readable for modern Tamil readers
-
-## Output Format
-
-Provide a JSON response with this structure:
-{
-  "totalScore": <0-100>,
-  "breakdown": {
-    "terminology": <0-30>,
-    "grammar": <0-25>,
-    "meaning": <0-25>,
-    "style": <0-20>
-  },
-  "errors": [
-    {
-      "type": "terminology|grammar|meaning|style",
-      "location": "text snippet",
-      "issue": "description of issue",
-      "suggestion": "correction suggestion"
-    }
-  ],
-  "recommendation": "approve|human_review|retry"
-}`;
-
   constructor(
-    private ollama: OllamaService,
-    private prisma: PrismaService,
+    private readonly prisma: PrismaService,
+    private readonly modelsService: ModelsService,
   ) {}
 
-  async reviewPage(pageId: string): Promise<QualityScore> {
-    const page = await this.prisma.page.findUnique({
-      where: { id: pageId },
+  /**
+   * Main entrypoint to review a batch of sentence translations.
+   */
+  async reviewBatch(
+    projectId: string,
+    sentences: ReviewInput[],
+  ): Promise<SentenceReviewOutput[]> {
+    this.logger.log(`Evaluating translation quality for ${sentences.length} sentences on project ${projectId}`);
+
+    // 1. Fetch project details & style guide reference
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        genre: {
+          include: {
+            currentVersion: true,
+          },
+        },
+      },
     });
 
-    if (!page || !page.translatedText) {
-      throw new Error(`Page not found or no translation: ${pageId}`);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
     }
 
-    try {
-      // Update status
-      await this.prisma.page.update({
-        where: { id: pageId },
-        data: { status: PageStatus.REVIEWING },
-      });
+    const sourceLang = project.sourceLang;
+    const targetLang = project.targetLang;
+    const styleGuide = project.genre.currentVersion?.content?.slice(0, 2000) || 'Standard formal tone guide.';
 
-      const prompt = `${this.reviewPrompt}
+    // 2. Fetch top 50 glossary terms for this genre
+    const glossaryTerms = await this.prisma.glossaryTerm.findMany({
+      where: { genreId: project.genreId },
+      take: 50,
+      orderBy: { sourceTerm: 'asc' },
+    });
 
-## Original Text:
-${page.originalText}
+    const glossaryBlock = glossaryTerms
+      .map((term) => `${term.sourceTerm} → ${term.targetTerm}`)
+      .join('\n');
 
-## Translated Text:
-${page.translatedText}
+    // 3. Construct System Prompt
+    const systemPrompt = `You are a professional translation quality reviewer.
+Evaluate the ${targetLang} translations of the provided ${sourceLang} source sentences.
+Apply the terminology and style rules from the style guide when assessing quality.
 
-Please evaluate and respond with JSON only.`;
+## Style Guide Reference
+${styleGuide}
 
-      const response = await this.ollama.generate(
-        prompt,
-        'phi4-mini',
-        {
-          temperature: 0.1,
-          top_p: 0.95,
-        },
-      );
+## Glossary Reference
+${glossaryBlock || 'No glossary terms defined.'}
 
-      // Parse the JSON response
-      const result = this.parseQualityResponse(response.response);
-
-      // Save review data
-      await this.prisma.page.update({
-        where: { id: pageId },
-        data: {
-          qualityScore: result.totalScore,
-          reviewData: {
-            ...result,
-            model: response.model,
-          },
-          // Route to human review regardless (policy: every page gets human review)
-          status: PageStatus.HUMAN_REVIEW,
-        },
-      });
-
-      this.logger.log(`Page ${pageId} reviewed, score: ${result.totalScore}`);
-      return result;
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? (error as Error).message : 'Unknown error';
-      await this.prisma.page.update({
-        where: { id: pageId },
-        data: {
-          status: PageStatus.ERROR,
-          errorMessage: `Review failed: ${errorMessage}`,
-        },
-      });
-
-      throw new Error(errorMessage);
-    }
+## Output Format (strict JSON array — one entry per input sentence)
+[
+  {
+    "sentenceId": "UUID",
+    "errors": [
+      {
+        "severity": "CRITICAL|HIGH|MEDIUM|LOW",
+        "category": "TERMINOLOGY|ACCURACY|FLUENCY|STYLE|GRAMMAR",
+        "location": "<text snippet where error occurs>",
+        "currentText": "<what was translated>",
+        "suggestedText": "<what it should be>",
+        "issueDescription": "<why it is wrong>",
+        "reference": "<glossary term or style guide rule if applicable>",
+        "aiNote": "<model's explanation of why this error occurred>"
+      }
+    ]
   }
+]
+Output an empty errors array for sentences with no errors. Do not omit any sentence from the output.`;
 
-  private parseQualityResponse(response: string): QualityScore {
+    // 4. Construct User Prompt
+    const userPrompt = `Review the following ${sourceLang} → ${targetLang} sentence translations:
+
+\`\`\`json
+${JSON.stringify(
+  sentences.map((s) => ({ id: s.id, source: s.source, translation: s.translation })),
+  null,
+  2,
+)}
+\`\`\``;
+
+    // 5. Execute Prompt using ModelsService
+    const response = await this.modelsService.executePrompt(AgentType.REVIEW, `${systemPrompt}\n\n${userPrompt}`, {
+      temperature: 0.1,
+      max_tokens: 4096,
+    });
+
+    // 6. Safely Parse and Validate JSON
     try {
-      // Extract JSON from response
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const textResponse = response.text.trim();
+      const jsonMatch = textResponse.match(/\[\s*\{[\s\S]*\}\s*\]/);
+
       if (!jsonMatch) {
-        throw new Error('No JSON found in response');
+        throw new Error(`Failed to extract JSON array from review response. Raw response: ${textResponse}`);
       }
 
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonMatch[0]) as any[];
 
-      return {
-        totalScore: parsed.totalScore ?? 0,
-        breakdown: {
-          terminology: parsed.breakdown?.terminology ?? 0,
-          grammar: parsed.breakdown?.grammar ?? 0,
-          meaning: parsed.breakdown?.meaning ?? 0,
-          style: parsed.breakdown?.style ?? 0,
-        },
-        errors: parsed.errors ?? [],
-        recommendation: parsed.recommendation ?? 'human_review',
-      };
-    } catch (error) {
-      this.logger.error(`Failed to parse quality response: ${(error as Error).message}`);
-      return {
-        totalScore: 50,
-        breakdown: { terminology: 10, grammar: 10, meaning: 15, style: 15 },
-        errors: [],
-        recommendation: 'human_review',
-      };
+      // Map and robustly parse error severity/category values to match Prisma enums perfectly
+      const outputs: SentenceReviewOutput[] = parsed.map((item) => {
+        if (!item.sentenceId) {
+          throw new Error('Review response item missing "sentenceId"');
+        }
+
+        const rawErrors = (item.errors || []) as any[];
+
+        const mappedErrors: ReviewErrorOutput[] = rawErrors.map((err) => {
+          // Normalize ErrorSeverity
+          let severity: ErrorSeverity = ErrorSeverity.MEDIUM;
+          const rawSeverity = String(err.severity).toUpperCase();
+          if (rawSeverity === 'CRITICAL') severity = ErrorSeverity.CRITICAL;
+          else if (rawSeverity === 'HIGH') severity = ErrorSeverity.HIGH;
+          else if (rawSeverity === 'MEDIUM') severity = ErrorSeverity.MEDIUM;
+          else if (rawSeverity === 'LOW') severity = ErrorSeverity.LOW;
+
+          // Normalize ErrorCategory
+          let category: ErrorCategory = ErrorCategory.STYLE;
+          const rawCategory = String(err.category).toUpperCase();
+          if (rawCategory === 'TERMINOLOGY') category = ErrorCategory.TERMINOLOGY;
+          else if (rawCategory === 'STYLE') category = ErrorCategory.STYLE;
+          else if (rawCategory === 'ACCURACY') category = ErrorCategory.ACCURACY;
+          else if (rawCategory === 'FLUENCY') category = ErrorCategory.FLUENCY;
+          else if (rawCategory === 'GRAMMAR') category = ErrorCategory.GRAMMAR;
+
+          return {
+            severity,
+            category,
+            location: err.location || 'entire sentence',
+            currentText: err.currentText || '',
+            suggestedText: err.suggestedText || '',
+            issueDescription: err.issueDescription || 'Quality issue detected.',
+            reference: err.reference || null,
+            aiNote: err.aiNote || null,
+          };
+        });
+
+        return {
+          sentenceId: item.sentenceId,
+          errors: mappedErrors,
+        };
+      });
+
+      return outputs;
+    } catch (parseErr) {
+      this.logger.error(`Failed parsing review response: ${(parseErr as Error).message}`);
+      throw parseErr;
     }
   }
 }

@@ -1,11 +1,334 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(REVIEWER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens       RefreshToken[]
+  ownedProjects       Project[]        @relation("ProjectOwner")
+  pageReviews         PageReviewer[]
+  sentenceAssignments Sentence[]       @relation("SentenceReviewer")
+  genreVersions       GenreVersion[]
+  chatSessions        ChatSession[]
+  activityLogs        ActivityLog[]
+  createdGenres       Genre[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// ─── Genre ───────────────────────────────────────────────────────────────────
+
+model Genre {
+  id               String       @id @default(uuid())
+  name             String
+  key              String?      @unique
+  description      String?
+  icon             String?      // emoji or icon name
+  color            String?      // hex color for card
+  systemPrompt     String?      @db.Text
+  userPromptTemplate String?    @db.Text
+  segmentUnit      SegmentUnit  @default(SENTENCE)  // how sentences are grouped for display in the workbench
+  pdfTemplate      Json?        // export typography/layout settings (see 07-architecture.md § PDF Export)
+  docxTemplate     Json?        // export Word document styles (see 07-architecture.md § DOCX Export)
+  currentVersionId String?      @unique
+  currentVersion   GenreVersion? @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  createdById      String?
+  createdBy        User?        @relation(fields: [createdById], references: [id])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  versions      GenreVersion[] @relation("AllVersions")
+  projects      Project[]
+  glossaryTerms GlossaryTerm[]
+  memories      TranslationMemory[]
+}
+
+model GenreVersion {
+  id          String   @id @default(uuid())
+  genreId     String
+  genre       Genre    @relation("AllVersions", fields: [genreId], references: [id], onDelete: Cascade)
+  version     String   // e.g. "1.0", "1.1", "2.0"
+  content     String   // full markdown content (system prompt + style guide + glossary hints)
+  note        String?  // change summary
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  currentForGenre Genre? @relation("CurrentVersion")
+}
+
+// ─── Project ─────────────────────────────────────────────────────────────────
+
+model Project {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  sourceLang  String
+  targetLang  String
+  genreId     String
+  genre       Genre         @relation(fields: [genreId], references: [id])
+  status      ProjectStatus @default(DRAFT)
+  ownerId     String?
+  owner       User?         @relation("ProjectOwner", fields: [ownerId], references: [id])
+  sourceFileId String?      // MinIO object key
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  chapters    Chapter[]
+  pages       Page[]
+  jobs        Job[]
+  memories    TranslationMemory[]
+}
+
+model Chapter {
+  id        String   @id @default(uuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  number    Int
+  title     String?
+  createdAt DateTime @default(now())
+
+  pages     Page[]
+
+  @@unique([projectId, number])
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
+model Page {
+  id                 String     @id @default(uuid())
+  projectId          String
+  project            Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  chapterId          String?
+  chapter            Chapter?   @relation(fields: [chapterId], references: [id])
+  pageNumber         Int
+  originalText       String?
+  sourceMarkdown     String?    @db.Text   // Markdown skeleton with {{SENTENCE_X}} placeholders
+  layoutMetadata     Json?                 // structural data from OCR: columns, dimensions, font bands, image regions
+  status             PageStatus @default(PENDING)
+  priority           Priority   @default(MEDIUM)
+  assignedAt         DateTime?  // when first reviewer was assigned (set on HUMAN_REVIEW transition)
+  lastAiRunAt        DateTime?  // when last AI translation/review job finished
+  quality            Int?       // 0-100; null before REVIEW_PAGE runs; recalculated after each Error status change
+  notes              String?    // page-level notes visible to all assigned reviewers
+  errorMessage       String?    // last job error
+  retryCount         Int        @default(0)
+  maxRetries         Int        @default(3)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  sentences    Sentence[]
+  jobs         Job[]
+  reviewers    PageReviewer[]
+
+  @@unique([projectId, pageNumber])
+}
+
+// ─── PageReviewer ─────────────────────────────────────────────────────────────
+
+model PageReviewer {
+  id         String   @id @default(uuid())
+  pageId     String
+  page       Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  assignedAt DateTime @default(now())
+  isPrimary  Boolean  @default(false)  // true for the round-robin auto-assigned reviewer
+
+  @@unique([pageId, userId])
+}
+
+// ─── Sentence ─────────────────────────────────────────────────────────────────
+
+model Sentence {
+  id                 String        @id @default(uuid())
+  pageId             String
+  page               Page          @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  sentenceNumber     Int
+  originalText       String
+  translatedText     String?
+  aiTranslatedText   String?       // AI-generated translation before any human edits; used for "Reset to AI translation"
+  status             SentenceStatus @default(PENDING)
+  confidence         Float?        // 0-1 from translation agent
+  isApproved         Boolean       @default(false) // marked as accepted by human reviewer
+  assignedReviewerId String?       // sentence-level reviewer override (optional)
+  assignedReviewer   User?         @relation("SentenceReviewer", fields: [assignedReviewerId], references: [id])
+  reviewedAt         DateTime?     // when reviewer last touched this sentence
+  reviewedById       String?       // FK to User (soft ref — who last edited)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  errors         Error[]
+  memory         TranslationMemory?
+
+  @@unique([pageId, sentenceNumber])
+}
+
+// ─── Error ───────────────────────────────────────────────────────────────────
+
+model Error {
+  id               String        @id @default(uuid())
+  sentenceId       String
+  sentence         Sentence      @relation(fields: [sentenceId], references: [id], onDelete: Cascade)
+  severity         ErrorSeverity
+  category         ErrorCategory
+  location         String?       // e.g. "words 5-7"
+  currentText      String        // what the AI produced
+  suggestedText    String        // what it should be
+  issueDescription String        // why it's wrong
+  reference        String?       // glossary term or domain reference
+  aiNote           String?       // model's own explanation
+  status           ErrorStatus   @default(OPEN)
+  appliedAt        DateTime?
+  appliedById      String?
+  escalatedAt      DateTime?
+  escalatedById    String?
+  createdAt        DateTime      @default(now())
+}
+
+// ─── Glossary ─────────────────────────────────────────────────────────────────
+
+model GlossaryTerm {
+  id         String   @id @default(uuid())
+  genreId    String
+  genre      Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  sourceTerm String
+  targetTerm String
+  context    String?  // which sense / topic area
+  notes      String?
+  version    Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([genreId, sourceTerm])
+}
+
+// ─── Translation Memory (RAG) ─────────────────────────────────────────────────
+
+model TranslationMemory {
+  id             String   @id @default(uuid())
+  genreId        String
+  genre          Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sentenceId     String   @unique
+  sentence       Sentence @relation(fields: [sentenceId], references: [id], onDelete: Cascade)
+  sourceLang     String
+  targetLang     String
+  originalText   String
+  translatedText String
+  embedding      Unsupported("vector(768)")?  // nomic-embed-text output
+  createdAt      DateTime @default(now())
+
+  @@index([genreId, sourceLang, targetLang])
+}
+
+// ─── Jobs ────────────────────────────────────────────────────────────────────
+
+model Job {
+  id           String    @id @default(uuid())
+  type         JobType
+  status       JobStatus @default(QUEUED)
+  payload      Json      @default("{}")  // input params (projectId, pageId, etc.)
+  result       Json?     // output (fileUrl, stats, etc.)
+  progress     Int       @default(0)     // 0-100
+  retryCount   Int       @default(0)     // incremented on each re-queue; capped at 3
+  errorMessage String?
+  parentJobId  String?   // set on child jobs (e.g. EXTRACT_PAGE children of PROCESS_DOCUMENT)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  // Optional relations (a job may belong to a project or page)
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id])
+  pageId      String?
+  page        Page?     @relation(fields: [pageId], references: [id])
+}
+
+// ─── Chat ────────────────────────────────────────────────────────────────────
+
+model ChatSession {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  context       ChatContext @default(GENERAL)
+  entityId      String?     // genreId, pageId, etc. depending on context
+  modelProvider Provider    @default(OLLAMA)
+  modelName     String      @default("qwen2.5:7b")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  messages      ChatMessage[]
+}
+
+model ChatMessage {
+  id         String      @id @default(uuid())
+  sessionId  String
+  session    ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role       MessageRole
+  content    String
+  mode       ChatMode?   // PLAN or BUILD (null for USER/SYSTEM messages)
+  tokenCount Int?
+  createdAt  DateTime    @default(now())
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model ModelConfig {
+  id        String    @id @default(uuid())
+  agentType AgentType
+  provider  Provider
+  modelName String
+  endpoint  String?
+  apiKeyEnc String?   // AES-256-GCM encrypted
+  isActive  Boolean   @default(true)
+  isDefault Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([agentType, isDefault])
+}
+
+// ─── Activity ────────────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String   // e.g. "page.approved", "genre.version_created"
+  entityType String   // "page", "project", "genre", etc.
+  entityId   String?
+  entityHref String?  // frontend route for click-through navigation
+  details    Json     @default("{}")
+  createdAt  DateTime @default(now())
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum Role {
   REVIEWER
@@ -16,6 +339,7 @@ enum Role {
 enum ProjectStatus {
   DRAFT
   PROCESSING
+  PAUSED
   REVIEW
   COMPLETED
   ARCHIVED
@@ -31,228 +355,100 @@ enum PageStatus {
   HUMAN_REVIEW
   APPROVED
   REJECTED
-  OCR_FAILED
-  TRANSLATION_TIMEOUT
+  ESCALATED
   ERROR
 }
 
-enum Priority {
-  LOW
-  NORMAL
-  HIGH
-  URGENT
+enum SentenceStatus {
+  PENDING
+  TRANSLATED
+  REVIEWED
 }
 
-enum FeedbackType {
-  CORRECTION
-  APPROVAL
-  REJECTION
-  COMMENT
-  SUGGESTION
+enum ErrorSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ErrorCategory {
+  TERMINOLOGY
+  STYLE
+  ACCURACY
+  FLUENCY
+  GRAMMAR
+}
+
+enum ErrorStatus {
+  OPEN
+  APPLIED
+  REJECTED
+  ESCALATED
+  EXCEPTION
+}
+
+enum JobType {
+  PROCESS_DOCUMENT
+  EXTRACT_PAGE
+  DETECT_CHAPTERS
+  TRANSLATE_BATCH
+  REVIEW_PAGE
+  INDEX_MEMORY
+  EXPORT_PROJECT
+  EXPORT_PAGE_REPORT
+  EXPORT_ADMIN_REPORT
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  PAUSED
+  DONE
+  FAILED
+  CANCELLED
 }
 
 enum AgentType {
-  EXTRACTION
   TRANSLATION
   REVIEW
-  QUALITY_ROUTER
-  HUMAN_GATE
-  LEARNING
+  CHAT
+  EMBEDDING
 }
 
 enum Provider {
   OLLAMA
-  OPENAI
   ANTHROPIC
-  GOOGLE
 }
 
-enum RuleCategory {
-  TRANSLATION
-  EXTRACTION
+enum ChatContext {
+  GENRE
   REVIEW
-  QUALITY
-  TERMINOLOGY
+  GLOSSARY
+  GENERAL
 }
 
-model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  passwordHash String    @map("password_hash")
-  name         String
-  role         Role      @default(REVIEWER)
-  isActive     Boolean   @default(true) @map("is_active")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-
-  projects     Project[]
-  pages        Page[]    @relation("PageReviewer")
-  feedback     Feedback[]
-  auditLogs    AuditLog[]
-  createdRules Rule[]    @relation("RuleCreator")
-
-  @@map("users")
+enum ChatMode {
+  PLAN
+  BUILD
 }
 
-model Project {
-  id           String        @id @default(uuid())
-  name         String
-  description  String?
-  sourceLang   String        @default("en") @map("source_lang")
-  targetLang   String        @default("ta") @map("target_lang")
-  sourceFile   String?       @map("source_file")
-  totalPages   Int           @default(0) @map("total_pages")
-  status       ProjectStatus @default(DRAFT)
-  settings     Json          @default("{}")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-
-  ownerId      String?
-  owner        User?         @relation(fields: [ownerId], references: [id])
-  pages        Page[]
-  ruleOverrides RuleOverride[]
-
-  @@map("projects")
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
 }
 
-model Page {
-  id              String        @id @default(uuid())
-  projectId       String        @map("project_id")
-  project         Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  pageNumber      Int           @map("page_number")
-  originalText    String?       @map("original_text")
-  translatedText  String?       @map("translated_text")
-  status          PageStatus    @default(PENDING)
-  qualityScore    Decimal?      @map("quality_score")
-  priority        Priority      @default(NORMAL)
-  retryCount      Int           @default(0) @map("retry_count")
-  maxRetries      Int           @default(3) @map("max_retries")
-  ocrData         Json?         @map("ocr_data")
-  translationData Json?         @map("translation_data")
-  reviewData      Json?         @map("review_data")
-  errorMessage    String?       @map("error_message")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-
-  assignedReviewerId String?    @map("assigned_reviewer_id")
-  assignedReviewer   User?      @relation("PageReviewer", fields: [assignedReviewerId], references: [id])
-
-  versions    PageVersion[]
-  feedback    Feedback[]
-
-  @@unique([projectId, pageNumber])
-  @@map("pages")
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }
 
-model PageVersion {
-  id            String   @id @default(uuid())
-  pageId        String   @map("page_id")
-  page          Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  versionNumber Int      @map("version_number")
-  originalText  String?  @map("original_text")
-  translatedText String? @map("translated_text")
-  qualityScore  Decimal? @map("quality_score")
-  rulesApplied  Json?    @map("rules_applied")
-  createdAt     DateTime @default(now()) @map("created_at")
-
-  @@unique([pageId, versionNumber])
-  @@map("page_versions")
-}
-
-model Rule {
-  id             String        @id @default(uuid())
-  name           String
-  description    String?
-  content        String
-  frontmatter    Json          @default("{}")
-  category       RuleCategory
-  priority       Int           @default(0)
-  isGlobal       Boolean       @default(true) @map("is_global")
-  isActive       Boolean       @default(true) @map("is_active")
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
-
-  createdById    String?       @map("created_by_id")
-  createdBy      User?         @relation("RuleCreator", fields: [createdById], references: [id])
-
-  overrides      RuleOverride[]
-
-  @@map("rules")
-}
-
-model RuleOverride {
-  id                 String   @id @default(uuid())
-  projectId          String   @map("project_id")
-  project            Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  ruleId             String   @map("rule_id")
-  rule               Rule     @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  overrideContent    String?  @map("override_content")
-  overrideFrontmatter Json?   @map("override_frontmatter")
-  isActive           Boolean  @default(true) @map("is_active")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
-
-  @@unique([projectId, ruleId])
-  @@map("rule_overrides")
-}
-
-model ModelConfig {
-  id          String   @id @default(uuid())
-  agentType   AgentType @map("agent_type")
-  provider    Provider
-  modelName   String   @map("model_name")
-  endpoint    String?
-  apiKeyEnc   String?  @map("api_key_enc")
-  config      Json     @default("{}")
-  isActive    Boolean  @default(true) @map("is_active")
-  isDefault   Boolean  @default(false) @map("is_default")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  @@unique([agentType, isActive], map: "model_config_active_unique")
-  @@map("model_configs")
-}
-
-model Feedback {
-  id                String        @id @default(uuid())
-  pageId            String        @map("page_id")
-  page              Page          @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  userId            String?       @map("user_id")
-  user              User?         @relation(fields: [userId], references: [id])
-  feedbackType      FeedbackType  @map("feedback_type")
-  originalText      String?       @map("original_text")
-  correctedText     String?       @map("corrected_text")
-  feedbackText      String?       @map("feedback_text")
-  ruleIds           String[]      @map("rule_ids")
-  isUsedForLearning Boolean       @default(false) @map("is_used_for_learning")
-  createdAt         DateTime      @default(now()) @map("created_at")
-
-  @@map("feedback")
-}
-
-model AuditLog {
-  id          String   @id @default(uuid())
-  userId      String?  @map("user_id")
-  user        User?    @relation(fields: [userId], references: [id])
-  action      String
-  entityType  String   @map("entity_type")
-  entityId    String?  @map("entity_id")
-  details     Json     @default("{}")
-  ipAddress   String?  @map("ip_address")
-  userAgent   String?  @map("user_agent")
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  @@map("audit_logs")
-}
-
-model Setting {
-  id          String   @id @default(uuid())
-  key         String   @unique
-  value       String?
-  valueType   String   @default("string") @map("value_type")
-  description String?
-  isPublic    Boolean  @default(false) @map("is_public")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  @@map("settings")
+enum SegmentUnit {
+  VERSE
+  PARAGRAPH
+  SENTENCE
+  PAGE
 }

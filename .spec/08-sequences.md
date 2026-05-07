@@ -102,7 +102,7 @@ sequenceDiagram
 
     FE->>API: POST /projects {name, genreId, sourceLang, targetLang, sourceFileId}
     API->>DB: INSERT Project (status: DRAFT)
-    API->>DB: INSERT Job (type: EXTRACT_PDF, projectId, payload: {sourceFileId})
+    API->>DB: INSERT Job (type: PROCESS_DOCUMENT, projectId, payload: {sourceFileId})
     DB-->>API: Project + Job
     API-->>FE: 201 Project
 
@@ -138,23 +138,51 @@ sequenceDiagram
 
     Worker->>DB: SELECT EXTRACT_PAGE job
     Worker->>MinIO: getObject(page_X.png)
-    Worker->>Worker: OCR/LlamaParse → Markdown
-    Worker->>Worker: Crop images → MinIO
-    Worker->>Worker: detectChapters() & extractSentences()
+    Worker->>Worker: OCR/LlamaParse → Markdown + layoutMetadata
+    Worker->>Worker: Crop images → MinIO (embed ![img] in Markdown)
+    Worker->>Worker: SegmentationService: Markdown structure split → spaCy per paragraph
     
-    Worker->>DB: UPDATE Page SET sourceMarkdown
     loop Each sentence
         Worker->>DB: INSERT Sentence (status: PENDING)
     end
+    Worker->>DB: UPDATE Page SET sourceMarkdown, layoutMetadata, status=EXTRACTED
 
-    Worker->>DB: UPDATE page SET status=EXTRACTED
-    Worker->>DB: INSERT Job (type: TRANSLATE_PAGE, pageId)
+    Worker->>DB: UPDATE job SET status=DONE
+    Note over Worker,DB: Check if all EXTRACT_PAGE siblings DONE
+    alt All siblings DONE
+        Worker->>DB: INSERT Job (type: DETECT_CHAPTERS, projectId)
+    end
+```
+
+---
+
+## 5b. DETECT_CHAPTERS + Batch Planning
+
+```mermaid
+sequenceDiagram
+    participant Worker as JobWorker
+    participant DB
+
+    Worker->>DB: SELECT DETECT_CHAPTERS job FOR UPDATE SKIP LOCKED
+    Worker->>DB: SELECT all Pages for project ORDER BY pageNumber
+    Worker->>Worker: Cross-page sentence stitching (detect + merge fragments)
+    loop Each merged/deleted sentence
+        Worker->>DB: UPDATE/DELETE Sentence; UPDATE Page.sourceMarkdown
+    end
+    Worker->>Worker: detectChapters() across all sourceMarkdown → Chapter spans
+    loop Each Chapter
+        Worker->>DB: INSERT Chapter; UPDATE pages SET chapterId
+    end
+    Worker->>Worker: Token-budget batch planner → group pages into batches
+    loop Each batch
+        Worker->>DB: INSERT Job (type: TRANSLATE_BATCH, payload: {projectId, pageIds: [...]})
+    end
     Worker->>DB: UPDATE job SET status=DONE
 ```
 
 ---
 
-## 6. Translation Pipeline (TRANSLATE_PAGE Job)
+## 6. Translation Pipeline (TRANSLATE_BATCH Job)
 
 ```mermaid
 sequenceDiagram
@@ -162,27 +190,33 @@ sequenceDiagram
     participant DB
     participant LLM as Ollama/Claude
 
-    Worker->>DB: SELECT TRANSLATE_PAGE job FOR UPDATE SKIP LOCKED
+    Worker->>DB: SELECT TRANSLATE_BATCH job FOR UPDATE SKIP LOCKED
     Worker->>DB: UPDATE job SET status=RUNNING
-    Worker->>DB: UPDATE page SET status=TRANSLATING
+    Worker->>DB: UPDATE pages SET status=TRANSLATING (for each page in batch)
     Worker->>DB: SELECT project (sourceLang, targetLang, genreId)
     Worker->>DB: SELECT genre.currentVersion.content
     Worker->>DB: SELECT top 50 GlossaryTerms for genreId
+    Worker->>DB: SELECT all sentences across batch pages
 
-    Worker->>DB: SELECT all sentences for pageId
-    Worker->>Worker: embed(first sentence) for context mapping
-    Worker->>DB: SELECT top 3 TranslationMemory matches
-    Worker->>Worker: Build system prompt with {sourceLang}, {targetLang}, genre, glossary, RAG
-    Worker->>LLM: generate(systemPrompt + JSON array of all sentences)
-    LLM-->>Worker: JSON array of translated sentences
-    
-    loop Each translated sentence
-        Worker->>DB: UPDATE sentence SET translatedText, confidence, status=TRANSLATED
+    loop Each sentence
+        Worker->>LLM: embed(sentence.originalText)
+        Worker->>DB: SELECT top 3 TranslationMemory matches (cosine ≥ 0.75)
     end
 
-    Worker->>DB: UPDATE page SET status=TRANSLATED
+    Worker->>Worker: Build system prompt: genre + glossary + TM block
+    Worker->>Worker: Build user prompt: [DOCUMENT_CONTEXT] per page + JSON sentence array
+    Worker->>LLM: generate(systemPrompt + userPrompt)
+    LLM-->>Worker: JSON array [{id, translatedText, confidence}]
+
+    loop Each translated sentence
+        Worker->>DB: UPDATE sentence SET translatedText, aiTranslatedText, confidence, status=TRANSLATED
+    end
+
+    loop Each page in batch
+        Worker->>DB: UPDATE page SET status=TRANSLATED
+        Worker->>DB: INSERT Job (type: REVIEW_PAGE, pageId)
+    end
     Worker->>DB: UPDATE job SET status=DONE
-    Worker->>DB: INSERT Job (type: REVIEW_PAGE, pageId)
 ```
 
 ---
@@ -200,20 +234,23 @@ sequenceDiagram
     Worker->>DB: UPDATE page SET status=REVIEWING
     Worker->>DB: Load project langs, genre content, glossary
 
-    loop Each sentence in page
-        Worker->>LLM: generateStructured(reviewPrompt) → JSON
-        LLM-->>Worker: {errors[]}
+    Worker->>DB: SELECT all unreviewed sentences for pageId
+    Worker->>LLM: generateStructured(reviewPrompt + all sentences as JSON array)
+    LLM-->>Worker: [{sentenceId, errors[]}]
+
+    loop Each sentence entry
         Worker->>DB: UPDATE sentence SET status=REVIEWED
-        loop Each error in errors[]
+        loop Each error
             Worker->>DB: INSERT Error (severity, category, currentText, suggestedText, ...)
         end
     end
 
-    Worker->>Worker: Determine Priority based on highest error severity
-    Worker->>DB: UPDATE page SET status=HUMAN_REVIEW, lastAiRunAt=now(), priority
+    Worker->>Worker: Determine Priority (highest error severity across page)
+    Worker->>Worker: Compute quality score across OPEN errors only: max(0, 100 − (C×5 + H×2 + M×1 + L×0.5))
+    Worker->>DB: UPDATE page SET status=HUMAN_REVIEW, quality, lastAiRunAt=now(), priority, assignedAt=now()
 
-    Worker->>Worker: Round-robin reviewer assignment
-    Worker->>DB: UPDATE page SET assignedReviewerId, assignedAt
+    Worker->>Worker: Round-robin reviewer assignment (fewest HUMAN_REVIEW assignments)
+    Worker->>DB: INSERT PageReviewer (pageId, userId, isPrimary=true)
 
     Worker->>DB: UPDATE job SET status=DONE
 
@@ -237,13 +274,16 @@ sequenceDiagram
 
     FE->>API: POST /pages/:id/approve {notes?}
     API->>DB: SELECT page WITH errors WHERE status=OPEN
+    API->>DB: SELECT count of sentences WHERE isApproved=false
     alt Has OPEN errors AND user is not MASTER/ADMIN
         API-->>FE: 422 {message: "Resolve open errors first"}
+    else Has unapproved sentences AND user is not MASTER/ADMIN
+        API-->>FE: 422 {message: "All sentences must be approved first"}
     else OK
         API->>DB: UPDATE page SET status=APPROVED, notes
         API->>DB: INSERT ActivityLog {action: "page.approved"}
-        
-        Note right of API: Async fire-and-forget: MemoryService.index(page)
+        API->>DB: INSERT Job (type: INDEX_MEMORY, pageId)
+        Note right of API: INDEX_MEMORY runs async — approval response not blocked
 
         API->>DB: Check if all project pages are APPROVED
         alt All approved
@@ -268,7 +308,8 @@ sequenceDiagram
     FE->>API: POST /pages/:id/request-changes {note}
     API->>DB: UPDATE page SET status=REJECTED, notes=note
     API->>DB: INSERT ActivityLog {action: "page.changes_requested"}
-    API->>DB: INSERT Job (type: TRANSLATE_PAGE, pageId)
+    API->>DB: INSERT Job (type: TRANSLATE_BATCH, payload: {projectId, pageIds: [pageId]})
+    Note over DB: TRANSLATE_BATCH accepts REJECTED pages (idempotency allows EXTRACTED or REJECTED)
     Note over DB: Page will move REJECTED → TRANSLATING → TRANSLATED → REVIEWING → HUMAN_REVIEW
     API-->>FE: 200 Page
 ```
@@ -292,7 +333,7 @@ sequenceDiagram
 
     FE->>API: POST /pages/:id/resolve-escalation {resolution}
     API->>DB: UPDATE page SET status=HUMAN_REVIEW
-    API->>DB: Re-assign to original reviewer (or round-robin if inactive)
+    API->>DB: SELECT PageReviewer WHERE isPrimary=true; assign if active, else round-robin new primary
     API->>DB: INSERT ActivityLog {action: "page.escalation_resolved"}
     API-->>FE: 200 Page
 ```
@@ -570,8 +611,12 @@ sequenceDiagram
     participant DB
 
     FE->>API: POST /admin/bulk-reassign {pageIds: [...], reviewerId}
-    API->>DB: UPDATE pages SET assignedReviewerId=reviewerId, assignedAt=now() WHERE id IN (pageIds)
-    API->>DB: INSERT ActivityLog for each page {action: "page.reassigned"}
+    loop Each pageId
+        API->>DB: DELETE PageReviewer WHERE pageId
+        API->>DB: INSERT PageReviewer (pageId, userId=reviewerId, isPrimary=true)
+        API->>DB: UPDATE page SET assignedAt=now()
+        API->>DB: INSERT ActivityLog {action: "page.reassigned"}
+    end
     API-->>FE: 200 {updated: N}
 ```
 
@@ -672,8 +717,8 @@ sequenceDiagram
 
     Note over FE: Reviewer clicks through sentences
 
-    FE->>API: PATCH /sentences/:id {reviewed: true}
-    API->>DB: UPDATE sentence SET reviewedAt=now(), reviewedById
+    FE->>API: PATCH /sentences/:id {isApproved: true}
+    API->>DB: UPDATE sentence SET isApproved=true, reviewedAt=now(), reviewedById
     API-->>FE: Sentence
 
     Note over FE: Reviewer applies a single error fix
@@ -735,9 +780,9 @@ sequenceDiagram
 
     Note over FE: Page shows ERROR status with error banner
 
-    FE->>API: POST /jobs {type: TRANSLATE_PAGE, pageId}
-    API->>DB: UPDATE page SET status=PENDING, retryCount += 1
-    API->>DB: INSERT Job (type: TRANSLATE_PAGE, pageId)
+    FE->>API: POST /jobs {type: TRANSLATE_BATCH, payload: {projectId, pageIds: [pageId]}}
+    API->>DB: UPDATE page SET status=EXTRACTED, retryCount += 1
+    API->>DB: INSERT Job (type: TRANSLATE_BATCH, payload: {projectId, pageIds: [pageId]})
     API-->>FE: Job
 
     Note over FE: Resumes polling; page re-enters pipeline
@@ -775,16 +820,17 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant API
+    participant Worker as JobWorker
     participant DB
     participant LLM
 
-    Note over API: Triggered async after page approval
+    Note over Worker,DB: INDEX_MEMORY job — picked up by JobWorker after page approval
 
-    loop Each sentence in approved page
-        API->>LLM: embed(sentence.originalText)
-        LLM-->>API: 768-dim vector
-
-        API->>DB: INSERT TranslationMemory {genreId, sourceLang, targetLang, originalText, translatedText, embedding}
+    Worker->>DB: SELECT QUEUED INDEX_MEMORY job FOR UPDATE SKIP LOCKED
+    Worker->>DB: SELECT all sentences for pageId
+    loop Each sentence
+        Worker->>LLM: embed(sentence.originalText) → 768-dim vector
+        Worker->>DB: UPSERT TranslationMemory {genreId, sourceLang, targetLang, originalText, translatedText, embedding}
     end
+    Worker->>DB: UPDATE job SET status=DONE
 ```

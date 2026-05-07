@@ -23,14 +23,17 @@ Before Phase 0, manually:
 **Goal:** All services start; API health endpoint returns green.
 
 ### Create / Update
-- `docker-compose.yml` — postgres:17, minio/minio, ollama/ollama, maildev/maildev, api (port 3000), frontend (port 4200)
+- `docker-compose.yml` — postgres:17, minio/minio, ollama/ollama, maildev/maildev, api (port 3000), frontend (port 4200), nlp (port 8001)
 - `docker-compose.prod.yml` — same without dev overrides
 - `apps/api/.env.example` — all env vars from `07-architecture.md`
 - `apps/api/src/main.ts` — enable CORS, helmet, throttler, global validation pipe, Pino logger
 - `apps/api/src/app.module.ts` — root module: imports PrismaModule, ThrottlerModule, ConfigModule
+- `apps/nlp/main.py` — FastAPI/spaCy sentence segmentation sidecar (~20 lines; see `07-architecture.md` § NLP Segmentation Service)
+- `apps/nlp/requirements.txt` — `fastapi`, `uvicorn`, `spacy`; pre-download `en_core_web_sm`
+- `apps/nlp/Dockerfile.nlp` — Python 3.11 slim; installs requirements; downloads `en_core_web_sm`; exposes port 8001
 
 ### Acceptance
-- `docker compose up` → all 6 services healthy
+- `docker compose up` → all 7 services healthy (postgres, minio, ollama, nlp, maildev, api, frontend)
 - `GET /health` → `{status: "ok", db: "ok", minio: "ok", ollama: "ok"}`
 
 **Spec ref:** `07-architecture.md` § Docker Services, § Environment Variables
@@ -44,13 +47,17 @@ Before Phase 0, manually:
 ### Create / Replace
 - `apps/api/prisma/schema.prisma` — full schema from `02-domain.md` (replace v1 schema entirely)
   - Models: User, RefreshToken, Genre, GenreVersion, Project, Chapter, Page, Sentence, Error, GlossaryTerm, Job, ChatSession, ChatMessage, ModelConfig, ActivityLog
-  - Enums: Role, ProjectStatus, PageStatus, SentenceStatus, ErrorSeverity, ErrorCategory, ErrorStatus, JobType, JobStatus, AgentType, Provider, ChatContext, ChatMode, MessageRole, Priority
-- `apps/api/prisma/migrations/` — single initial migration
+  - Enums: Role, ProjectStatus, PageStatus, SentenceStatus, ErrorSeverity, ErrorCategory, ErrorStatus, JobType, JobStatus, AgentType, Provider, ChatContext, ChatMode, MessageRole, Priority, SegmentUnit
+- `apps/api/prisma/migrations/` — single initial migration. **Important:** after Prisma generates the migration SQL, manually append the pgvector ivfflat index for `TranslationMemory.embedding` — Prisma cannot express this for `Unsupported` types:
+  ```sql
+  CREATE INDEX tm_embedding_idx ON "TranslationMemory"
+    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+  ```
 - `apps/api/prisma/seed.ts`:
   - 3 users: admin@tai.local / master@tai.local / reviewer@tai.local (bcrypt passwords)
-  - Genre "Literary Translation" with v1.0 content from `05-agents.md` § Default Genre Template
-  - 20–30 demo GlossaryTerms (generic literary vocabulary) linked to the demo genre
-  - 4 ModelConfigs: TRANSLATION/OLLAMA/qwen2.5:7b, REVIEW/OLLAMA/phi4:mini, CHAT/OLLAMA/qwen2.5:7b, CHAT/ANTHROPIC/claude-sonnet-4-6
+  - Genre "Tamil Bible (Parisutha Vedagamam)" (icon: 📖, color: #7c3aed) with v1.0 content from `05-agents.md` § Default Genre Template
+  - 50 GlossaryTerms (Parisutha Vedagamam Protestant theological vocabulary) from `02-domain.md` § Seed Data linked to the Bible genre
+  - 5 ModelConfigs: TRANSLATION/OLLAMA/qwen2.5:7b, REVIEW/OLLAMA/phi4:mini, CHAT/OLLAMA/qwen2.5:7b, CHAT/ANTHROPIC/claude-sonnet-4-6, EMBEDDING/OLLAMA/nomic-embed-text
 
 ### Acceptance
 - `npx prisma migrate dev --name init` runs clean
@@ -107,6 +114,8 @@ Before Phase 0, manually:
 - `GET /users` (MASTER+) → list of users
 - `POST /users/invite` (ADMIN) → creates user, email in maildev
 - `PATCH /users/:id` → updates user; role change takes effect on next login
+
+> **Design decision**: `POST /users/invite` accepts roles REVIEWER and MASTER only. ADMIN accounts are provisioned exclusively via the seed script or direct DB access — the invite endpoint must reject `role: "ADMIN"` with a 422.
 
 **Spec ref:** `03-api.md` § Users
 
@@ -168,7 +177,7 @@ Before Phase 0, manually:
 
 ### Create / Replace
 - `apps/api/src/modules/files/minio.service.ts` — `upload()`, `getSignedUrl()` (1h expiry), `deleteObject()`
-- `apps/api/src/modules/files/files.controller.ts` — `POST /files/upload` (multipart), `GET /files/:fileId/url`
+- `apps/api/src/modules/files/files.controller.ts` — `POST /files/upload` (multipart), `GET /files/:fileId/url`, `GET /files/public/:path` (streams object directly from MinIO, no auth required — used by Markdown `![img]` tags in the workbench)
 - Store MinIO object key as `sourceFileId` on Project
 
 ### Acceptance
@@ -206,18 +215,16 @@ Before Phase 0, manually:
 
 ### Create / Replace
 - `apps/api/src/agents/extraction.service.ts`:
-  - `processDocument(job)`: Download PDF via `minio.getObject()`, split into images (`pdf2image`), upload to MinIO, create Page records, enqueue `EXTRACT_PAGE` jobs.
-  - `extractPage(job)`: Download page image, run OCR (Marker/LlamaParse) → `markdownString`.
-  - Image Extraction: Crop illustrations/diagrams, upload to MinIO, and embed `![image](minio_url)` in Markdown.
-  - `detectChapters()` — regex scan for chapter headings.
-  - `extractSentences()` — parses markdown, splits sentences, and leaves `{{SENTENCE_X}}` placeholders.
-  - Create Chapter + Sentence records, set `page.sourceMarkdown`, set `page.status = EXTRACTED`, enqueue `TRANSLATE_PAGE`.
+  - `processDocument(job)`: Download PDF via `minio.getObject()`, split into images (`pdf2image`), upload to MinIO, create Page records, enqueue `EXTRACT_PAGE` jobs (parentJobId = this job's id).
+  - `extractPage(job)`: Download page image, run OCR (Marker/LlamaParse) → `markdownString`. Capture `page.layoutMetadata`. Image Extraction: crop illustrations/diagrams, upload to MinIO, embed `![image](minio_url)` in Markdown. Call SegmentationService (two-level: Markdown structure → spaCy per paragraph). Save `page.sourceMarkdown` with `{{SENTENCE_X}}` placeholders. Set `page.status = EXTRACTED`. Check if all sibling EXTRACT_PAGE jobs are DONE; if yes, enqueue DETECT_CHAPTERS.
+  - `detectChapters(job)`: Cross-page sentence stitching → chapter detection → token-budget batch planner → enqueue TRANSLATE_BATCH jobs (see `05-agents.md` § Agent Pipeline).
 - `apps/api/src/agents/translation.agent.ts`:
   - Load `project.sourceLang`, `project.targetLang` from DB
   - Build system prompt using `{sourceLang}` / `{targetLang}` variables (see `05-agents.md` § Translation Agent)
-  - Inject `[GENRE_CONTENT_CACHE_BLOCK]` + `[GLOSSARY_CACHE_BLOCK]`
-  - Call `LlmService.forAgent(TRANSLATION)`, passing a JSON array of all sentences on the page.
-  - Parse JSON array response and save `translatedText` + `confidence` to each Sentence
+  - Inject `[GENRE_CONTENT_CACHE_BLOCK]` + `[GLOSSARY_CACHE_BLOCK]` + `[TRANSLATION_MEMORY_BLOCK]`
+  - User prompt: `[DOCUMENT_CONTEXT]` block per page + JSON array of sentences to translate
+  - Call `LlmService.forAgent(TRANSLATION)` with all sentences across the batch.
+  - Parse JSON array response and save `translatedText`, `aiTranslatedText = translatedText`, and `confidence` to each Sentence
 - `apps/api/src/agents/review.agent.ts`:
   - Load `project.sourceLang`, `project.targetLang` from DB
   - Build review prompt using `{sourceLang}` / `{targetLang}` variables (see `05-agents.md` § Review Agent)
@@ -228,15 +235,15 @@ Before Phase 0, manually:
 - `apps/api/src/agents/orchestrator.ts`:
   - `runProcessDocument(job)` — splits PDF and queues page extraction
   - `runExtractPage(job)` — runs OCR pipeline on single image
-  - `runTranslatePage(job)` — fetches all page sentences, calls translation agent
-  - `runReviewPage(job)` — iterates sentences, calls review agent
-  - Priority assignment (< 50 → CRITICAL, 50-69 → HIGH, 70-84 → MEDIUM, ≥ 85 → LOW)
+  - `runTranslateBatch(job)` — fetches sentences for all pages in batch, calls translation agent; implements batch-split retry on JSON parse failure (split in half, retry each half, max 3 attempts per half)
+  - `runReviewPage(job)` — fetches all page sentences, calls review agent in one batch call
+  - Priority assignment: map the worst error severity across all errors on the page directly to `page.priority` — any CRITICAL error → CRITICAL, else any HIGH → HIGH, else any MEDIUM → MEDIUM, else LOW (or MEDIUM if no errors)
   - Sets `page.lastAiRunAt`, assigns reviewer
 
 ### Acceptance
 - Upload a PDF, trigger PROCESS_DOCUMENT → Page images split and EXTRACT_PAGE jobs queued.
 - EXTRACT_PAGE completes → Sentence records created with correct text.
-- Trigger TRANSLATE_PAGE → JSON array sent to LLM, all sentences get `translatedText`.
+- Trigger TRANSLATE_BATCH → JSON array sent to LLM, all sentences get `translatedText`.
 - Trigger REVIEW_PAGE → all sentences get scores + Error records created
 - Page priority assigned based on highest error severity
 
@@ -259,14 +266,14 @@ Before Phase 0, manually:
   - Performs pgvector cosine similarity search (`<=>`) filtered by genre and languages
   - Returns top 3 matches with similarity ≥ 0.75
 - `apps/api/src/modules/pages/pages.service.ts`:
-  - In `approve()` method, after setting status to APPROVED: loop through page sentences and call `MemoryService.index()` asynchronously (fire-and-forget).
+  - In `approve()` method, after setting status to APPROVED: enqueue INDEX_MEMORY job (async — approval response is not blocked). The INDEX_MEMORY job runner calls `MemoryService.index()` per sentence.
 - `apps/api/src/agents/translation.agent.ts`:
   - Before building the prompt, call `MemoryService.retrieve()`
   - Inject retrieved pairs into `[TRANSLATION_MEMORY_BLOCK]`
 
 ### Acceptance
 - `POST /pages/:id/approve` succeeds → new rows appear in `TranslationMemory` with embeddings
-- `TRANSLATE_PAGE` job for similar text → log output shows `[TRANSLATION_MEMORY_BLOCK]` populated with the previously approved pair
+- `TRANSLATE_BATCH` job for similar text → log output shows `[TRANSLATION_MEMORY_BLOCK]` populated with the previously approved pair
 - `MemoryService.retrieve` correctly filters out results from a different `genreId`
 
 **Spec ref:** `05-agents.md` § Translation Memory (RAG)
@@ -283,16 +290,16 @@ Before Phase 0, manually:
 - `apps/api/src/modules/jobs/job.worker.ts`:
   - Polls `jobs` table every 2s for `status = QUEUED`
   - `SELECT FOR UPDATE SKIP LOCKED` transaction
-  - Dispatches to `orchestrator.runExtract()`, `runTranslatePage()`, `runReviewPage()`, etc.
+  - Dispatches to `orchestrator.runProcessDocument()`, `runExtractPage()`, `runDetectChapters()`, `runTranslateBatch()`, `runReviewPage()`, `runIndexMemory()`, `runExportProject()`, `runExportPageReport()`, `runExportAdminReport()`
   - Updates `progress` (0-100) in real time via `job.progress = N`; saves to DB
   - Graceful shutdown: `onModuleDestroy()` waits for running jobs to complete
   - On restart: finds jobs stuck in `RUNNING` → marks `FAILED` → re-queues
 
 ### Acceptance
-- Enqueue EXTRACT_PDF → job appears as QUEUED, transitions RUNNING → DONE
+- Enqueue PROCESS_DOCUMENT → job appears as QUEUED, transitions RUNNING → DONE
 - `GET /jobs/:id` while running → `{status: "RUNNING", progress: 47}`
 - Kill API mid-job → restart → job goes to FAILED then re-queues automatically
-- `DELETE /jobs/:id` on QUEUED → cancels; on RUNNING → 409 or cancels gracefully
+- `DELETE /jobs/:id` on QUEUED → cancels immediately; on RUNNING → cancels gracefully (worker finishes current LLM call but discards result — does not advance page status)
 
 **Spec ref:** `03-api.md` § Jobs; `07-architecture.md` § Job Worker
 
@@ -305,15 +312,20 @@ Before Phase 0, manually:
 ### Create
 - `apps/api/src/modules/pages/pages.controller.ts` — full endpoints from `03-api.md` § Pages including `GET /pages/:id/next-in-queue`:
   - `PATCH /pages/:id` (notes, priority, status)
-  - `POST /pages/:id/approve` — blocked if OPEN errors exist (unless MASTER+)
-  - `POST /pages/:id/request-changes` — requires note; enqueues TRANSLATE_PAGE
-  - `POST /pages/:id/reassign`
+  - `POST /pages/:id/approve` — blocked if OPEN errors or any sentence isApproved=false (unless MASTER+); enqueues INDEX_MEMORY
+  - `POST /pages/:id/request-changes` — requires note; sets page.retryCount += 1; if page.retryCount > page.maxRetries (3), return 422 with code `MAX_RETRIES_EXCEEDED`; otherwise enqueues TRANSLATE_BATCH for this page alone
+  - `POST /pages/:id/reassign {reviewerIds}` — replaces entire PageReviewer list
+  - `POST /pages/:id/add-reviewer {reviewerId}` — adds reviewer without removing others
+  - `POST /pages/:id/remove-reviewer {reviewerId}` — removes reviewer; error if last reviewer
   - `POST /pages/:id/escalate`
   - `POST /pages/:id/resolve-escalation`
+  - Recalculate `page.quality` after any Error status change
 - `apps/api/src/modules/sentences/sentences.controller.ts`:
   - `GET /sentences?pageId=`
-  - `PATCH /sentences/:id` — edit translatedText
-  - `POST /sentences/:id/apply-all-fixes` — sets all OPEN errors to APPLIED
+  - `PATCH /sentences/:id` — edit translatedText; blocked if sentence.assignedReviewerId set and caller is not that reviewer (unless MASTER+)
+  - `POST /sentences/:id/apply-all-fixes` — sets all OPEN errors to APPLIED; recalculates page.quality
+  - `POST /sentences/:id/assign {reviewerId}` — locks sentence to specific reviewer
+  - `POST /sentences/:id/reset-translation` — sets translatedText = aiTranslatedText; clears isApproved
 - `apps/api/src/modules/errors/errors.controller.ts`:
   - `GET /errors?sentenceId=&pageId=&status=`
   - `POST /errors/:id/apply` — sets status APPLIED; replaces `error.currentText` with `error.suggestedText` in `sentence.translatedText` (string replace); returns updated Error + Sentence
@@ -440,18 +452,22 @@ Before Phase 0, manually:
 
 ### Create / Replace
 - `apps/api/src/modules/export/export.controller.ts`:
-  - `POST /export/project/:id` — `{format: pdf|text|html, scope: all|approved}` → `{jobId}`
+  - `POST /export/project/:id` — `{format: pdf|docx|text|html, scope: all|approved, templateOverride?}` → `{jobId}`
   - `POST /export/page/:id/report` → `{jobId}`
+  - `POST /export/admin-report` (MASTER+) — `{projectIds?: string[], format?: pdf|xlsx}` → `{jobId}`; generates an aggregate quality/progress report across selected projects (or all accessible projects if `projectIds` omitted)
 - `apps/api/src/modules/export/export.service.ts`:
-  - Reconstruct markdown: Fetch `page.sourceMarkdown`, replace `{{SENTENCE_X}}` with approved `sentence.translatedText`.
-  - PDF generation: Use `md-to-pdf` or similar to render the reconstructed markdown to a formatted PDF.
-  - Page report: sentence-by-sentence analysis
-  - Store output in MinIO; set `job.result.fileUrl` (signed URL)
+  - Reconstruct markdown per page: fetch `page.sourceMarkdown`, replace `{{SENTENCE_X}}` with `sentence.translatedText`
+  - **PDF**: pdfkit with `genre.pdfTemplate` + `page.layoutMetadata`; Noto font family; see `07-architecture.md` § PDF Export Layer
+  - **DOCX**: `docx` npm package; map Markdown heading/paragraph/list/quote to Word styles; apply `genre.docxTemplate` if set; fetch images from MinIO for inline embedding; see `07-architecture.md` § DOCX Export Layer
+  - **text / html**: plain string concatenation or lightweight Markdown-to-HTML
+  - Page report: sentence-by-sentence quality analysis with error breakdown
+  - Store output in MinIO; set `job.result.fileUrl` (signed URL, 1h expiry)
 
 ### Acceptance
-- `POST /export/project/:id` with `{format: "pdf", scope: "approved"}` → jobId → poll → signed PDF URL
-- PDF renders text correctly
+- `POST /export/project/:id` with `{format: "pdf", scope: "approved"}` → jobId → poll → signed PDF URL; PDF renders Tamil text with correct fonts
+- `POST /export/project/:id` with `{format: "docx", scope: "approved"}` → jobId → poll → signed DOCX URL; Word document opens with correct heading hierarchy
 - `POST /export/page/:id/report` → jobId → poll → downloadable report
+- `POST /export/admin-report` (MASTER+) → jobId → poll → aggregate report (PDF or XLSX)
 
 **Spec ref:** `03-api.md` § Export
 
@@ -544,7 +560,7 @@ Before Phase 0, manually:
   - Chapter accordion; each chapter shows page status grid
   - Page status chips: color-coded by status
   - Click page → navigate to `/workbench/:pageId`
-  - Re-run AI button (MASTER+): enqueues TRANSLATE_PAGE + REVIEW_PAGE
+  - Re-run AI button (MASTER+): enqueues TRANSLATE_BATCH (single-page batch) + REVIEW_PAGE
 
 ### Acceptance
 - Create project with PDF → progress toast shows extraction progress
@@ -555,32 +571,48 @@ Before Phase 0, manually:
 
 ---
 
-## Phase 20 — Workbench Screen
+## Phase 20 — Workbench Screen (browse mode)
 
-**Goal:** 3-column translation workbench with segment editor and chat assistant.
+**Goal:** 3-column translation workbench matching the authoritative `04-screens.md` layout — source and target rendered side-by-side with inline AI suggestions and Cursor-style chat.
 
 ### Create
-- `apps/frontend/src/app/features/workbench/workbench.component.ts`:
-  - **Left panel (1/4):** page list sidebar with status dots + priority pills
-  - **Center panel (2/4):** sentence-by-sentence display
-    - Each sentence: original text (top, read-only) + translated text (bottom, editable textarea)
-    - Sentence approval toggle: click to mark `isApproved: true` or `false`.
-    - Auto-save on blur (debounce 500ms): `PATCH /sentences/:id`
-  - **Right panel (1/4):** inspector (no chat — static only)
-    - Page info: assigned reviewer, last AI run
-    - Static AI feedback text (aiFeedbackSummary from review agent)
-    - Action buttons: Approve / Request Changes / Reassign / Escalate
-  - Toolbar: project breadcrumb, page nav (prev/next), overlay mode toggle, AI re-run button
-  - **Overlay mode:** when toggled, original text overlays translation side-by-side in a fullscreen layer
-  - Job progress banner: when page is TRANSLATING or REVIEWING, show progress bar + cancel button
-  - Poll `/jobs/:id` every 2s when active job exists for this page
+- `apps/frontend/src/app/features/workbench/workbench.component.ts` (browse mode, `/workbench/:pageId`):
+  - **Left sidebar (15%):** page navigation list — StatusDot + `P{nn}` (mono) per page; click switches active page; chapter eyebrow label; active page highlighted
+  - **Middle column (35%) — Source Document:**
+    - Renders `page.sourceMarkdown` as structured document — headings, bullets, paragraphs, images
+    - Each `{{SENTENCE_X}}` replaced by a read-only `SentenceComponent` showing `sentence.originalText`
+    - Each sentence has a numbered badge and an approval toggle (`[ ]` hollow / `[✓]` filled green)
+    - Clicking a sentence highlights it and scrolls the right column to the matching sentence
+  - **Right column (50%) — Target Document Editor:**
+    - Renders same `page.sourceMarkdown` structure; each `{{SENTENCE_X}}` replaced by an editable `SentenceComponent` showing `sentence.translatedText`
+    - Structural formatting identical to source column (heading → heading, bullet → bullet)
+    - Sentences with OPEN errors have colored underlines (red for CRITICAL/HIGH, yellow for MEDIUM/LOW)
+    - AI suggestion popover on underlined sentence: severity pill + category + suggestedText + `[✓ Accept suggestion]` → `POST /errors/:id/apply`
+    - Inline chat rewrite below suggestion: text input + `[→]` → `POST /chat/sessions/:id/stream (BUILD mode)`
+    - Approval toggle on source column SentenceComponent: `PATCH /sentences/:id {isApproved}`; accepting a suggestion auto-approves the sentence
+    - Manual editing: click anywhere and type; debounced auto-save (500ms): `PATCH /sentences/:id {translatedText}`
+    - Cmd+K / Ctrl+K on selected text → capsule inline prompt pill; on submit calls chat BUILD mode; renders red/green inline diff blocks with `[Accept (Y)]` / `[Reject (N)]` / `[Retry]` floating toolbar
+    - Right sidebar toggle (Cmd+I): Chat (PLAN mode) tab + Composer (BUILD mode) tab; supports `@`-mentions (`@page`, `@glossary`, `@genre`)
+    - Sentence context menu (⋮ or right-click): **Reset to AI translation** → `POST /sentences/:id/reset-translation` (confirmation dialog); **Assign to reviewer** (MASTER+) → `POST /sentences/:id/assign`
+    - Reviewer panel in right column footer: Avatar chips for all `PageReviewer` entries; MASTER+ sees **Add reviewer** (`POST /pages/:id/add-reviewer`) and **Reassign** (`POST /pages/:id/reassign`) buttons; each sentence row has `[👤 Assign]` gutter icon → `POST /sentences/:id/assign`
+  - **Toolbar:**
+    - Back button → navigate to `/projects/:projectId`
+    - Breadcrumb: project name · chapter · page number
+    - Progress bar: `X / Y accepted` with visual bar
+    - Prev / Next page buttons
+    - Skip + Complete action buttons
+  - Job progress banner: when page is TRANSLATING or REVIEWING, show progress bar with cancel button; poll `/jobs/:id` every 2s while status is QUEUED or RUNNING
 
 ### Acceptance
+- Middle and right columns render identical Markdown structure (headings align, bullets align)
+- Click sentence in source column → right column scrolls to and focuses the matching editable sentence
 - Edit sentence text → auto-saves after 500ms; no explicit save button needed
-- Apply error → error card updates status; error count badge decrements
-- Exception error → prompts for glossary term; creates GlossaryTerm
-- Overlay mode toggle → fullscreen side-by-side view
-- Open analysis button → navigates to `/review/:pageId`
+- Apply AI suggestion → error underline disappears; suggestion popover closes; sentence auto-approved
+- Cmd+K on sentence → inline prompt pill appears; submit → red/green diff renders in document body
+- Accept diff → sentence text updates; Reject → reverts; both remove the diff overlay
+- Exception error → prompts for glossary term input; on confirm → creates GlossaryTerm
+- MASTER adds reviewer via footer panel → new Avatar chip appears immediately
+- Reset to AI translation → confirmation dialog → sentence text reverts to `aiTranslatedText`; `isApproved` cleared
 
 **Spec ref:** `04-screens.md` § Workbench Screen
 
@@ -609,24 +641,24 @@ Before Phase 0, manually:
 
 ---
 
-## Phase 22 — Review Screen
+## Phase 22 — Review Screen (queue mode)
 
-**Goal:** Full page review with error annotation and approval/rejection workflow.
+**Goal:** Wire the workbench component to the `/review/:pageId` route with queue-mode behaviour.
 
-### Create
-- `apps/frontend/src/app/features/review-detail/review-detail.component.ts`:
-  - Toolbar: Progress bar "Progress: X / N accepted"
-  - Center: 2-column inline editor + inline chat/suggestions
-  - Sentence approval toggle next to each sentence. Automatically checks when a suggestion is applied or an AI rewrite is accepted.
-  - Approve: blocked if OPEN errors or any unapproved sentences → shows tooltip; `POST /pages/:id/approve`
-  - Request Changes: modal requiring non-empty note; `POST /pages/:id/request-changes`
-  - "Save & next": approves then navigates to next page in queue
+### Create / Modify
+- `apps/frontend/src/app/features/workbench/workbench.component.ts` receives a `mode` input derived from the active route (`/workbench` → `browse`, `/review` → `queue`).
+- **Queue mode differences** (activated on `/review/:pageId`):
+  - "Back" navigates to `/queue` instead of `/projects/:id`
+  - Sidebar shows only the caller's assigned HUMAN_REVIEW pages (filtered by PageReviewer)
+  - "Complete" button calls `POST /pages/:id/approve` then `GET /pages/:id/next-in-queue`; navigates to returned pageId or to `/queue` with "Queue complete" toast if null
+  - Shows reviewer chip list in right column footer; MASTER+ sees "Add reviewer" and "Reassign" buttons
+- `apps/frontend/src/app/app.routes.ts` — both `/workbench/:pageId` and `/review/:pageId` map to `WorkbenchComponent` with `data: { mode: 'browse' | 'queue' }`
 
 ### Acceptance
-- Toggle sentence approval → visual checkmark updates; progress bar updates; `PATCH /sentences/:id`
-- Approve with OPEN errors or unapproved sentences → blocked with tooltip message
-- Request Changes without note → submit button disabled
-- Apply single error → error card updates; sentence automatically marked as approved
+- Navigate from queue → `/review/:pageId` → "Complete" → lands on next queued page automatically
+- Navigate from project detail → `/workbench/:pageId` → "Back" → returns to project detail
+- MASTER adds reviewer via "Add reviewer" chip → new Avatar appears in reviewer list immediately
+- "Reset to AI translation" on sentence → confirmation dialog → translatedText reverts; isApproved cleared
 
 **Spec ref:** `04-screens.md` § Review Screen
 
@@ -643,24 +675,37 @@ Before Phase 0, manually:
   - New Genre button (MASTER+): name + description + icon picker + color picker
   - Click card → navigate to genre editor
 - `apps/frontend/src/app/features/genres/genre-editor.component.ts`:
-  - Left pane: rich markdown editor (or CodeMirror) for genre content
+  - Left pane: rich markdown editor (or CodeMirror) for genre content; switchable to Glossary Panel or Diff Mode
+  - View mode tabs: Split / Edit / Preview / Diff (Diff tab appears only while a version is selected for diffing)
   - Mode pill: "Discuss" (Plan) / "Edit doc" (Build) — toggles chat mode
   - Right pane: chat assistant panel
     - In Plan mode: discuss, suggest, explain — no document changes
     - In Build mode: AI edits; response shows inline diff; "Save as new version" button
-  - Toolbar: genre name (editable), Save Version button, Version History button → opens drawer
-  - Test Translation input: text box + Run Test button → shows target-language output
+  - Toolbar: genre name (editable), Segment unit select, Version select, History button, **Glossary button**, Test button, Save button
+  - Test Translation: text box + Run Test button → shows target-language output
+- **Glossary Panel** (toggled by Glossary toolbar button — replaces left pane):
+  - `GET /glossary?genreId=` → searchable/paginated table of terms
+  - MASTER+: inline add/edit/delete via `POST /glossary`, `PUT /glossary/:id`, `DELETE /glossary/:id`
+  - ADMIN: `[↑ Import CSV]` button → `POST /glossary/bulk`
+  - REVIEWER: read-only table view
+- **Diff Mode** (toggled by `[↔ Diff]` on any version row in the History Drawer):
+  - Calls `GET /genres/:id/versions/:versionId/diff` → unified diff string
+  - Renders diff client-side as line-level colored blocks (removed = red, added = green)
+  - `[Diff ← v{n}]` tab appears in view mode bar; closing it returns to previous mode
 - Version History Drawer (`genre-version-drawer.component.ts`):
-  - List of versions: version number, date, note, author, "Restore" button (MASTER+)
-  - No diff view — just list + restore
+  - List of versions: version number, date, note, author, Restore button (MASTER+), `[↔ Diff]` button per row
+  - Restore → POST /genres/:id/restore/:versionId
 
 ### Acceptance
 - Edit genre content → Save Version → creates new GenreVersion; bumps version number
 - Build mode: AI response includes "Save as new version" button; click → creates version with AI-revised content
 - Restore older version → confirms dialog → creates new version with old content
 - Test Translation → shows target-language output in ≤ 30s
+- Glossary button → table of genre terms; MASTER+ can add/edit/delete inline; ADMIN sees Import CSV
+- `[↔ Diff]` on v1.1 → main pane switches to diff view showing changes between v1.1 and current; red/green line highlights
+- ADMIN invite with `role: "ADMIN"` → 422 (enforced in Phase 3 API)
 
-**Spec ref:** `04-screens.md` § Genres List Screen, § Genre Editor Screen, § Version History Drawer
+**Spec ref:** `04-screens.md` § Genres List Screen, § Genre Editor Screen, § Version History Drawer, § Diff Mode, § Glossary Panel
 
 ---
 
@@ -676,8 +721,9 @@ Before Phase 0, manually:
 - `apps/frontend/src/app/features/admin/settings.component.ts`:
   - Tabs: Models / Languages / System
   - **Models tab** (functional):
-    - 3 model config rows: Translation Agent, Review Agent, Chat Agent
+    - 4 model config rows: Translation Agent, Review Agent, Chat Agent, Embedding Agent
     - Each: provider dropdown (Ollama/Anthropic), model name input, endpoint field, API key field (masked)
+    - Embedding Agent row: provider locked to Ollama (show inline warning if user tries to switch to Anthropic)
     - Test Connection button → shows latency or error
     - Prompt logs accordion (last 10 prompts, redacted)
   - **Languages / System tabs** → "Coming soon" placeholder
@@ -764,7 +810,7 @@ Before Phase 0, manually:
 | 17 | Frontend Foundation | Auth screen + layout shell |
 | 18 | Dashboard UI | Stats + chart + queue |
 | 19 | Projects UI | List + create modal + detail |
-| 20 | Workbench UI | 2-column editor + chat |
+| 20 | Workbench UI | 3-column workbench (sidebar / source / target editor) + chat |
 | 21 | Queue UI | Filtered list + error stats |
 | 22 | Review UI | Full page review + approve flow |
 | 23 | Genres UI | Editor + version drawer |
