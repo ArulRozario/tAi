@@ -1,31 +1,34 @@
-import { Controller, Get, Param, Query, Res, HttpException, HttpStatus } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Post, Param, Body, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { ExportService } from './export.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('export')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ExportController {
-  constructor(private exportService: ExportService) {}
+  constructor(private readonly exportService: ExportService) {}
 
-  @Get('project/:id')
-  async exportProject(
-    @Param('id') projectId: string,
-    @Query('format') format: 'text' | 'html' = 'html',
-    @Res() res: Response,
+  @Post('project/:id')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  enqueueProjectExport(
+    @Param('id', ParseUUIDPipe) projectId: string,
+    @Body() body: { format?: 'pdf' | 'docx' | 'text' | 'html'; scope?: 'all' | 'approved' },
   ) {
-    try {
-      const result = await this.exportService.exportProject(projectId, format);
-      const content = result as string;
-      const isHtml = format === 'html';
-      const filename = `translation_export.${isHtml ? 'html' : 'txt'}`;
-      
-      res.setHeader('Content-Type', isHtml ? 'text/html' : 'text/plain');
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(content);
-    } catch (error: any) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException('Project not found', HttpStatus.NOT_FOUND);
-    }
+    return this.exportService.enqueueProjectExport(projectId, body.format ?? 'text', body.scope ?? 'approved');
+  }
+
+  @Post('page/:id/report')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  enqueuePageReport(@Param('id', ParseUUIDPipe) pageId: string) {
+    return this.exportService.enqueuePageReport(pageId);
+  }
+
+  @Post('admin-report')
+  @Roles('ADMIN', 'MASTER')
+  enqueueAdminReport(
+    @Body() body: { projectIds?: string[]; format?: 'pdf' | 'xlsx' },
+  ) {
+    return this.exportService.enqueueAdminReport(body.projectIds, body.format ?? 'pdf');
   }
 }

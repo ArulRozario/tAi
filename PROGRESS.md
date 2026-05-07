@@ -4,8 +4,8 @@ Last updated: 2026-05-07
 
 ## Current Status
 
-**Active phase:** Phase 15 — Export Module (API)  
-**Next up:** Phase 16 — Health Endpoint
+**Active phase:** Phase 16 — Health Endpoint  
+**Next up:** Phase 17 — Frontend Foundation (already built, needs audit)
 
 ---
 
@@ -29,7 +29,7 @@ Last updated: 2026-05-07
 | 12 | Chat Module (API — SSE streaming) | ✅ | 2026-05-06 |
 | 13 | Dashboard, Queue & Admin Modules (API) | ✅ | 2026-05-07 |
 | 14 | Models Module (API) | ✅ | 2026-05-07 |
-| 15 | Export Module (API) | ☐ | — |
+| 15 | Export Module (API) | ✅ | 2026-05-07 |
 | 16 | Activity Logging & Health | ☐ | — |
 | 17 | Frontend Foundation (auth + layout shell) | ✅ | 2026-05-06 |
 | 18 | Dashboard Screen | ✅ | 2026-05-06 |
@@ -67,6 +67,7 @@ Last updated: 2026-05-07
 | 2026-05-07 | 17 | Built secure, context-enriched Chat REST API, featuring full Server-Sent Events (SSE) streaming, build-mode version suggestions, and quick suggestion lists | chat module API with SSE streaming |
 | 2026-05-07 | 18 | Built Dashboard (30s cached stats/throughput/queue/activity), Queue (filterable HUMAN_REVIEW list + error stats + escalations), and Admin (bulk reassign/approve + page override) API modules | dashboard, queue, admin modules |
 | 2026-05-07 | 19 | Audited and patched Models module: updated Anthropic model list to Claude 4.x, replaced simulated test with real HTTP ping to api.anthropic.com, fixed bad Ollama seed endpoint, stripped doc comments | models module audit |
+| 2026-05-07 | 20 | Rewrote Export module: POST endpoints enqueue jobs and return jobId; job worker runs actual PDF (pdfkit), DOCX (docx), text, HTML generation from page.sourceMarkdown with sentence substitution; uploads to MinIO | export module rewrite |
 
 ---
 
