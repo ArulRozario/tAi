@@ -17,6 +17,7 @@ import { ChatModule } from '../modules/chat/chat.module';
 import { DashboardModule } from '../modules/dashboard/dashboard.module';
 import { QueueModule } from '../modules/queue/queue.module';
 import { AdminModule } from '../modules/admin/admin.module';
+import { HealthModule } from '../modules/health/health.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -40,6 +41,7 @@ import { AppService } from './app.service';
     DashboardModule,
     QueueModule,
     AdminModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
