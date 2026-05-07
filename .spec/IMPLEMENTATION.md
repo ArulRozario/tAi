@@ -826,3 +826,46 @@ Before Phase 0, manually:
 - **Phases 17–24** depend on Phase 2 (auth tokens) being complete.
 - **Phase 8** (agents) and **Phase 9** (job worker) are interdependent — build agent code first, then wire into worker.
 - Any screen that embeds the chat assistant (Genre Editor) must complete Phase 12 first.
+
+---
+
+## Appendices & Extensions
+
+### Phase 20b — Workbench Manual Edits & Multi-Sentence Copilot Dialog
+
+**Goal:** Implement the multi-selection matrix, the inline `contenteditable` double-click micro-editor, and the unified modal `p-dialog` sentence co-pilot with streaming AI output redirection and lead-anchor save mechanics.
+
+#### Implementation Steps
+1. **Selection Matrix & Gutter Checkboxes**:
+   - In `SentenceComponent` or `WorkbenchComponent` target segment list, add left checkboxes.
+   - Bind checkbox selection to toggle segment indices into a `selectedSentenceNums = signal<number[]>([])` signal.
+2. **Refine Action Hook**:
+   - In the right-hand inspector component, add a **`[⚡ Refine Selected Segments]`** button (with PrimeIcons `pi-sparkles`), bound to `[disabled]="selectedSentenceNums().length === 0"` and `(click)="openCopilotDialog()"`.
+3. **The Sentence Co-Pilot Dialog Component**:
+   - Build a PrimeNG `p-dialog` overlay in `workbench.component.html`.
+   - **Bilingual reference list**: Render an `*ngFor` mapping `selectedSentenceNums()`, retrieving the original source text via `getSentence(num)?.originalText`.
+   - **Main Textarea**: Add a `<textarea [(ngModel)]="dialogDraftContent" [readonly]="chatLoading" class="w-full h-32 text-text-1 bg-surface-2 p-3 border border-border rounded-md focus:outline-none focus:border-primary">` field.
+   - **Model Selector**: Add a `<p-select [options]="models" [(ngModel)]="selectedModel" class="w-40 text-xs">` container.
+   - **Prompt input**: Add an input bar `<input [(ngModel)]="dialogPrompt" (keydown.enter)="sendDialogPrompt()" placeholder="Ask AI to rewrite...">` with a send button `<p-button icon="pi pi-send" (click)="sendDialogPrompt()">`.
+   - **Streaming integration**:
+     - On prompt send, set `chatLoading = true` and target the existing chat endpoint: `GET /api/v1/chat/sessions/:sessionId/stream`.
+     - In the chunk reader loop, parse JSON tokens. Clear `dialogDraftContent` on first chunk if executing a full overwrite, then append tokens successvely: `dialogDraftContent.set(dialogDraftContent() + chunkText)`.
+     - Disable textarea editability during stream loading.
+4. **Lead-Anchor Database Write Service**:
+   - Clicking **`[✓ Accept & Save]`** will:
+     - Select the first element of selected IDs: `const leadId = selectedSentenceIds[0]`.
+     - Call `patchSentence(leadId, { translatedText: dialogDraftContent(), isApproved: false })`.
+     - For all remaining elements (`const siblingId of selectedSentenceIds.slice(1)`), call `patchSentence(siblingId, { translatedText: "", isApproved: false })`.
+     - On successful response, clear selections and refresh the active page's sentences.
+5. **Double-Click Inline Editing**:
+   - On the sentence translation text `<span>` inside the Target pane, bind `(dblclick)="startInlineEdit(sentence)"`.
+   - Under edit mode, toggle `contenteditable="true"` on the element, call `focus()`, and capture keyboard events:
+     - `keydown.enter`: Prevent default newline, retrieve element's `innerText`, and call `patchSentence(s.id, { translatedText: text, isApproved: false })`.
+     - `keydown.escape`: Revert `innerText` to original model signal and disable edit mode.
+
+#### Verification
+- Click a translation segment row, double-click it, change text, hit `Enter`, and verify a successful DB patch is triggered and visual edits are saved.
+- Select checkboxes for sentences 12 and 13. Verify the "Refine Selected Segments" button activates.
+- Click the button, verify the modal opens showing both source segments. Type a prompt, click send, and watch the AI stream text directly inside the textarea.
+- Click "Accept & Save". Verify the first sentence receives the full merged text, and the second sentence row renders seamlessly merged/omitted.
+

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinIOService } from '../files/minio.service';
 import { JobType, JobStatus, PageStatus } from '@prisma/client';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 const PDFDocument = require('pdfkit');
 import { Document, Paragraph, TextRun, HeadingLevel, Packer } from 'docx';
 
@@ -33,7 +33,7 @@ export class ExportService {
     return { jobId: job.id };
   }
 
-  async enqueueAdminReport(projectIds?: string[], format: string = 'pdf') {
+  async enqueueAdminReport(projectIds?: string[], format = 'pdf') {
     const job = await this.prisma.job.create({
       data: { type: JobType.EXPORT_ADMIN_REPORT, status: JobStatus.QUEUED, payload: { projectIds: projectIds ?? [], format } },
     });
@@ -49,9 +49,6 @@ export class ExportService {
         ...(statusFilter ? { status: { in: statusFilter } } : {}),
       },
       orderBy: { pageNumber: 'asc' },
-      include: {
-        sentences: { orderBy: { sentenceNumber: 'asc' } },
-      },
     });
 
     const project = await this.prisma.project.findUnique({
@@ -61,14 +58,9 @@ export class ExportService {
     if (!project) throw new NotFoundException('Project not found');
 
     const reconstructed = pages.map((page) => {
-      let markdown = page.sourceMarkdown ?? '';
-      for (const sentence of page.sentences) {
-        markdown = markdown.replace(
-          `{{SENTENCE_${sentence.sentenceNumber}}}`,
-          sentence.translatedText ?? sentence.originalText,
-        );
-      }
-      return { pageNumber: page.pageNumber, content: markdown };
+      // Use the continuous visual Tamil translation HTML, fallback to original transcription HTML
+      const contentHtml = page.translatedHtml || page.originalHtml || '';
+      return { pageNumber: page.pageNumber, content: contentHtml };
     });
 
     let buffer: Buffer;
@@ -106,9 +98,8 @@ export class ExportService {
     const page = await this.prisma.page.findUnique({
       where: { id: pageId },
       include: {
-        sentences: {
-          orderBy: { sentenceNumber: 'asc' },
-          include: { errors: true },
+        errors: {
+          orderBy: { createdAt: 'asc' },
         },
         project: { select: { name: true, sourceLang: true, targetLang: true } },
       },
@@ -121,21 +112,27 @@ export class ExportService {
       `Status: ${page.status}`,
       `Priority: ${page.priority}`,
       '',
-      '## Sentences',
+      `## Continuous HTML Page Content`,
+      `**Original HTML:**`,
+      page.originalHtml || '(none)',
+      '',
+      `**Translated HTML:**`,
+      page.translatedHtml || '(none)',
+      '',
+      '## QA Visual Errors',
     ];
 
-    for (const sentence of page.sentences) {
-      lines.push(`\n### Sentence ${sentence.sentenceNumber}`);
-      lines.push(`**Original:** ${sentence.originalText}`);
-      lines.push(`**Translation:** ${sentence.translatedText ?? '(none)'}`);
-      lines.push(`**Approved:** ${sentence.isApproved ? 'Yes' : 'No'}`);
-
-      if (sentence.errors.length > 0) {
-        lines.push('**Errors:**');
-        for (const err of sentence.errors) {
-          lines.push(`  - [${err.severity}] ${err.category}: ${err.issueDescription} (${err.status})`);
-        }
+    if (page.errors.length > 0) {
+      for (const err of page.errors) {
+        lines.push(`\n### Error [${err.severity}] - Category: ${err.category}`);
+        lines.push(`**Location:** ${err.location}`);
+        lines.push(`**Current text:** ${err.currentText}`);
+        lines.push(`**Suggested text:** ${err.suggestedText}`);
+        lines.push(`**Description:** ${err.issueDescription}`);
+        if (err.aiNote) lines.push(`**Reasoning:** ${err.aiNote}`);
       }
+    } else {
+      lines.push('No errors detected on this page!');
     }
 
     const buffer = Buffer.from(lines.join('\n'), 'utf8');

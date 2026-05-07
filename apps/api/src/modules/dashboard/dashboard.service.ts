@@ -136,14 +136,17 @@ export class DashboardService {
           },
         });
       } else {
-        const sentences = await this.prisma.sentence.findMany({
+        const approvedPages = await this.prisma.page.findMany({
           where: {
-            page: { status: PageStatus.APPROVED },
+            status: PageStatus.APPROVED,
             updatedAt: { gte: weekStart, lt: weekEnd },
           },
-          select: { originalText: true },
+          select: { originalHtml: true },
         });
-        value = sentences.reduce((sum, s) => sum + s.originalText.split(/\s+/).length, 0);
+        value = approvedPages.reduce((sum, p) => {
+          const text = p.originalHtml ? p.originalHtml.replace(/<[^>]+>/g, '') : '';
+          return sum + text.split(/\s+/).filter(Boolean).length;
+        }, 0);
       }
 
       const label = weekStart.toISOString().split('T')[0];
@@ -168,7 +171,6 @@ export class DashboardService {
         reviewers: {
           include: { user: { select: { id: true, name: true, email: true, role: true } } },
         },
-        _count: { select: { sentences: true } },
       },
     });
 

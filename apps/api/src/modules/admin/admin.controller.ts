@@ -16,8 +16,8 @@ export class AdminController {
     @Query('chapterId') chapterId?: string,
     @Query('status') status?: string,
     @Query('reviewerId') reviewerId?: string,
-    @Query('limit') limit: string = '50',
-    @Query('offset') offset: string = '0',
+    @Query('limit') limit = '50',
+    @Query('offset') offset = '0',
   ) {
     return this.adminService.getPages({
       projectId,

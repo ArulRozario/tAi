@@ -11,9 +11,9 @@
 | Database | PostgreSQL 17 | Primary data store |
 | File storage | MinIO | S3-compatible, self-hosted |
 | LLM (local) | Ollama | Default 2 concurrent requests |
-| LLM (cloud) | Anthropic Claude (`@anthropic-ai/sdk`) | With prompt caching; supports many language pairs |
-| PDF extraction | LlamaParse / Marker (Surya) | Vision OCR; layout-aware Markdown output |
-| Sentence segmentation | spaCy 3 (FastAPI sidecar) | Accurate sentence boundary detection; `en_core_web_sm` default |
+| LLM (cloud) | Google Gemini (`@google/genai`) & Anthropic Claude | Gemini is primary for high-speed page-level structured translations; Claude serves as fallback |
+| PDF extraction | Native Visual Multimodal OCR | Pages are captured as layout images and passed directly to Gemini, completely bypassing external OCR text extraction tools |
+| Sentence segmentation | **None** | Completely retired; translation is processed directly at the cohesive Page level |
 | Email (dev) | `maildev` + `nodemailer` | Dev SMTP on :1080 |
 | PDF export | `pdfkit` | Embed Unicode/language-appropriate fonts (e.g. Noto Sans) |
 | DOCX export | `docx` (npm) | Generates .docx from paragraph/heading styles; no external dependencies |
@@ -54,40 +54,38 @@
 | Component library | PrimeNG + SCSS overrides | Faster than fully custom; design fidelity via overrides |
 | Rule system | **Genres only** (Rules removed) | Single source of truth per translation style and domain |
 | Backend | Full rewrite (discard v1 code) | Existing structure too divergent from v2 domain |
-| AI providers | Ollama + Anthropic | Local for dev/cost, Claude for production quality; both support multilingual output |
+| AI providers | Google Gemini primary + Claude fallback | Gemini visual translation provides extreme performance and cost-effectiveness |
 | Async strategy | **Polling** (DB-backed jobs) | Simpler than WebSockets; translation timescales allow it |
 | Database | Wipe + fresh schema | New domain too different from v1 |
 | Queue | **No BullMQ/Redis** — DB polling + `SELECT FOR UPDATE` | Fewer dependencies; sufficient throughput |
-| OCR | **Vision OCR** — LlamaParse or Marker/Surya | Scanned PDFs require layout-aware extraction |
-| Sentence segmentation | **spaCy** (Python FastAPI sidecar) | JS NLP libraries insufficient for production-quality boundary detection across document types |
+| OCR & Translation | **Page-Level Visual Sliding Window** | Direct image-to-translated-HTML translation via Gemini 1.5 Flash completely bypasses separate OCR tools |
+| Sentence segmentation | **None** | Completely retired; translation occurs at the cohesive Page level to optimize flow and context |
 
 ---
 
 ## Infrastructure Diagram
 
 ```
-┌─────────────────────────────────────────────────┐
-│  Angular SPA (PrimeNG + Tailwind)  :12008       │
-│  Polling: /jobs/:id every 2s during active jobs │
-│  SSE: /chat/stream for assistant responses      │
-└────────────────────┬────────────────────────────┘
-                     │ HTTPS
-┌────────────────────▼────────────────────────────┐
+┌──────────────────────────────────────────────────┐
+│  Angular SPA (PrimeNG + Tailwind)  :12008        │
+│  Continuous Rich-Text Inline Page Editor         │
+│  Polling: /jobs/:id every 2s during active jobs  │
+│  SSE: /chat/stream for assistant responses       │
+└─────────────────────┬────────────────────────────┘
+                      │ HTTPS
+┌─────────────────────▼────────────────────────────┐
 │  NestJS API  :12007                             │
 │  Modules: auth, users, genres, projects,        │
-│  chapters, pages, sentences, errors, glossary,  │
-│  jobs, chat, export, models, dashboard,         │
-│  queue, admin, health                           │
-└──┬──────────┬──────────┬──────────┬─────────────┘
-   │          │          │          │
-┌──▼───┐ ┌───▼───┐ ┌────▼───┐ ┌───▼────┐
-│  PG  │ │ MinIO │ │ Ollama │ │  NLP   │
-│:12000│ │:12001 │ │ :12003 │ │ :12004 │
-└──────┘ └───────┘ └────────┘ └────────┘
-                        │
-              ┌─────────▼────────┐
-              │ Anthropic Claude │
-              │ (external API)   │
+│  chapters, pages, errors, glossary, jobs,       │
+│  chat, export, models, dashboard, queue, admin, │
+│  health (sentences module deleted)               │
+└──────┬──────────┬──────────┬──────────┬──────────┘
+       │          │          │          │
+    ┌──▼───┐  ┌───▼───┐  ┌───▼────┐  ┌──▼─────────┐
+    │  PG  │  │ MinIO │  │ Ollama │  │ Google/    │
+    │:12000│  │:12001 │  │ :12003 │  │ Anthropic  │
+    └──────┘  └───────┘  └────────┘  │ (Ext APIs) │
+                                     └────────────┘
               └──────────────────┘
 ```
 
@@ -142,31 +140,22 @@ src/
 
 ---
 
-## sourceMarkdown — The Structural Spine
+## originalHtml & translatedHtml — The New Visual Spine
 
-`page.sourceMarkdown` is the authoritative record of a page's document structure. It is produced during `EXTRACT_PAGE` and has one controlled modification window: the `DETECT_CHAPTERS` job may remove a `{{SENTENCE_X}}` placeholder when a cross-page sentence fragment is merged into the preceding page (stitching). After `DETECT_CHAPTERS` completes, `sourceMarkdown` is frozen and never modified again. It looks like:
+The legacy `page.sourceMarkdown` structural skeleton and its `{{SENTENCE_X}}` placeholders are **REMOVED** from the architecture.
 
-```markdown
-# {{SENTENCE_1}}
+Instead of keeping complex skeletons and parsing lists of sentence records, the direct source of truth is stored as two continuous HTML-lite strings directly on the **`Page`** model:
+1. `Page.originalHtml`: The complete, visually transcribed English page text including typography tags (`<b>`, `<i>`, `<sup>`, `<span>`).
+2. `Page.translatedHtml`: The complete, visual Tamil translation page text with matching layout tags.
 
-{{SENTENCE_2}} {{SENTENCE_3}}
-
-- {{SENTENCE_4}}
-- {{SENTENCE_5}}
-
-![image](minio_url)
-```
-
-Everything downstream uses it:
+Everything downstream uses these page-level continuous strings:
 
 | Consumer | How |
 |---|---|
-| Translation Agent (user prompt) | Reconstructed with `originalText` substituted — gives model full structural context |
-| Workbench (source column) | Rendered with `SentenceComponent(originalText)` at each placeholder |
-| Workbench (target column) | Rendered with `SentenceComponent(translatedText)` at each placeholder |
-| Export module | Plain string replace: `{{SENTENCE_X}}` → `sentence.translatedText` → final Markdown → PDF/HTML |
-
-No `sentenceType` field is needed on the `Sentence` model — structural role (heading, bullet, paragraph, caption) is always derivable from the placeholder's position in `sourceMarkdown`.
+| Translation Agent | Gemini reads the visual scanned page image and outputs `originalHtml` and `translatedHtml` directly. |
+| Workbench (source column) | Renders `Page.originalHtml` directly within a continuous HTML visual viewport. |
+| Workbench (target column) | Renders `Page.translatedHtml` directly inside an active inline HTML editor panel. |
+| Export module | Simply parses `Page.translatedHtml` via `cheerio` and maps tags 1-to-1 directly to print coordinate vectors. |
 
 ---
 
@@ -296,48 +285,9 @@ The seed script does **not** set `docxTemplate` on the Bible genre — DOCX is s
 
 ---
 
-## NLP Segmentation Service
+## NLP Segmentation Service (DELETED)
 
-A lightweight Python FastAPI sidecar (`apps/nlp/`) handles sentence boundary detection using spaCy.
-
-### Why a sidecar
-JS NLP libraries (compromise, sbd) lack the accuracy needed for production document types — they fail on abbreviations, OCR noise, and domain-specific terminology. spaCy's statistical models handle these correctly and support multiple source languages.
-
-### Endpoint
-```
-POST http://nlp:8001/segment
-Content-Type: application/json
-
-{ "text": "paragraph text here", "lang": "en" }
-
-→ { "sentences": ["Sentence one.", "Sentence two."] }
-```
-
-### Implementation
-```python
-# apps/nlp/main.py  (~20 lines)
-import spacy
-from fastapi import FastAPI
-
-nlp_models = { "en": spacy.load("en_core_web_sm") }
-app = FastAPI()
-
-@app.post("/segment")
-def segment(body: dict):
-    model = nlp_models.get(body["lang"], nlp_models["en"])
-    doc = model(body["text"])
-    return { "sentences": [s.text.strip() for s in doc.sents] }
-```
-
-### How `segmentation.service.ts` uses it
-1. Split page Markdown on structural boundaries (`\n\n`, headings `#`, list items) → paragraphs
-2. For each paragraph: POST to `http://nlp:8001/segment` with the paragraph text and `sourceLang`
-3. Collect all returned sentences, assign `{{SENTENCE_X}}` placeholders in order
-4. Save rebuilt skeleton to `page.sourceMarkdown`
-
-### Models
-- `en_core_web_sm` — English (default, included in Docker image, ~12MB)
-- Additional language models installed on demand; `lang` param in request selects the model
+The Python FastAPI sidecar (`apps/nlp/`) and the `en_core_web_sm` spaCy sentence segmentations are **DELETED** from the active architecture. All page extractions and translations are executed at the native visual page level, which completely eliminates the need for sentence boundary segmentation.
 
 ---
 

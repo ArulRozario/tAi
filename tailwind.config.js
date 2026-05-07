@@ -39,6 +39,10 @@ export default {
         sans: ['var(--font-sans)', 'sans-serif'],
         mono: ['var(--font-mono)', 'monospace'],
       },
+      fontSize: {
+        'xs':  ['11px', { lineHeight: '16px' }],
+        'sm':  ['13px', { lineHeight: '20px' }],
+      },
       spacing: {
         'sp-5': '1.25rem',
         'sp-6': '1.5rem',

@@ -1,6 +1,7 @@
 import { Module, Global } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { OllamaService } from './ollama.service';
+import { GeminiService } from './gemini.service';
 import { ExtractionService } from './extraction.service';
 import { MemoryService } from './memory.service';
 import { TranslationAgent } from './translation.agent';
@@ -12,6 +13,7 @@ import { AgentOrchestrator } from './agent.orchestrator';
   imports: [HttpModule],
   providers: [
     OllamaService,
+    GeminiService,
     ExtractionService,
     MemoryService,
     TranslationAgent,
@@ -20,6 +22,7 @@ import { AgentOrchestrator } from './agent.orchestrator';
   ],
   exports: [
     OllamaService,
+    GeminiService,
     ExtractionService,
     MemoryService,
     TranslationAgent,

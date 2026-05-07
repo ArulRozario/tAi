@@ -26,8 +26,8 @@ export class PagesController {
     @Query('projectId') projectId?: string,
     @Query('chapterId') chapterId?: string,
     @Query('status') status?: string,
-    @Query('limit') limit: string = '50',
-    @Query('offset') offset: string = '0',
+    @Query('limit') limit = '50',
+    @Query('offset') offset = '0',
   ) {
     return this.pagesService.findByFilters({
       projectId,

@@ -42,7 +42,7 @@ export interface ConnectionTestResult {
 @Injectable()
 export class OllamaService implements OnModuleInit {
   private baseUrl: string;
-  private defaultModel: string = 'qwen2.5:7b';
+  private defaultModel = 'qwen2.5:7b';
 
   constructor(private httpService: HttpService) {
     this.baseUrl = process.env.OLLAMA_ENDPOINT || 'http://localhost:11434';
@@ -135,7 +135,7 @@ export class OllamaService implements OnModuleInit {
     }
   }
 
-  async getEmbedding(text: string, model: string = 'nomic-embed-text'): Promise<number[]> {
+  async getEmbedding(text: string, model = 'nomic-embed-text'): Promise<number[]> {
     try {
       const response = await firstValueFrom(
         this.httpService.post<EmbeddingResponse>(

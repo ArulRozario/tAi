@@ -98,7 +98,9 @@ export class AuthService {
 
     if (tokenRecord.expiresAt < new Date()) {
       // Clean up expired token from database
-      await this.prisma.refreshToken.delete({ where: { token: refreshTokenString } }).catch(() => {});
+      await this.prisma.refreshToken.delete({ where: { token: refreshTokenString } }).catch(() => {
+        // ignore deletion errors
+      });
       throw new UnauthorizedException('Expired refresh token');
     }
 
@@ -108,7 +110,9 @@ export class AuthService {
     }
 
     // Revoke the old refresh token (Refresh Token Rotation!)
-    await this.prisma.refreshToken.delete({ where: { token: refreshTokenString } }).catch(() => {});
+    await this.prisma.refreshToken.delete({ where: { token: refreshTokenString } }).catch(() => {
+      // ignore deletion errors
+    });
 
     // Issue a new refresh token with the same TTL duration (e.g. 7 days from now)
     const expiresAt = new Date();
@@ -137,7 +141,9 @@ export class AuthService {
    * Revoke/delete a refresh token to cleanly log out a user.
    */
   async logout(refreshTokenString: string) {
-    await this.prisma.refreshToken.delete({ where: { token: refreshTokenString } }).catch(() => {});
+    await this.prisma.refreshToken.delete({ where: { token: refreshTokenString } }).catch(() => {
+      // ignore deletion errors
+    });
   }
 
   /**

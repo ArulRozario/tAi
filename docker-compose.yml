@@ -45,16 +45,6 @@ services:
     networks:
       - tai-network
 
-  nlp:
-    build:
-      context: .
-      dockerfile: Dockerfile.nlp
-    container_name: tai-nlp
-    ports:
-      - "12004:8001"
-    networks:
-      - tai-network
-
 networks:
   tai-network:
     driver: bridge

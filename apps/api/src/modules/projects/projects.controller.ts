@@ -47,8 +47,8 @@ export class ProjectsController {
   @Roles('ADMIN', 'MASTER', 'REVIEWER')
   @HttpCode(HttpStatus.OK)
   findAll(
-    @Query('page') page: string = '1',
-    @Query('limit') limit: string = '20',
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
   ) {
     return this.projectsService.findAll(
       parseInt(page, 10),

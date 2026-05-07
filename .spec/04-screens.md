@@ -745,3 +745,39 @@ Non-Models tabs (Languages, System) show an empty-state placeholder: settings ic
 | Responsive | Min 1024px (tablet landscape). Below 1024px: show "Use a larger screen" message |
 | Pagination | All lists use "Load more" button (not traditional pagination). Default limits: projects=20, queue=25, admin pages=50, glossary=50. Button hidden when all items loaded. |
 | Project auto-pipeline | After PDF upload, the full pipeline runs automatically: extraction → translation → review → human queue. No user action needed between steps. |
+
+---
+
+## Appendices & Extensions
+
+### Extension A: Workbench Manual Edits & Multi-Sentence AI Co-Pilot Dialog
+
+This extension upgrades the core translation workbench with direct manual editing capabilities and a powerful multi-segment AI assistant.
+
+#### 1. Multi-Sentence Selection Matrix
+- The translation segment rows include a small selection checkbox in the left gutter.
+- Clicking a checkbox toggles the sentence in a selection array: `selectedSentenceNums = signal<number[]>([])`.
+- Multiple contiguous or non-contiguous sentences can be selected.
+- In the right-hand Inspector panel, a prominent action button: **`[⚡ Refine Selected Segments]`** is visible and active whenever `selectedSentenceNums().length > 0`.
+
+#### 2. The Unified Sentence Co-Pilot Dialog
+- Clicking **"Refine Selected Segments"** or pressing `Cmd+K` / `Ctrl+K` opens a modal dialog (`p-dialog`).
+- **Original Source Box (Read-Only):** Lists the source English text for all selected sentences inline as a numbered reference block (`[12] English text...`, `[13] English text...`).
+- **The Combined Manual Editor (Textarea):** A large, auto-resizing text field loaded with the concatenated current translations of all selected sentences. Users can edit, re-order, merge, or rewrite this text freely.
+- **The AI Chat Refiner Bar:**
+  - **Model Selector Dropdown:** A small `<p-select>` menu populated with configured model names (Ollama, Claude, etc.).
+  - **Prompt Input:** A chat input bar for instructions (e.g. *"Merge into one flowing Tamil sentence using formal tone"*).
+  - **Send Button (`pi pi-send`):** Submits the prompt, clearing/overwriting the combined textarea and streaming the LLM response directly into it token-by-token in real-time.
+- **Save Action (`[✓ Accept & Save]`):**
+  - Writes the entire textarea text into the **Lead Anchor** (the first selected sentence record) and marks it as unapproved: `patchSentence(leadId, { translatedText: finalValue, isApproved: false })`.
+  - Clears/nullifies translation text in any remaining sibling records in the selected range: `patchSentence(siblingId, { translatedText: "", isApproved: false })`.
+  - Closes the dialog and refreshes the page content.
+- **Cancel Action (`[✗ Cancel]`):** Discards all drafts/history and closes the dialog.
+
+#### 3. Snappy Inline `contenteditable` Micro-Edits
+- Double-clicking any translation segment row inside the Target Pane triggers instant inline editing mode for that segment.
+- Swaps the segment span element's `contenteditable` attribute to `true`, focuses the cursor, and adds an edit border.
+- **Key Bindings:**
+  - **`Enter`**: Submits the text edit and calls `patchSentence(id, { translatedText: innerText })` silently, exiting edit mode.
+  - **`Escape`**: Discards the typing, restores the original text, and exits edit mode.
+

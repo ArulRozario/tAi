@@ -1,18 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ModelsService } from '../models/models.service';
 import { MemoryService } from './memory.service';
-import { AgentType } from '@prisma/client';
+import { GeminiService } from './gemini.service';
+import { MinIOService } from '../files/minio.service';
 
-export interface TranslationInput {
-  id: string;
-  text: string;
-}
-
-export interface TranslationOutput {
-  id: string;
-  translatedText: string;
-  confidence: number;
+export interface PageTranslationResult {
+  pageId: string;
+  originalHtml: string;
+  translatedHtml: string;
+  borrowedText?: string;
+  isNewChapter?: boolean;
+  chapterNumber?: number;
 }
 
 @Injectable()
@@ -21,21 +19,21 @@ export class TranslationAgent {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly modelsService: ModelsService,
     private readonly memoryService: MemoryService,
+    private readonly gemini: GeminiService,
+    private readonly minio: MinIOService,
   ) {}
 
   /**
-   * Main entrypoint to translate a batch of sentences.
+   * Main entrypoint to visually translate a sliding batch of pages.
    */
   async translateBatch(
     projectId: string,
-    sentences: TranslationInput[],
     pageIds: string[],
-  ): Promise<TranslationOutput[]> {
-    this.logger.log(`Translating batch of ${sentences.length} sentences for project ${projectId}`);
+  ): Promise<PageTranslationResult[]> {
+    this.logger.log(`Executing visual page translation batch of ${pageIds.length} pages for project ${projectId}`);
 
-    // 1. Fetch project, language context, and genre
+    // 1. Fetch project context, language pair, genre, and style guides
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -53,7 +51,7 @@ export class TranslationAgent {
 
     const sourceLang = project.sourceLang;
     const targetLang = project.targetLang;
-    const genreContent = project.genre.currentVersion?.content || 'Standard formal tone style guide.';
+    const genreStyleGuide = project.genre.currentVersion?.content || 'Standard theological formal register.';
 
     // 2. Fetch top 50 glossary terms for this genre
     const glossaryTerms = await this.prisma.glossaryTerm.findMany({
@@ -63,133 +61,141 @@ export class TranslationAgent {
     });
 
     const glossaryBlock = glossaryTerms
-      .map((term) => `${term.sourceTerm} → ${term.targetTerm}`)
+      .map((term) => `- ${term.sourceTerm} → ${term.targetTerm} (${term.context || 'general'})`)
       .join('\n');
 
-    // 3. Build Translation Memory (RAG) Block
-    // Retrieve past approved translations for contextually similar sentences
-    const tmResults: string[] = [];
-    for (const sent of sentences.slice(0, 5)) { // Search for first few to avoid overloading embeddings
-      const matches = await this.memoryService.retrieve(sent.text, project.genreId, sourceLang, targetLang, 1);
-      if (matches.length > 0) {
-        tmResults.push(`Source: "${matches[0].originalText}"\nApproved translation: "${matches[0].translatedText}"`);
-      }
-    }
-
-    const tmBlock = tmResults.length > 0 
-      ? tmResults.join('\n---\n') 
-      : 'No past approved translations found for this block.';
-
-    // 4. Build Document Context Blocks for each Page
+    // 3. Load pages in exact order
     const pages = await this.prisma.page.findMany({
       where: { id: { in: pageIds } },
       orderBy: { pageNumber: 'asc' },
-      include: {
-        sentences: {
-          orderBy: { sentenceNumber: 'asc' },
-        },
-      },
     });
 
-    let documentContext = '';
-    for (const page of pages) {
-      if (page.sourceMarkdown) {
-        let reconstructedText = page.sourceMarkdown;
-        for (const s of page.sentences) {
-          reconstructedText = reconstructedText.replace(`{{SENTENCE_${s.sentenceNumber}}}`, s.originalText || '');
-        }
-        documentContext += `[PAGE ${page.pageNumber}]\n${reconstructedText}\n[/PAGE ${page.pageNumber}]\n\n`;
-      }
+    if (pages.length === 0) {
+      this.logger.warn(`No pages found in translation batch pageIds: ${pageIds.join(', ')}`);
+      return [];
     }
 
-    // 5. Construct System Prompt
-    const systemPrompt = `You are an expert professional translator.
-Translate the provided ${sourceLang} text into ${targetLang}.
+    // Determine target pages versus context page
+    // If we have 4 pages, targetPages = pages[0,1,2], contextPage = pages[3]
+    const hasContextPage = pages.length > 3;
+    const targetPages = hasContextPage ? pages.slice(0, 3) : pages;
+    const contextPage = hasContextPage ? pages[3] : null;
+
+    const results: PageTranslationResult[] = [];
+
+    // Translate target pages sequentially to pass the sliding boundary context dynamically!
+    for (let i = 0; i < targetPages.length; i++) {
+      const page = targetPages[i];
+      this.logger.log(`Translating target page ${page.pageNumber} (ID: ${page.id})`);
+
+      // Retrieve previous sliding boundary borrowed-text from the page's metadata
+      const translationMetadata = (page.translationMetadata as any) || {};
+      const ignoreFromTopOfPage = translationMetadata.borrowedTextFromNextPage || null;
+
+      // Build RAG block for this specific page if we have some original text reference
+      const searchRefText = page.originalHtml || '';
+      let tmBlock = 'No past approved translations found for this page.';
+      if (searchRefText.trim()) {
+        const matches = await this.memoryService.retrieve(
+          searchRefText.slice(0, 200),
+          project.genreId,
+          sourceLang,
+          targetLang,
+          3,
+        );
+        if (matches.length > 0) {
+          tmBlock = matches
+            .map((m) => `Source: "${m.originalText}"\nApproved: "${m.translatedText}"`)
+            .join('\n---\n');
+        }
+      }
+
+      // Download page visual image from MinIO
+      let pageImageBase64 = '';
+      const objectKey = `projects/${project.id}/pages/${page.pageNumber}.png`;
+      try {
+        const buffer = await this.minio.downloadFile(objectKey);
+        // If it's a mock file, check if it's just 'MOCK_PAGE_IMAGE'
+        if (buffer.toString('utf-8').startsWith('MOCK_')) {
+          throw new Error('Mock placeholder image detected. Falling back to text prompt.');
+        }
+        pageImageBase64 = buffer.toString('base64');
+      } catch (err) {
+        this.logger.warn(`Direct visual image load failed for Page ${page.pageNumber}: ${(err as Error).message}. Using transparent fallback PNG.`);
+        // Fallback tiny transparent 1x1 PNG so the API doesn't fail
+        pageImageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+      }
+
+      // Build specific visual context prompts
+      const ignoreContextInstruction = ignoreFromTopOfPage
+        ? `\n[SLIDING WINDOW NOTICE]\nThe preceding page already translated this cut-off sentence fragment from the top of this page: "${ignoreFromTopOfPage}". Do not re-translate or repeat this text at the beginning of your translatedHtml, but transcribe it in originalHtml for completeness.\n`
+        : '';
+
+      const systemPrompt = `You are an expert bilingual visual translator specializing in high-fidelity translation from ${sourceLang} to ${targetLang}.
+Your task is to transcribe the English text from the page image and translate it into Tamil.
+
+## Historic Tamil Bible Register Rules
+- You must write in the exact style, register, and syntax of the historic Tamil Protestant Bible (Parisutha Vedagamam).
+- Always use classical vocabulary (e.g., "ஆதி" for beginning, "வார்த்தை" for word, "வெளிச்சம்" for light, "தேவன்" for God).
+- Use honorific suffix systems (e.g., "உண்டாக்கினார்", "அருளினார்") for divine actors.
+- Maintain formal layout structures.
+
+## HTML Layout Parity Rule
+- Output BOTH original transcribed text ('originalHtml') and translated text ('translatedHtml') using clean HTML-lite wrappers.
+- Format layout paragraphs inside <p align="center"> or <p align="justify"> tags to reflect the page image's columns and margins.
+- Wrap verse numbers in superscript badges: <sup class="verse-badge">1</sup> or <sup>1</sup>.
+- Maintain bold (<b>), italics (<i>), underlines (<u>), and span-level text decorations (e.g. <span style="background-color: #f3f4f6;">) in exact matching locations between originalHtml and translatedHtml.
 
 ## Style Guide
-Follow the rules, terminology, and tone defined in the style guide below.
-When in doubt, prefer the terms and phrasing specified in the style guide over general usage.
+${genreStyleGuide}
 
-[GENRE_CONTENT_CACHE_BLOCK]
-${genreContent}
-[/GENRE_CONTENT_CACHE_BLOCK]
-
-[GLOSSARY_CACHE_BLOCK]
+## Glossary Table
 ${glossaryBlock || 'No glossary terms defined.'}
-[/GLOSSARY_CACHE_BLOCK]
 
-[TRANSLATION_MEMORY_BLOCK]
-## Past Approved Translations (use as reference)
-These are human-verified translations of similar source text in this genre.
-Use them to maintain consistency with previously approved style and terminology.
-Do NOT copy them verbatim — apply them only where the source text is genuinely similar.
-
+## Translation Memory Reference
 ${tmBlock}
-[/TRANSLATION_MEMORY_BLOCK]
+`;
 
-The user message will include a [DOCUMENT_CONTEXT] block for each source page in the batch.
-Use it to understand each sentence's structural role (heading, bullet, paragraph, caption) and
-to maintain coherence and terminology consistency across all pages in the batch.
-Translate only the sentences listed in the JSON array — do not translate the context block itself.
+      const userPrompt = `Please transcribe and translate the attached image for Page ${page.pageNumber}.
+${ignoreContextInstruction}
+${page.originalHtml ? `[PAGE TEXT REFERENCE]\n${page.originalHtml}\n[/PAGE TEXT REFERENCE]` : ''}
+${contextPage ? `\n[NEXT PAGE PREVIEW CONTEXT (READ-ONLY)]\nFor visual continuity, the next page (Page ${contextPage.pageNumber}) starts with: "${contextPage.originalHtml || 'scanned layout'}". If a sentence is split across the bottom boundary, use this context to borrow text and complete the sentence elegantly, and flag it in 'borrowedTextFromNextPage'.` : ''}
 
-Output a strict JSON array. Do not output anything else.
+Output the structured JSON response containing:
+1. 'originalHtml' (English HTML-lite visual transcription)
+2. 'translatedHtml' (Tamil HTML-lite visual translation)
+3. 'boundaryMetadata' (defining any borrowed text from the next page preview)
+4. 'isNewChapter' & 'chapterNumber' (if page starts a new chapter)
+`;
 
-Format:
-\`\`\`json
-[
-  {"id": "sent-1", "translatedText": "..."}
-]
-\`\`\``;
+      // Call Gemini structured content generator
+      const translation = await this.gemini.translatePageVisual(pageImageBase64, `${systemPrompt}\n\n${userPrompt}`);
 
-    // 6. Construct User Prompt
-    const userPrompt = `[DOCUMENT_CONTEXT]
-${documentContext.trim()}
-[/DOCUMENT_CONTEXT]
-
-Translate the following ${sourceLang} sentences into ${targetLang}.
-Use the document context above to inform register, structural role, and terminology consistency:
-
-\`\`\`json
-${JSON.stringify(
-  sentences.map((s) => ({ id: s.id, text: s.text })),
-  null,
-  2,
-)}
-\`\`\``;
-
-    // 7. Call LLM Service
-    const response = await this.modelsService.executePrompt(AgentType.TRANSLATION, `${systemPrompt}\n\n${userPrompt}`, {
-      temperature: 0.3,
-      max_tokens: 4096,
-    });
-
-    // 8. Parse JSON response safely
-    try {
-      const textResponse = response.text.trim();
-      const jsonMatch = textResponse.match(/\[\s*\{[\s\S]*\}\s*\]/);
-      
-      if (!jsonMatch) {
-        throw new Error(`Failed to extract JSON array from translation response. Response content: ${textResponse}`);
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]) as any[];
-
-      // Validate parsed array structure
-      const outputs: TranslationOutput[] = parsed.map((item) => {
-        if (!item.id || !item.translatedText) {
-          throw new Error('Invalid translated sentence output item: missing "id" or "translatedText"');
-        }
-        return {
-          id: item.id,
-          translatedText: item.translatedText,
-          confidence: 0.9, // Default confidence score
-        };
+      results.push({
+        pageId: page.id,
+        originalHtml: translation.originalHtml,
+        translatedHtml: translation.translatedHtml,
+        borrowedText: translation.boundaryMetadata?.borrowedTextFromNextPage,
+        isNewChapter: translation.isNewChapter,
+        chapterNumber: translation.chapterNumber,
       });
 
-      return outputs;
-    } catch (parseErr) {
-      this.logger.error(`Failed parsing translation response: ${(parseErr as Error).message}`);
-      throw parseErr;
+      // If this target page borrowed text from the next page, write it to the next page's translationMetadata immediately!
+      // This ensures that when the loop processes the next page (either in this batch or the next batch), it respects the boundary!
+      if (translation.boundaryMetadata?.borrowedTextFromNextPage && i + 1 < pages.length) {
+        const nextPage = pages[i + 1];
+        const nextMeta = (nextPage.translationMetadata as any) || {};
+        nextMeta.borrowedTextFromNextPage = translation.boundaryMetadata.borrowedTextFromNextPage;
+
+        await this.prisma.page.update({
+          where: { id: nextPage.id },
+          data: { translationMetadata: nextMeta },
+        });
+        // Update local object as well
+        nextPage.translationMetadata = nextMeta;
+      }
     }
+
+    return results;
   }
 }

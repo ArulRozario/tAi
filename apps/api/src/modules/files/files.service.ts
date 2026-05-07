@@ -10,6 +10,21 @@ export class FilesService {
   ) {}
 
   /**
+   * Uploads a file to a general uploads directory in MinIO.
+   */
+  async uploadGeneralFile(filename: string, buffer: Buffer, contentType: string) {
+    const key = `uploads/${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const url = await this.minioService.uploadBuffer(buffer, key, contentType);
+
+    return {
+      fileId: key,
+      filename,
+      size: buffer.length,
+      url,
+    };
+  }
+
+  /**
    * Uploads a file for a specific project.
    * If the project has no sourceFileId yet, automatically assigns this uploaded key.
    */

@@ -83,7 +83,7 @@ export class AdminService {
     for (const pageId of pageIds) {
       const openErrorCount = await this.prisma.error.count({
         where: {
-          sentence: { pageId },
+          pageId,
           status: ErrorStatus.OPEN,
         },
       });

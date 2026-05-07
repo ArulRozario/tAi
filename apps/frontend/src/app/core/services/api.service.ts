@@ -20,16 +20,26 @@ export interface Genre {
   projectCount?: number;
   lastUpdatedBy?: User;
   currentVersion?: GenreVersion;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: User;
+  _count?: { projects: number };
 }
 
 export interface GenreVersion {
   id: string;
   genreId: string;
-  versionNumber: string;
+  version: string;
   content: string;
   note?: string;
   createdAt: string;
   createdBy?: User;
+}
+
+export interface VersionDiff {
+  fromVersion: string;
+  toVersion: string;
+  diff: string;
 }
 
 export interface Project {
@@ -338,7 +348,7 @@ export class ApiService {
   }
 
   addReviewer(pageId: string, userId: string): Observable<Page> {
-    return this.http.post<Page>(`${this.base}/pages/${pageId}/add-reviewer`, { userId });
+    return this.http.post<Page>(`${this.base}/pages/${pageId}/add-reviewer`, { reviewerId: userId });
   }
 
   reassignReviewers(pageId: string, userIds: string[]): Observable<Page> {
@@ -357,8 +367,16 @@ export class ApiService {
     return this.http.get<Genre>(`${this.base}/genres/${id}`);
   }
 
-  createGenre(data: { name: string; description?: string; icon?: string; color?: string }): Observable<Genre> {
+  createGenre(data: { name: string; key: string; description?: string; icon?: string; color?: string }): Observable<Genre> {
     return this.http.post<Genre>(`${this.base}/genres`, data);
+  }
+
+  patchGenre(id: string, data: Partial<Genre & { segmentUnit: string }>): Observable<Genre> {
+    return this.http.patch<Genre>(`${this.base}/genres/${id}`, data);
+  }
+
+  restoreGenreVersion(genreId: string, versionId: string): Observable<GenreVersion> {
+    return this.http.post<GenreVersion>(`${this.base}/genres/${genreId}/restore/${versionId}`, {});
   }
 
   getGenreVersions(id: string): Observable<GenreVersion[]> {
@@ -369,8 +387,8 @@ export class ApiService {
     return this.http.post<GenreVersion>(`${this.base}/genres/${id}/versions`, { content, note });
   }
 
-  getVersionDiff(genreId: string, versionId: string): Observable<{ diff: string }> {
-    return this.http.get<{ diff: string }>(`${this.base}/genres/${genreId}/versions/${versionId}/diff`);
+  getVersionDiff(genreId: string, versionId: string): Observable<VersionDiff> {
+    return this.http.get<VersionDiff>(`${this.base}/genres/${genreId}/versions/${versionId}/diff`);
   }
 
   testGenre(id: string, sampleText: string): Observable<{ translation: string; tokensUsed: number }> {
@@ -389,6 +407,25 @@ export class ApiService {
     return this.http.get<{ data: GlossaryTerm[]; total: number }>(`${this.base}/glossary`, {
       params: new HttpParams().set('genreId', genreId).set('limit', limit).set('offset', offset),
     });
+  }
+
+  createGlossaryTerm(data: { genreId: string; sourceTerm: string; targetTerm: string; context?: string; notes?: string }): Observable<GlossaryTerm> {
+    return this.http.post<GlossaryTerm>(`${this.base}/glossary`, data);
+  }
+
+  updateGlossaryTerm(id: string, data: Partial<GlossaryTerm>): Observable<GlossaryTerm> {
+    return this.http.put<GlossaryTerm>(`${this.base}/glossary/${id}`, data);
+  }
+
+  deleteGlossaryTerm(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/glossary/${id}`);
+  }
+
+  bulkImportGlossary(genreId: string, file: File): Observable<{ imported: number }> {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('genreId', genreId);
+    return this.http.post<{ imported: number }>(`${this.base}/glossary/bulk`, fd);
   }
 
   // ── Queue ─────────────────────────────────────────────────────────────────
@@ -449,5 +486,31 @@ export class ApiService {
 
   exportProject(projectId: string, format = 'text', scope = 'approved'): Observable<{ jobId: string }> {
     return this.http.post<{ jobId: string }>(`${this.base}/export/project/${projectId}`, { format, scope });
+  }
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+
+  getChatSessions(context: string, entityId?: string): Observable<any[]> {
+    let hp = new HttpParams().set('context', context);
+    if (entityId) hp = hp.set('entityId', entityId);
+    return this.http.get<any[]>(`${this.base}/chat/sessions`, { params: hp });
+  }
+
+  createChatSession(data: { context: string; entityId?: string; modelProvider?: string; modelName?: string }): Observable<any> {
+    return this.http.post<any>(`${this.base}/chat/sessions`, data);
+  }
+
+  getChatSession(id: string): Observable<any> {
+    return this.http.get<any>(`${this.base}/chat/sessions/${id}`);
+  }
+
+  addChatMessage(id: string, content: string, mode?: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/chat/sessions/${id}/messages`, { content, mode });
+  }
+
+  getQuickPrompts(context: string, mode?: string): Observable<string[]> {
+    let hp = new HttpParams().set('context', context);
+    if (mode) hp = hp.set('mode', mode);
+    return this.http.get<string[]>(`${this.base}/chat/quick-prompts`, { params: hp });
   }
 }

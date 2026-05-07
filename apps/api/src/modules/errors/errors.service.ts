@@ -1,22 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ErrorStatus, SentenceStatus } from '@prisma/client';
+import { ErrorStatus, PageStatus } from '@prisma/client';
 
 @Injectable()
 export class ErrorsService {
   constructor(private prisma: PrismaService) {}
 
-  async findMany(filters: { sentenceId?: string; pageId?: string; status?: string }) {
+  async findMany(filters: { pageId?: string; status?: string }) {
     const where: any = {};
 
-    if (filters.sentenceId) {
-      where.sentenceId = filters.sentenceId;
-    }
-
     if (filters.pageId) {
-      where.sentence = {
-        pageId: filters.pageId,
-      };
+      where.pageId = filters.pageId;
     }
 
     if (filters.status) {
@@ -33,13 +27,9 @@ export class ErrorsService {
     const error = await this.prisma.error.findUnique({
       where: { id },
       include: {
-        sentence: {
+        page: {
           include: {
-            page: {
-              include: {
-                project: true,
-              },
-            },
+            project: true,
           },
         },
       },
@@ -59,17 +49,18 @@ export class ErrorsService {
       throw new ConflictException('This error has already been applied');
     }
 
-    const sentence = error.sentence;
-    let currentText = sentence.translatedText || sentence.aiTranslatedText || '';
+    const page = error.page;
+    let currentHtml = page.translatedHtml || '';
 
     if (!error.currentText || !error.suggestedText) {
       throw new BadRequestException('Error data does not support replacement');
     }
 
-    currentText = currentText.replace(error.currentText, error.suggestedText);
+    // Replace the wrong translation snippet with suggested text inside continuous page HTML-lite
+    currentHtml = currentHtml.replace(error.currentText, error.suggestedText);
 
-    // Atomically mark error as APPLIED and update sentence translated text
-    const [updatedError, updatedSentence] = await this.prisma.$transaction([
+    // Atomically mark error as APPLIED and update page translated HTML
+    const [updatedError, updatedPage] = await this.prisma.$transaction([
       this.prisma.error.update({
         where: { id },
         data: {
@@ -78,19 +69,17 @@ export class ErrorsService {
           appliedById: user.id,
         },
       }),
-      this.prisma.sentence.update({
-        where: { id: sentence.id },
+      this.prisma.page.update({
+        where: { id: page.id },
         data: {
-          translatedText: currentText,
-          status: SentenceStatus.REVIEWED,
-          reviewedAt: new Date(),
-          reviewedById: user.id,
+          translatedHtml: currentHtml,
+          status: PageStatus.HUMAN_REVIEW,
         },
         include: { errors: true },
       }),
     ]);
 
-    return { error: updatedError, sentence: updatedSentence };
+    return { error: updatedError, page: updatedPage };
   }
 
   async reject(id: string) {
@@ -115,7 +104,7 @@ export class ErrorsService {
 
     let glossaryTerm = null;
     if (data.sourceTerm) {
-      const genreId = error.sentence.page.project.genreId;
+      const genreId = error.page.project.genreId;
       glossaryTerm = await this.prisma.glossaryTerm.upsert({
         where: {
           genreId_sourceTerm: {

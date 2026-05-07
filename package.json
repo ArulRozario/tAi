@@ -62,6 +62,7 @@
     "@angular/platform-browser": "^21.2.11",
     "@aws-sdk/client-s3": "^3.1041.0",
     "@aws-sdk/lib-storage": "^3.1041.0",
+    "@google/genai": "^1.52.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/jwt": "^11.0.2",
     "@primeng/themes": "^21.0.4",

@@ -25,6 +25,26 @@ export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
   /**
+   * Uploads a file without a project context.
+   * Authorized: ADMIN, MASTER (MASTER+ tier).
+   */
+  @Post('files/upload')
+  @Roles('ADMIN', 'MASTER')
+  @UseInterceptors(FileInterceptor('file'))
+  @HttpCode(HttpStatus.CREATED)
+  async uploadFileGeneral(@UploadedFile() file: any) {
+    if (!file) {
+      throw new BadRequestException('Multi-part field "file" is required in request body.');
+    }
+
+    return this.filesService.uploadGeneralFile(
+      file.originalname,
+      file.buffer,
+      file.mimetype,
+    );
+  }
+
+  /**
    * Uploads a file for a specific project.
    * Authorized: ADMIN, MASTER (MASTER+ tier).
    */

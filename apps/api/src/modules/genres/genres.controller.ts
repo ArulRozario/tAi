@@ -1,85 +1,42 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Put, 
-  Delete, 
-  Body, 
-  Param, 
-  UseGuards, 
-  ParseUUIDPipe, 
-  HttpCode, 
-  HttpStatus 
+import {
+  Controller, Get, Post, Put, Patch, Delete, Body, Param,
+  UseGuards, ParseUUIDPipe, HttpCode, HttpStatus,
 } from '@nestjs/common';
+import { IsNotEmpty, IsString, IsOptional } from 'class-validator';
 import { GenresService } from './genres.service';
-import { 
-  IsNotEmpty, 
-  IsString, 
-  IsOptional 
-} from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 export class CreateGenreDto {
-  @IsString()
-  @IsNotEmpty({ message: 'Genre name is required' })
-  name!: string;
-
-  @IsString()
-  @IsNotEmpty({ message: 'Genre key identifier is required' })
-  key!: string;
-
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @IsString()
-  @IsOptional()
-  systemPrompt?: string;
-
-  @IsString()
-  @IsOptional()
-  userPromptTemplate?: string;
-
-  @IsString()
-  @IsOptional()
-  icon?: string;
-
-  @IsString()
-  @IsOptional()
-  color?: string;
+  @IsString() @IsNotEmpty() name!: string;
+  @IsString() @IsNotEmpty() key!: string;
+  @IsString() @IsOptional() description?: string;
+  @IsString() @IsOptional() systemPrompt?: string;
+  @IsString() @IsOptional() userPromptTemplate?: string;
+  @IsString() @IsOptional() icon?: string;
+  @IsString() @IsOptional() color?: string;
 }
 
 export class UpdateGenreDto {
-  @IsString()
-  @IsOptional()
-  name?: string;
+  @IsString() @IsOptional() name?: string;
+  @IsString() @IsOptional() key?: string;
+  @IsString() @IsOptional() description?: string;
+  @IsString() @IsOptional() systemPrompt?: string;
+  @IsString() @IsOptional() userPromptTemplate?: string;
+  @IsString() @IsOptional() icon?: string;
+  @IsString() @IsOptional() color?: string;
+  @IsString() @IsOptional() segmentUnit?: string;
+}
 
-  @IsString()
-  @IsOptional()
-  key?: string;
+export class CreateVersionDto {
+  @IsString() @IsNotEmpty() content!: string;
+  @IsString() @IsOptional() note?: string;
+}
 
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @IsString()
-  @IsOptional()
-  systemPrompt?: string;
-
-  @IsString()
-  @IsOptional()
-  userPromptTemplate?: string;
-
-  @IsString()
-  @IsOptional()
-  icon?: string;
-
-  @IsString()
-  @IsOptional()
-  color?: string;
+export class TestGenreDto {
+  @IsString() @IsNotEmpty() sampleText!: string;
 }
 
 @Controller('genres')
@@ -87,64 +44,89 @@ export class UpdateGenreDto {
 export class GenresController {
   constructor(private readonly genresService: GenresService) {}
 
-  /**
-   * Retrieves all registered genres.
-   * Authorized: All authenticated users (ADMIN, MASTER, REVIEWER).
-   */
   @Get()
   @Roles('ADMIN', 'MASTER', 'REVIEWER')
-  @HttpCode(HttpStatus.OK)
-  async findAll() {
+  findAll() {
     return this.genresService.findAll();
   }
 
-  /**
-   * Retrieves a single genre detail by ID.
-   * Authorized: All authenticated users (ADMIN, MASTER, REVIEWER).
-   */
   @Get(':id')
   @Roles('ADMIN', 'MASTER', 'REVIEWER')
-  @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.genresService.findOne(id);
   }
 
-  /**
-   * Creates a new genre.
-   * Authorized: ADMIN only.
-   */
   @Post()
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MASTER')
   @HttpCode(HttpStatus.CREATED)
-  async create(
-    @CurrentUser() user: { id: string },
-    @Body() createGenreDto: CreateGenreDto
-  ) {
-    return this.genresService.create(user.id, createGenreDto);
+  create(@CurrentUser() user: { id: string }, @Body() dto: CreateGenreDto) {
+    return this.genresService.create(user.id, dto);
   }
 
-  /**
-   * Modifies an existing genre completely (PUT specification).
-   * Authorized: ADMIN only.
-   */
   @Put(':id')
-  @Roles('ADMIN')
-  @HttpCode(HttpStatus.OK)
-  async update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateGenreDto: UpdateGenreDto
-  ) {
-    return this.genresService.update(id, updateGenreDto);
+  @Roles('ADMIN', 'MASTER')
+  updateFull(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateGenreDto) {
+    return this.genresService.update(id, dto as any);
   }
 
-  /**
-   * Removes a genre.
-   * Authorized: ADMIN only.
-   */
+  @Patch(':id')
+  @Roles('ADMIN', 'MASTER')
+  patch(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateGenreDto) {
+    return this.genresService.update(id, dto as any);
+  }
+
   @Delete(':id')
   @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   async delete(@Param('id', ParseUUIDPipe) id: string) {
     await this.genresService.delete(id);
+  }
+
+  // ── Versions ────────────────────────────────────────────────────────────────
+
+  @Get(':id/versions')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  listVersions(@Param('id', ParseUUIDPipe) id: string) {
+    return this.genresService.listVersions(id);
+  }
+
+  @Post(':id/versions')
+  @Roles('ADMIN', 'MASTER')
+  @HttpCode(HttpStatus.CREATED)
+  addVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateVersionDto,
+  ) {
+    return this.genresService.addVersion(id, user.id, dto.content, dto.note);
+  }
+
+  @Get(':id/versions/:versionId/diff')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  diffVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+  ) {
+    return this.genresService.diffVersion(id, versionId);
+  }
+
+  @Post(':id/restore/:versionId')
+  @Roles('ADMIN', 'MASTER')
+  @HttpCode(HttpStatus.CREATED)
+  restoreVersion(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.genresService.restoreVersion(id, versionId, user.id);
+  }
+
+  @Post(':id/test')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  testTranslation(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TestGenreDto,
+  ) {
+    return this.genresService.testTranslation(id, dto.sampleText);
   }
 }

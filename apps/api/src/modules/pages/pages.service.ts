@@ -10,7 +10,6 @@ import {
   Priority,
   JobType,
   JobStatus,
-  SentenceStatus,
   ErrorStatus,
 } from '@prisma/client';
 
@@ -81,13 +80,8 @@ export class PagesService {
             },
           },
         },
-        sentences: {
-          orderBy: { sentenceNumber: 'asc' },
-          include: {
-            errors: {
-              orderBy: { createdAt: 'asc' },
-            },
-          },
+        errors: {
+          orderBy: { createdAt: 'asc' },
         },
       },
     });
@@ -122,11 +116,11 @@ export class PagesService {
     });
   }
 
-  async updateTranslation(id: string, markdownContent: string, qualityScore?: number) {
+  async updateTranslation(id: string, htmlContent: string, qualityScore?: number) {
     return this.prisma.page.update({
       where: { id },
       data: {
-        sourceMarkdown: markdownContent,
+        translatedHtml: htmlContent,
         quality: qualityScore ?? undefined,
         status: PageStatus.TRANSLATED,
       },
@@ -158,18 +152,12 @@ export class PagesService {
 
     // Bypass validations only for MASTER and ADMIN
     if (user.role !== 'MASTER' && user.role !== 'ADMIN') {
-      // 1. Block if there are any OPEN errors on sentences
-      const openErrors = page.sentences.some((sentence) =>
-        sentence.errors.some((error) => error.status === ErrorStatus.OPEN),
-      );
-      if (openErrors) {
+      // 1. Block if there are any OPEN errors on the page
+      const openErrorsCount = await this.prisma.error.count({
+        where: { pageId: id, status: ErrorStatus.OPEN },
+      });
+      if (openErrorsCount > 0) {
         throw new ForbiddenException('Cannot approve page with open linting errors');
-      }
-
-      // 2. Block if any sentence has isApproved = false
-      const unapprovedSentences = page.sentences.some((sentence) => !sentence.isApproved);
-      if (unapprovedSentences) {
-        throw new ForbiddenException('Cannot approve page when sentences are not fully approved');
       }
     }
 
@@ -184,17 +172,6 @@ export class PagesService {
       data: {
         status: PageStatus.APPROVED,
         notes: updatedNotes,
-      },
-    });
-
-    // Mark all page sentences as approved and reviewed
-    await this.prisma.sentence.updateMany({
-      where: { pageId: id },
-      data: {
-        status: SentenceStatus.REVIEWED,
-        isApproved: true,
-        reviewedAt: new Date(),
-        reviewedById: user.id,
       },
     });
 

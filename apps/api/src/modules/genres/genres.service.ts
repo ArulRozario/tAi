@@ -1,57 +1,42 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  ConflictException 
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SegmentUnit } from '@prisma/client';
 
 @Injectable()
 export class GenresService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Retrieves all genres in the database.
-   * Ordered by creation date newest first.
-   */
   async findAll() {
     return this.prisma.genre.findMany({
       include: {
-        createdBy: {
-          select: { id: true, name: true, email: true }
-        }
+        createdBy: { select: { id: true, name: true, email: true } },
+        currentVersion: { select: { id: true, version: true, createdAt: true } },
+        _count: { select: { projects: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  /**
-   * Retrieves a single genre by ID.
-   * Throws NotFoundException if the genre does not exist.
-   */
   async findOne(id: string) {
     const genre = await this.prisma.genre.findUnique({
       where: { id },
       include: {
-        createdBy: {
-          select: { id: true, name: true, email: true }
-        },
+        createdBy: { select: { id: true, name: true, email: true } },
+        currentVersion: true,
         versions: {
-          orderBy: { createdAt: 'desc' }
-        }
+          include: { createdBy: { select: { id: true, name: true, email: true } } },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
-
-    if (!genre) {
-      throw new NotFoundException(`Genre with ID '${id}' not found.`);
-    }
-
+    if (!genre) throw new NotFoundException(`Genre '${id}' not found.`);
     return genre;
   }
 
-  /**
-   * Creates a new translation genre.
-   * Enforces uniqueness on the 'key' parameter and generates an initial version 1.0 record.
-   */
   async create(
     userId: string,
     data: {
@@ -62,22 +47,13 @@ export class GenresService {
       userPromptTemplate?: string;
       icon?: string;
       color?: string;
-    }
+    },
   ) {
     const normalizedKey = data.key.toLowerCase().trim();
+    const existing = await this.prisma.genre.findUnique({ where: { key: normalizedKey } });
+    if (existing) throw new ConflictException(`Genre key '${data.key}' already exists.`);
 
-    // 1. Enforce unique key constraint
-    const existingKey = await this.prisma.genre.findUnique({
-      where: { key: normalizedKey },
-    });
-
-    if (existingKey) {
-      throw new ConflictException(`Genre with key '${data.key}' already exists.`);
-    }
-
-    // 2. Perform transaction to create genre and generate its initial Version 1.0
     return this.prisma.$transaction(async (tx) => {
-      // Create Genre
       const genre = await tx.genre.create({
         data: {
           name: data.name,
@@ -91,71 +67,41 @@ export class GenresService {
         },
       });
 
-      // Assemble content for version 1.0
-      const contentStr = `System Prompt:\n${data.systemPrompt || ''}\n\nUser Prompt Template:\n${data.userPromptTemplate || ''}`;
-
-      // Create initial GenreVersion
-      const initialVersion = await tx.genreVersion.create({
-        data: {
-          genreId: genre.id,
-          version: '1.0',
-          content: contentStr,
-          note: 'Initial scaffolding of translation prompts',
-          createdById: userId,
-        },
+      const content = `# ${data.name}\n\n${data.description ?? ''}\n\n## System Prompt\n${data.systemPrompt ?? ''}\n\n## User Prompt Template\n${data.userPromptTemplate ?? ''}`;
+      const v = await tx.genreVersion.create({
+        data: { genreId: genre.id, version: '1.0', content, note: 'Initial version', createdById: userId },
       });
 
-      // Link currentVersion back to Genre
       return tx.genre.update({
         where: { id: genre.id },
-        data: { currentVersionId: initialVersion.id },
-        include: {
-          currentVersion: true,
-          createdBy: {
-            select: { id: true, name: true, email: true }
-          }
-        },
+        data: { currentVersionId: v.id },
+        include: { currentVersion: true, createdBy: { select: { id: true, name: true, email: true } } },
       });
     });
   }
 
-  /**
-   * Modifies an existing genre's configuration and prompts.
-   */
-  async update(
-    id: string,
-    data: {
-      name?: string;
-      key?: string;
-      description?: string;
-      systemPrompt?: string;
-      userPromptTemplate?: string;
-      icon?: string;
-      color?: string;
-    }
-  ) {
-    // 1. Verify existence
+  async update(id: string, data: {
+    name?: string;
+    key?: string;
+    description?: string;
+    systemPrompt?: string;
+    userPromptTemplate?: string;
+    icon?: string;
+    color?: string;
+    segmentUnit?: SegmentUnit;
+  }) {
     const genre = await this.prisma.genre.findUnique({ where: { id } });
-    if (!genre) {
-      throw new NotFoundException(`Genre with ID '${id}' not found.`);
-    }
+    if (!genre) throw new NotFoundException(`Genre '${id}' not found.`);
 
-    // 2. If changing key, enforce key uniqueness
     if (data.key !== undefined) {
-      const normalizedKey = data.key.toLowerCase().trim();
-      if (normalizedKey !== genre.key) {
-        const existingKey = await this.prisma.genre.findUnique({
-          where: { key: normalizedKey },
-        });
-        if (existingKey) {
-          throw new ConflictException(`Genre with key '${data.key}' already exists.`);
-        }
-        data.key = normalizedKey;
+      const norm = data.key.toLowerCase().trim();
+      if (norm !== genre.key) {
+        const dup = await this.prisma.genre.findUnique({ where: { key: norm } });
+        if (dup) throw new ConflictException(`Genre key '${data.key}' already exists.`);
+        data.key = norm;
       }
     }
 
-    // 3. Update record and optionally increment/append a new version 
-    // (We will update the core genre prompt fields, which is the primary source of truth)
     return this.prisma.genre.update({
       where: { id },
       data: {
@@ -166,30 +112,109 @@ export class GenresService {
         ...(data.userPromptTemplate !== undefined && { userPromptTemplate: data.userPromptTemplate }),
         ...(data.icon !== undefined && { icon: data.icon }),
         ...(data.color !== undefined && { color: data.color }),
+        ...(data.segmentUnit !== undefined && { segmentUnit: data.segmentUnit }),
       },
-      include: {
-        currentVersion: true,
-        createdBy: {
-          select: { id: true, name: true, email: true }
-        }
-      }
+      include: { currentVersion: true, createdBy: { select: { id: true, name: true, email: true } } },
     });
   }
 
-  /**
-   * Administratively deletes a genre from the system.
-   * Cascade rule deletes all linked versions.
-   */
   async delete(id: string): Promise<void> {
-    // 1. Verify existence
     const genre = await this.prisma.genre.findUnique({ where: { id } });
-    if (!genre) {
-      throw new NotFoundException(`Genre with ID '${id}' not found.`);
-    }
+    if (!genre) throw new NotFoundException(`Genre '${id}' not found.`);
+    await this.prisma.genre.delete({ where: { id } });
+  }
 
-    // 2. Perform cascade cleanup (Prisma's onDelete: Cascade in schema handles the Version child rows)
-    await this.prisma.genre.delete({
-      where: { id },
+  // ── Versions ────────────────────────────────────────────────────────────────
+
+  async listVersions(genreId: string) {
+    const genre = await this.prisma.genre.findUnique({ where: { id: genreId } });
+    if (!genre) throw new NotFoundException(`Genre '${genreId}' not found.`);
+    return this.prisma.genreVersion.findMany({
+      where: { genreId },
+      include: { createdBy: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async addVersion(genreId: string, userId: string, content: string, note?: string) {
+    const genre = await this.prisma.genre.findUnique({
+      where: { id: genreId },
+      include: { versions: { orderBy: { createdAt: 'desc' }, take: 1 } },
+    });
+    if (!genre) throw new NotFoundException(`Genre '${genreId}' not found.`);
+
+    const latestVersion = genre.versions[0]?.version ?? '1.0';
+    const [major, minor] = latestVersion.split('.').map(Number);
+    const nextVersion = `${major}.${(minor ?? 0) + 1}`;
+
+    return this.prisma.$transaction(async (tx) => {
+      const v = await tx.genreVersion.create({
+        data: { genreId, version: nextVersion, content, note, createdById: userId },
+        include: { createdBy: { select: { id: true, name: true, email: true } } },
+      });
+      await tx.genre.update({ where: { id: genreId }, data: { currentVersionId: v.id } });
+      return v;
+    });
+  }
+
+  async diffVersion(genreId: string, versionId: string) {
+    const [genre, oldVersion] = await Promise.all([
+      this.prisma.genre.findUnique({
+        where: { id: genreId },
+        include: { currentVersion: true },
+      }),
+      this.prisma.genreVersion.findUnique({ where: { id: versionId } }),
+    ]);
+    if (!genre) throw new NotFoundException(`Genre '${genreId}' not found.`);
+    if (!oldVersion) throw new NotFoundException(`Version '${versionId}' not found.`);
+
+    const oldLines = (oldVersion.content ?? '').split('\n');
+    const newLines = (genre.currentVersion?.content ?? '').split('\n');
+    const diff = this.computeLineDiff(oldLines, newLines);
+    return { fromVersion: oldVersion.version, toVersion: genre.currentVersion?.version ?? 'current', diff };
+  }
+
+  private computeLineDiff(oldLines: string[], newLines: string[]): string {
+    const oldSet = new Set(oldLines);
+    const newSet = new Set(newLines);
+    const result: string[] = [];
+    let oi = 0, ni = 0;
+    while (oi < oldLines.length || ni < newLines.length) {
+      const ol = oldLines[oi];
+      const nl = newLines[ni];
+      if (ol === nl) {
+        result.push(` ${ol}`);
+        oi++; ni++;
+      } else if (ol !== undefined && !newSet.has(ol)) {
+        result.push(`-${ol}`);
+        oi++;
+      } else if (nl !== undefined && !oldSet.has(nl)) {
+        result.push(`+${nl}`);
+        ni++;
+      } else {
+        if (ol !== undefined) { result.push(`-${ol}`); oi++; }
+        if (nl !== undefined) { result.push(`+${nl}`); ni++; }
+      }
+    }
+    return result.join('\n');
+  }
+
+  async restoreVersion(genreId: string, versionId: string, userId: string) {
+    const oldVersion = await this.prisma.genreVersion.findUnique({ where: { id: versionId } });
+    if (!oldVersion) throw new NotFoundException(`Version '${versionId}' not found.`);
+    return this.addVersion(genreId, userId, oldVersion.content, `Restored from v${oldVersion.version}`);
+  }
+
+  async testTranslation(genreId: string, sampleText: string) {
+    const genre = await this.prisma.genre.findUnique({
+      where: { id: genreId },
+      include: { currentVersion: true },
+    });
+    if (!genre) throw new NotFoundException(`Genre '${genreId}' not found.`);
+    // Stub: return input with note. Real implementation would call translation agent.
+    return {
+      translation: `[Test output for "${genre.name}" genre]\n\n${sampleText}`,
+      tokensUsed: 0,
+    };
   }
 }

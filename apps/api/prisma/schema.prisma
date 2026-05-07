@@ -24,7 +24,6 @@ model User {
   refreshTokens       RefreshToken[]
   ownedProjects       Project[]        @relation("ProjectOwner")
   pageReviews         PageReviewer[]
-  sentenceAssignments Sentence[]       @relation("SentenceReviewer")
   genreVersions       GenreVersion[]
   chatSessions        ChatSession[]
   activityLogs        ActivityLog[]
@@ -126,8 +125,9 @@ model Page {
   chapterId          String?
   chapter            Chapter?   @relation(fields: [chapterId], references: [id])
   pageNumber         Int
-  originalText       String?
-  sourceMarkdown     String?    @db.Text   // Markdown skeleton with {{SENTENCE_X}} placeholders
+  originalHtml       String?    @db.Text
+  translatedHtml     String?    @db.Text
+  translationMetadata Json?
   layoutMetadata     Json?                 // structural data from OCR: columns, dimensions, font bands, image regions
   status             PageStatus @default(PENDING)
   priority           Priority   @default(MEDIUM)
@@ -141,9 +141,10 @@ model Page {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
-  sentences    Sentence[]
-  jobs         Job[]
-  reviewers    PageReviewer[]
+  errors           Error[]
+  translationMemory TranslationMemory[]
+  jobs             Job[]
+  reviewers        PageReviewer[]
 
   @@unique([projectId, pageNumber])
 }
@@ -162,41 +163,15 @@ model PageReviewer {
   @@unique([pageId, userId])
 }
 
-// ─── Sentence ─────────────────────────────────────────────────────────────────
-
-model Sentence {
-  id                 String        @id @default(uuid())
-  pageId             String
-  page               Page          @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  sentenceNumber     Int
-  originalText       String
-  translatedText     String?
-  aiTranslatedText   String?       // AI-generated translation before any human edits; used for "Reset to AI translation"
-  status             SentenceStatus @default(PENDING)
-  confidence         Float?        // 0-1 from translation agent
-  isApproved         Boolean       @default(false) // marked as accepted by human reviewer
-  assignedReviewerId String?       // sentence-level reviewer override (optional)
-  assignedReviewer   User?         @relation("SentenceReviewer", fields: [assignedReviewerId], references: [id])
-  reviewedAt         DateTime?     // when reviewer last touched this sentence
-  reviewedById       String?       // FK to User (soft ref — who last edited)
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
-
-  errors         Error[]
-  memory         TranslationMemory?
-
-  @@unique([pageId, sentenceNumber])
-}
-
 // ─── Error ───────────────────────────────────────────────────────────────────
 
 model Error {
   id               String        @id @default(uuid())
-  sentenceId       String
-  sentence         Sentence      @relation(fields: [sentenceId], references: [id], onDelete: Cascade)
+  pageId           String
+  page             Page          @relation(fields: [pageId], references: [id], onDelete: Cascade)
   severity         ErrorSeverity
   category         ErrorCategory
-  location         String?       // e.g. "words 5-7"
+  location         String?       // snippet/phrase selector
   currentText      String        // what the AI produced
   suggestedText    String        // what it should be
   issueDescription String        // why it's wrong
@@ -235,8 +210,8 @@ model TranslationMemory {
   genre          Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
   projectId      String
   project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  sentenceId     String   @unique
-  sentence       Sentence @relation(fields: [sentenceId], references: [id], onDelete: Cascade)
+  pageId         String
+  page           Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
   sourceLang     String
   targetLang     String
   originalText   String
@@ -359,12 +334,6 @@ enum PageStatus {
   ERROR
 }
 
-enum SentenceStatus {
-  PENDING
-  TRANSLATED
-  REVIEWED
-}
-
 enum ErrorSeverity {
   CRITICAL
   HIGH
@@ -419,6 +388,7 @@ enum AgentType {
 enum Provider {
   OLLAMA
   ANTHROPIC
+  GOOGLE
 }
 
 enum ChatContext {

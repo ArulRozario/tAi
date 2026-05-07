@@ -78,7 +78,7 @@ const LANGUAGES: { code: string; name: string }[] = [
               <div class="font-medium text-text-1 text-sm">{{ g.name }}</div>
               <div class="text-xs text-text-3 truncate">{{ g.description }}</div>
             </div>
-            <span class="text-xs text-text-3 font-mono">{{ g.currentVersion?.versionNumber ?? 'v1.0' }}</span>
+            <span class="text-xs text-text-3 font-mono">{{ g.currentVersion?.version ? 'v' + g.currentVersion?.version : 'v1.0' }}</span>
           </div>
           <div *ngIf="genres.length === 0" class="text-sm text-text-3 py-2">Loading genres…</div>
         </div>

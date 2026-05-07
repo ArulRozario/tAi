@@ -35,6 +35,7 @@ Last updated: 2026-05-07 (session 26)
 | 18 | Dashboard Screen | ✅ | 2026-05-07 |
 | 19 | Projects Screen | ✅ | 2026-05-07 |
 | 20 | Workbench Screen | ✅ | 2026-05-07 |
+| 20b | Workbench Manual Edits & Multi-Sentence Copilot Dialog | ☐ | — |
 | 21 | Queue Screen | ✅ | 2026-05-07 |
 | 22 | Review Screen | ✅ | 2026-05-07 |
 | 23 | Genres Screen (editor + version drawer) | ☐ | — |
@@ -74,6 +75,7 @@ Last updated: 2026-05-07 (session 26)
 | 2026-05-07 | 24 | Phase 20: WorkbenchComponent full-page 3-column (240px sidebar + dual pdf-panes + 360px inspector); sentence approval toggles; error cards with apply-fix; approve/request-changes/escalate actions with dialogs; queue mode auto-advance via next-in-queue; reviewer notes debounce-save; workbench/review routes moved outside AppLayout; SentenceError interface + patchPage + escalatePage + getNextInQueue + applyError added to ApiService | workbench screen |
 | 2026-05-07 | 25 | Phase 21: ReviewQueueComponent — filterable queue table (sort by priority/quality/waitTime, low-quality toggle, error-type filter), quality progress bars (red/warning/success), error count tags, priority pills, wait time, error distribution card with proportional bars and quick-filter pills, escalations "Needs attention" card for MASTER/ADMIN with Resolve dialog; typed QueuePage/ErrorStat/Escalation interfaces + getEscalations + resolveEscalation added to ApiService | queue screen |
 | 2026-05-07 | 26 | Phase 22: WorkbenchComponent review-mode additions — goBack() routes to /queue in queue mode; queue-mode sidebar loads GET /queue?reviewerId=me; MASTER/ADMIN Add reviewer + Reassign buttons in inspector footer with user-picker dialogs; Reset to AI translation confirmation dialog on selected sentence; resetSentenceTranslation + addReviewer + reassignReviewers added to ApiService | review screen |
+| 2026-05-07 | 27 | Brainstormed, validated, and appended Specifications and Implementation Plans for Phase 20b (Workbench Manual Edits + Multi-Sentence Copilot Dialog) to .spec files and progression logs | spec update |
 
 ---
 

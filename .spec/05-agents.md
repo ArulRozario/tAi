@@ -15,13 +15,15 @@ Temperature and params are defaults; overridden by active `ModelConfig`.
 
 ---
 
-## Translation Agent
+## Translation Agent (Google Gemini 1.5 Flash)
+
+The translation agent performs direct visual OCR and translation on full page images in a single step, outputting a strict, schema-compliant JSON block. It operates using the `@google/genai` structured output engine to guarantee database alignment.
 
 ### System Prompt
 
 ```
-You are an expert professional translator.
-Translate the provided {sourceLang} text into {targetLang}.
+You are an expert professional translator and high-fidelity book typographer.
+Your task is to transcribe and translate the scanned book page image provided.
 
 ## Style Guide
 Follow the rules, terminology, and tone defined in the style guide below.
@@ -37,52 +39,55 @@ When in doubt, prefer the terms and phrasing specified in the style guide over g
 
 [TRANSLATION_MEMORY_BLOCK]
 ## Past Approved Translations (use as reference)
-These are human-verified translations of similar source text in this genre.
-Use them to maintain consistency with previously approved style and terminology.
-Do NOT copy them verbatim — apply them only where the source text is genuinely similar.
-
-{top-3 TranslationMemory results formatted as:
-1. Source: "..."
-   Approved translation: "..."
-}
+These are human-verified page-level translations of similar text in this genre.
+{top-3 TranslationMemory results}
 [/TRANSLATION_MEMORY_BLOCK]
 
-The user message will include a [DOCUMENT_CONTEXT] block for each source page in the batch.
-Use it to understand each sentence's structural role (heading, bullet, paragraph, caption) and
-to maintain coherence and terminology consistency across all pages in the batch.
-Translate only the sentences listed in the JSON array — do not translate the context block itself.
+## Typography Rules (Sanitized HTML-lite)
+You must preserve all print typography natively in your transcription (originalHtml) and translation (translatedHtml) using ONLY the following safe HTML tags:
+1. Bold: <b>text</b>
+2. Italic: <i>text</i>
+3. Underline: <u>text</u> (use to indicate direct translator text annotations/deviations)
+4. Superscripts (Verse Numbers / Citation Markers): <sup>12</sup> (wrap all verse numbers in <sup> tags!)
+5. Colors/Highlights (Shaded Box Panels): <span style="background-color: #HEX;">text</span> (extract background contrasting colors as hex)
+6. Alignment: <p align="center|right|left">text</p> (for centered poetic stanzas or dialogue)
 
-Output a strict JSON array. Do not output anything else.
+Do not generate any other HTML tags, styles, classes, or structures. Ensure all tags are properly closed and nested.
 
-Format:
-```json
-[
-  {"id": "sent-1", "translatedText": "..."}
-]
+## Output Format
+You must respond with a strict JSON object that conforms to the schema below. Do not include markdown code block backticks (` ```json ` or ` ``` `) in your raw response. Just output the clean JSON object.
 ```
 
-### User Prompt
-```
-[DOCUMENT_CONTEXT]
-{page.sourceMarkdown with each {{SENTENCE_X}} placeholder replaced by sentence.originalText}
-[/DOCUMENT_CONTEXT]
+### Structured Output JSON Schema (Zod/Gemini Spec)
 
-Translate the following {sourceLang} sentences into {targetLang}.
-Use the document context above to inform register, structural role, and terminology consistency:
+```typescript
+import { Type } from '@google/genai';
 
-```json
-[{"id": "sent-1", "text": "..."}, ...]
+const geminiPageTranslationSchema = {
+  type: Type.OBJECT,
+  properties: {
+    pageNumber: { type: Type.INTEGER, description: "The physical number of the page currently being translated." },
+    originalHtml: { type: Type.STRING, description: "Full transcribed English page text including all inline typography tags." },
+    translatedHtml: { type: Type.STRING, description: "Full translated Tamil page text in Parisutha Vedagamam style including matching inline typography tags." },
+    boundaryMetadata: {
+      type: Type.OBJECT,
+      properties: {
+        hasBleedOver: { type: Type.BOOLEAN, description: "True if a sentence or segment is cut off at the very bottom of this page and bleeds into the next page." },
+        borrowedTextFromNextPage: { type: Type.STRING, description: "The exact English text fragment that was visually read from the top of the next page to complete the last sentence of this page." }
+      },
+      required: ["hasBleedOver"]
+    }
+  },
+  required: ["pageNumber", "originalHtml", "translatedHtml", "boundaryMetadata"]
+};
 ```
-```
-
-If the genre's content includes a `## Examples` section, prepend those examples before the [DOCUMENT_CONTEXT] block.
 
 ### Parameters
 | Param | Value |
 |-------|-------|
 | Temperature | 0.3 |
-| Top P | 0.9 |
-| Max tokens | 4096 |
+| Max tokens | 8192 |
+| Response MIME | application/json |
 
 ---
 
@@ -387,7 +392,7 @@ PROCESS_DOCUMENT job (runs once per file):
   Idempotency: check existing Page records for this project before creating.
   1. Set project.status = PROCESSING
   2. Stream-split PDF — for each page in order (do not wait for all pages before enqueueing):
-     a. Extract page image (pdf2image / poppler)
+     a. Extract page layout image screenshot (pdf2image / poppler)
      b. Upload page image to MinIO
      c. Create Page record (status: PENDING) — skip if record already exists for this pageNumber
      d. Enqueue EXTRACT_PAGE job (parentJobId: this job's id)
@@ -396,79 +401,63 @@ PROCESS_DOCUMENT job (runs once per file):
 EXTRACT_PAGE job (parallel per page):
   Idempotency: if page.status != PENDING, exit immediately (already extracted or beyond).
   1. Set page.status = EXTRACTING
-  2. Download page image from MinIO
-  3. OCR & Vision-aware extraction (LlamaParse/Marker) → Markdown string
-  4. Image Extraction: crop illustrations/diagrams, upload to MinIO, embed `![image](/api/v1/files/public/<objectKey>)` in Markdown.
-     Use the backend proxy path (`GET /files/public/:path`), NOT a direct MinIO URL — the browser cannot reach MinIO directly and MinIO URLs require credentials.
-  5. SegmentationService.extractSentences() →
-     a. Split page Markdown on structural boundaries (double newlines, headings, list items) → paragraphs
-     b. For each paragraph: POST to NLP service (http://nlp:8001/segment) with paragraph text + sourceLang
-     c. Collect returned sentences; create Sentence records in order
-     d. Save markdown skeleton to page.sourceMarkdown with {{SENTENCE_X}} placeholders
-  6. Set page.status = EXTRACTED
-  7. Check: are all EXTRACT_PAGE sibling jobs for this project DONE?
+  2. Verify page layout screenshot exists in MinIO
+  3. Create empty Page placeholders with originalHtml = null, translatedHtml = null
+  4. Image Extraction: crop illustrations/diagrams, upload to MinIO, and note their positions
+  5. Set page.status = EXTRACTED
+  6. Check: are all EXTRACT_PAGE sibling jobs for this project DONE?
      If yes: enqueue one DETECT_CHAPTERS job for the project
 
 DETECT_CHAPTERS job (runs once per document, after all EXTRACT_PAGE jobs complete):
   Idempotency: if any Chapter records already exist for this project, delete them and all
-  page.chapterId assignments before re-running (safe to re-run on retry — produces same result).
+  page.chapterId assignments before re-running.
   1. Load all Pages for project in pageNumber order
-  2. Cross-page sentence stitching (detects sentence fragments split across page boundaries):
-     a. For each adjacent page pair (page N, page N+1):
-        - If the last sentence of page N has no terminal punctuation (.!?:;) AND
-          the first sentence of page N+1 starts with a lowercase letter or a conjunction/preposition:
-          → Merge: append the first sentence of page N+1 to the last sentence of page N
-            (update page N's last Sentence.originalText; delete page N+1's first Sentence record;
-             renumber remaining sentences on page N+1; update page N+1's sourceMarkdown to remove
-             the merged {{SENTENCE_X}} placeholder)
-     b. Repeat pass until no fragments are detected (handles runs of 3+ consecutive fragments)
-  3. SegmentationService.detectChapters() across all pages' sourceMarkdown in sequence
+  2. Detect Chapters across all pages in sequence
      → create Chapter records with correct start/end page spans; assign page.chapterId
-  4. Token-budget batch planner:
-     - budget = min(contextWindow × 0.75 − estimatedSystemPromptTokens, MAX_TRANSLATION_BATCH_TOKENS)
-     - tokenEstimate(page) = sum of (sentence.originalText.length / 4) across all sentences on the page
-     - Walk pages in order, accumulating token estimates; cut a new batch when adding the next page
-       would exceed budget (a single page that alone exceeds budget becomes its own batch)
-  5. For each batch: enqueue one TRANSLATE_BATCH job with payload = {projectId, pageIds: [...]}
+  3. Plan 4-Page Sliding Window batches:
+     - Walk pages in order, creating sliding groups of 4 pages (e.g. [1, 2, 3, 4], then [4, 5, 6, 7], etc.).
+     - Page 1 in the group serves as context, while Pages 2, 3, 4 are the target translation pages.
+  4. For each batch: enqueue one TRANSLATE_BATCH job with payload = {projectId, pageIds: [...]}
 
-TRANSLATE_BATCH job (1+ pages, grouped by token budget):
+TRANSLATE_BATCH job (1-3 target pages + 1 context page):
   Idempotency: skip any page in the batch where page.status is not EXTRACTED or REJECTED.
-  (REJECTED pages are valid re-translation targets from the request-changes flow.)
-  1. For each page in batch: set page.status = TRANSLATING
+  1. For each target page in batch: set page.status = TRANSLATING
   2. Load project.sourceLang, project.targetLang, genre content, top 50 glossary terms
-  3. Collect all Sentence records across all pages in the batch (ordered by pageNumber, sentenceNumber)
-  4. TM Retrieval: for each sentence, generate embedding via EmbeddingService and query
-     TranslationMemory (cosine similarity ≥ 0.75, top 3, scoped to genreId + sourceLang + targetLang)
-  5. Build translation prompt (system + genre cache block + glossary cache block + TM block).
-     User prompt includes [DOCUMENT_CONTEXT] for each page in the batch.
-  6. Call TranslationAgent.translate(all_batch_sentences) — returns [{id, translatedText, confidence}]
-  7. Parse JSON array response (Zod validation).
-     On parse failure: split batch in half and retry each half independently (max 2 retries per half — 3 total attempts per half including the first).
-  8. For each sentence: save sentence.translatedText, sentence.aiTranslatedText = translatedText, sentence.confidence
-  9. For each page in batch: set page.status = TRANSLATED; enqueue REVIEW_PAGE job
+  3. Load Page 1's boundary metadata from its `translationMetadata` column.
+     - Extract `borrowedTextFromNextPage` if present, and add it to the prompt as an `ignoreFromTopOfPage` rule to prevent duplicate translations at the top of Page 2.
+  4. Build translation prompt containing system instructions, genre cache block, glossary cache block, TM block, and the 4 page images.
+  5. Call TranslationAgent.translate(images, ignoreFromTopOfPage) — returns structured JSON:
+     {
+       pageNumber: number,
+       originalHtml: string,
+       translatedHtml: string,
+       boundaryMetadata: { hasBleedOver: boolean, borrowedTextFromNextPage: string }
+     }
+  6. Save page.originalHtml, page.translatedHtml, page.translationMetadata = boundaryMetadata
+  7. For each target page in batch: set page.status = TRANSLATED; enqueue REVIEW_PAGE job
 
 REVIEW_PAGE job (per page):
-  Idempotency: filter to only sentences where sentence.status != REVIEWED before calling agent.
+  Idempotency: skip if page.status == HUMAN_REVIEW.
   1. Set page.status = REVIEWING
   2. Load project.sourceLang, project.targetLang, genre content, top 50 glossary terms
-  3. Fetch all unreviewed Sentence records for this page
-  4. Call ReviewAgent.review(sentences_batch) with all (id, originalText, translatedText) pairs in one call
-  5. Parse JSON array response; for each sentence entry:
-     a. Create Error records from errors array
-     b. Set sentence.status = REVIEWED
+  3. Fetch the continuous `translatedHtml` for this page
+  4. Call ReviewAgent.review(translatedHtml) to check for spelling, accuracy, register, and terminology errors.
+  5. Parse JSON response; for each detected error:
+     a. Create an Error record linked directly to this Page ID (with class severity, error snippet, suggested change)
   6. Set page.status = HUMAN_REVIEW
   7. Set page.lastAiRunAt = now()
   8. Determine Priority: highest severity across all errors on this page (CRITICAL > HIGH > MEDIUM > LOW)
-  9. Assign primary reviewer: round-robin among active REVIEWER users ordered by fewest current
-     HUMAN_REVIEW assignments; create PageReviewer record (isPrimary=true); set page.assignedAt = now()
-  10. Check project completion (via aggregate DB count — do not load all pages into memory):
+  9. Assign primary reviewer: round-robin among active REVIEWER users ordered by fewest current HUMAN_REVIEW assignments; set page.assignedAt = now()
+  10. Check project completion via database counts:
       - If all pages are HUMAN_REVIEW or APPROVED: set project.status = REVIEW
       - If all pages are APPROVED: set project.status = COMPLETED
 
 INDEX_MEMORY job (per page, enqueued on page approval):
-  1. Fetch all Sentence records for this page
-  2. For each sentence:
-     a. Generate 768-dim embedding of originalText via EmbeddingService (nomic-embed-text)
+  1. Fetch `Page.originalHtml` and `Page.translatedHtml`
+  2. Extract raw paragraphs/verses from the HTML strings, stripping HTML-lite tags
+  3. For each paragraph/verse text segment:
+     a. Generate 768-dim embedding of originalText via EmbeddingService (nomic-embed-text via Ollama)
      b. Upsert TranslationMemory (genreId, sourceLang, targetLang, originalText, translatedText, embedding)
   — Runs async so approval response is not blocked by embedding calls
 ```
+

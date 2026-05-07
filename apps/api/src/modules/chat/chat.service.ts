@@ -163,20 +163,14 @@ export class ChatService {
         const page = await this.prisma.page.findUnique({
           where: { id: entityId },
           include: {
-            sentences: {
-              orderBy: { sentenceNumber: 'asc' },
-              include: { errors: true },
-            },
+            errors: true,
           },
         });
         if (page) {
-          let textContext = `Context: You are reviewing Page Number ${page.pageNumber}.\nSentences on this page:\n`;
-          for (const s of page.sentences) {
-            textContext += `[Sentence #${s.sentenceNumber}] Source: "${s.originalText}" | Target: "${s.translatedText || s.aiTranslatedText || ''}"\n`;
-            const openErrors = s.errors.filter((e) => e.status === 'OPEN');
-            if (openErrors.length > 0) {
-              textContext += `  Open Errors: ${openErrors.map((e) => `[${e.category}] "${e.currentText}" -> "${e.suggestedText}" (${e.issueDescription})`).join(', ')}\n`;
-            }
+          let textContext = `Context: You are reviewing Page Number ${page.pageNumber}.\nOriginal HTML:\n"""\n${page.originalHtml || ''}\n"""\nTranslated HTML:\n"""\n${page.translatedHtml || ''}\n"""\n`;
+          const openErrors = page.errors.filter((e) => e.status === 'OPEN');
+          if (openErrors.length > 0) {
+            textContext += `Open Errors:\n${openErrors.map((e) => `- [${e.category}] "${e.currentText}" -> "${e.suggestedText}" (${e.issueDescription})`).join('\n')}\n`;
           }
           return `${baseInstruction}\n${textContext}`;
         }
@@ -369,7 +363,9 @@ export class ChatService {
             const textChunk = parsed.message?.content || '';
             accumulatedResponse += textChunk;
             subject.next({ data: JSON.stringify({ chunk: textChunk }) });
-          } catch (err) {}
+          } catch {
+            // ignore malformed JSON
+          }
         }
 
         // Save completed ASSISTANT response

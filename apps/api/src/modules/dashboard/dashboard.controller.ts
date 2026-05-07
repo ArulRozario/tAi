@@ -19,7 +19,7 @@ export class DashboardController {
   @Get('throughput')
   getThroughput(
     @Query('metric') metric: 'pages' | 'words' = 'pages',
-    @Query('weeks') weeks: string = '12',
+    @Query('weeks') weeks = '12',
   ) {
     return this.dashboardService.getThroughput(metric, parseInt(weeks, 10));
   }
@@ -27,18 +27,18 @@ export class DashboardController {
   @Get('my-queue')
   getMyQueue(
     @CurrentUser() user: { id: string },
-    @Query('limit') limit: string = '5',
+    @Query('limit') limit = '5',
   ) {
     return this.dashboardService.getMyQueue(user.id, parseInt(limit, 10));
   }
 
   @Get('recent-projects')
-  getRecentProjects(@Query('limit') limit: string = '4') {
+  getRecentProjects(@Query('limit') limit = '4') {
     return this.dashboardService.getRecentProjects(parseInt(limit, 10));
   }
 
   @Get('activity')
-  getActivity(@Query('limit') limit: string = '10') {
+  getActivity(@Query('limit') limit = '10') {
     return this.dashboardService.getActivity(parseInt(limit, 10));
   }
 }

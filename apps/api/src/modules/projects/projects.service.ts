@@ -87,7 +87,7 @@ export class ProjectsService {
   /**
    * Retrieves all projects, ordered newest first.
    */
-  async findAll(page: number = 1, limit: number = 20) {
+  async findAll(page = 1, limit = 20) {
     const skip = (page - 1) * limit;
 
     const [projects, total] = await Promise.all([

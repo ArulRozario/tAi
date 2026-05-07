@@ -30,14 +30,10 @@ export class QueueService {
     }
 
     if (filters.errorTypes?.length) {
-      where.sentences = {
+      where.errors = {
         some: {
-          errors: {
-            some: {
-              category: { in: filters.errorTypes as ErrorCategory[] },
-              status: ErrorStatus.OPEN,
-            },
-          },
+          category: { in: filters.errorTypes as ErrorCategory[] },
+          status: ErrorStatus.OPEN,
         },
       };
     }
@@ -72,7 +68,7 @@ export class QueueService {
           },
           _count: {
             select: {
-              sentences: true,
+              errors: true,
             },
           },
         },
@@ -84,7 +80,7 @@ export class QueueService {
       pages.map(async (p) => {
         const errorCount = await this.prisma.error.count({
           where: {
-            sentence: { pageId: p.id },
+            pageId: p.id,
             status: ErrorStatus.OPEN,
           },
         });
@@ -148,20 +144,13 @@ export class QueueService {
       include: {
         project: { select: { id: true, name: true } },
         chapter: { select: { id: true, number: true, title: true } },
-        sentences: {
-          where: {
-            errors: { some: { status: ErrorStatus.ESCALATED } },
-          },
-          include: {
-            errors: {
-              where: { status: ErrorStatus.ESCALATED },
-              select: {
-                category: true,
-                escalatedAt: true,
-                escalatedById: true,
-                issueDescription: true,
-              },
-            },
+        errors: {
+          where: { status: ErrorStatus.ESCALATED },
+          select: {
+            category: true,
+            escalatedAt: true,
+            escalatedById: true,
+            issueDescription: true,
           },
           take: 1,
         },
@@ -169,7 +158,7 @@ export class QueueService {
     });
 
     return pages.map((p) => {
-      const topError = p.sentences[0]?.errors[0];
+      const topError = p.errors[0];
       return {
         pageId: p.id,
         project: p.project,

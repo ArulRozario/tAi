@@ -22,11 +22,10 @@ export class ErrorsController {
   @Get()
   @Roles('ADMIN', 'MASTER', 'REVIEWER')
   findMany(
-    @Query('sentenceId') sentenceId?: string,
     @Query('pageId') pageId?: string,
     @Query('status') status?: string,
   ) {
-    return this.errorsService.findMany({ sentenceId, pageId, status });
+    return this.errorsService.findMany({ pageId, status });
   }
 
   @Post(':id/apply')

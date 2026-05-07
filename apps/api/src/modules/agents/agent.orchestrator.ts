@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TranslationAgent } from './translation.agent';
 import { ReviewAgent } from './review.agent';
 import { ExtractionService } from './extraction.service';
-import { PageStatus, Priority, JobType, JobStatus, SentenceStatus, ErrorSeverity } from '@prisma/client';
+import { PageStatus, Priority, JobType, JobStatus, ErrorSeverity } from '@prisma/client';
 
 @Injectable()
 export class AgentOrchestrator {
@@ -118,48 +118,48 @@ export class AgentOrchestrator {
         data: { status: PageStatus.TRANSLATING },
       });
 
-      // 1. Gather sentences for this batch
-      const sentences = await this.prisma.sentence.findMany({
-        where: { pageId: { in: pageIds } },
-        orderBy: { sentenceNumber: 'asc' },
-      });
+      // 1. Translate batch of pages visually (Gemini 1.5 Flash sliding context)
+      const results = await this.translationAgent.translateBatch(projectId, pageIds);
 
-      if (sentences.length === 0) {
-        this.logger.warn(`No sentences found to translate in batch ${jobId}`);
-      } else {
-        const inputList = sentences.map((s) => ({ id: s.id, text: s.originalText }));
-
-        // 2. Translate sentences
-        const results = await this.translationAgent.translateBatch(projectId, inputList, pageIds);
-
-        // 3. Save translations to DB
-        for (const item of results) {
-          await this.prisma.sentence.update({
-            where: { id: item.id },
-            data: {
-              translatedText: item.translatedText,
-              aiTranslatedText: item.translatedText,
-              confidence: item.confidence,
-              status: SentenceStatus.TRANSLATED,
-            },
+      // 2. Save translated outputs and create/update Chapters dynamically!
+      for (const item of results) {
+        let assignedChapterId: string | null = null;
+        
+        if (item.isNewChapter && item.chapterNumber) {
+          // Idempotent Chapter fetching or creation
+          let chapter = await this.prisma.chapter.findFirst({
+            where: { projectId, number: item.chapterNumber },
           });
+          if (!chapter) {
+            chapter = await this.prisma.chapter.create({
+              data: {
+                projectId,
+                number: item.chapterNumber,
+                title: `Chapter ${item.chapterNumber}`,
+              },
+            });
+          }
+          assignedChapterId = chapter.id;
         }
-      }
 
-      // 4. Mark pages as TRANSLATED & enqueue individual REVIEW_PAGE jobs
-      for (const pageId of pageIds) {
         await this.prisma.page.update({
-          where: { id: pageId },
-          data: { status: PageStatus.TRANSLATED },
+          where: { id: item.pageId },
+          data: {
+            originalHtml: item.originalHtml,
+            translatedHtml: item.translatedHtml,
+            status: PageStatus.TRANSLATED,
+            ...(assignedChapterId ? { chapterId: assignedChapterId } : {}),
+          },
         });
 
+        // 3. Enqueue individual REVIEW_PAGE jobs
         await this.prisma.job.create({
           data: {
             type: JobType.REVIEW_PAGE,
             status: JobStatus.QUEUED,
             projectId,
-            pageId,
-            payload: { pageId },
+            pageId: item.pageId,
+            payload: { pageId: item.pageId },
           },
         });
       }
@@ -254,57 +254,41 @@ export class AgentOrchestrator {
         data: { status: PageStatus.REVIEWING },
       });
 
-      // 1. Gather all unreviewed page sentences
-      const sentences = await this.prisma.sentence.findMany({
-        where: { pageId: page.id, status: { not: SentenceStatus.REVIEWED } },
-        orderBy: { sentenceNumber: 'asc' },
+      // 1. Run visual/linguistic quality verification
+      const originalHtml = page.originalHtml || '';
+      const translatedHtml = page.translatedHtml || '';
+      
+      const results = await this.reviewAgent.reviewPage(
+        page.projectId,
+        page.id,
+        originalHtml,
+        translatedHtml,
+      );
+
+      // 2. Clear previous errors on this page and insert new ones
+      await this.prisma.error.deleteMany({
+        where: { pageId: page.id },
       });
 
-      if (sentences.length > 0) {
-        const inputList = sentences.map((s) => ({
-          id: s.id,
-          source: s.originalText,
-          translation: s.translatedText || '',
-        }));
-
-        // 2. Call ReviewAgent
-        const results = await this.reviewAgent.reviewBatch(page.projectId, inputList);
-
-        // 3. Process errors and update sentence metadata
-        for (const item of results) {
-          // Clear previous errors to avoid duplicates
-          await this.prisma.error.deleteMany({
-            where: { sentenceId: item.sentenceId },
-          });
-
-          // Insert new open errors
-          for (const err of item.errors) {
-            await this.prisma.error.create({
-              data: {
-                sentenceId: item.sentenceId,
-                severity: err.severity,
-                category: err.category,
-                location: err.location,
-                currentText: err.currentText,
-                suggestedText: err.suggestedText,
-                issueDescription: err.issueDescription,
-                reference: err.reference,
-                aiNote: err.aiNote,
-              },
-            });
-          }
-
-          // Mark sentence as REVIEWED
-          await this.prisma.sentence.update({
-            where: { id: item.sentenceId },
-            data: { status: SentenceStatus.REVIEWED },
-          });
-        }
+      for (const err of results) {
+        await this.prisma.error.create({
+          data: {
+            pageId: page.id,
+            severity: err.severity,
+            category: err.category,
+            location: err.location,
+            currentText: err.currentText,
+            suggestedText: err.suggestedText,
+            issueDescription: err.issueDescription,
+            reference: err.reference,
+            aiNote: err.aiNote,
+          },
+        });
       }
 
-      // 4. Calculate page quality score & assign priorities
+      // 3. Calculate page quality score & worst severity priority
       const errorsOnPage = await this.prisma.error.findMany({
-        where: { sentence: { pageId: page.id } },
+        where: { pageId: page.id },
       });
 
       let pageQuality = 100;
@@ -337,7 +321,7 @@ export class AgentOrchestrator {
       else if (worstSeverity === ErrorSeverity.MEDIUM) priority = Priority.MEDIUM;
       else if (worstSeverity === ErrorSeverity.LOW) priority = Priority.LOW;
 
-      // 5. Round-robin auto-assign reviewer with fewest current assignments
+      // 4. Round-robin auto-assign reviewer with fewest current assignments
       const reviewers = await this.prisma.user.findMany({
         where: { role: 'REVIEWER' },
       });
@@ -383,7 +367,7 @@ export class AgentOrchestrator {
         });
       }
 
-      // 6. Transition page to HUMAN_REVIEW
+      // 5. Transition page to HUMAN_REVIEW
       await this.prisma.page.update({
         where: { id: page.id },
         data: {
@@ -395,7 +379,7 @@ export class AgentOrchestrator {
         },
       });
 
-      // 7. Check and aggregate overall project status completion
+      // 6. Check and aggregate overall project status completion
       const totalPageCount = await this.prisma.page.count({ where: { projectId: page.projectId } });
       const approvedCount = await this.prisma.page.count({ where: { projectId: page.projectId, status: PageStatus.APPROVED } });
       const reviewPendingCount = await this.prisma.page.count({ where: { projectId: page.projectId, status: { in: [PageStatus.HUMAN_REVIEW, PageStatus.REJECTED] } } });

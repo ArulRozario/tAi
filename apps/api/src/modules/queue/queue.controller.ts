@@ -18,8 +18,8 @@ export class QueueController {
     @Query('errorTypes') errorTypes?: string,
     @Query('reviewerId') reviewerId?: string,
     @Query('lowQualityOnly') lowQualityOnly?: string,
-    @Query('limit') limit: string = '50',
-    @Query('offset') offset: string = '0',
+    @Query('limit') limit = '50',
+    @Query('offset') offset = '0',
   ) {
     return this.queueService.getQueue({
       sort,

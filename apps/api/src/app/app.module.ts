@@ -10,7 +10,6 @@ import { ExportModule } from '../modules/export/export.module';
 import { GenresModule } from '../modules/genres/genres.module';
 import { ModelsModule } from '../modules/models/models.module';
 import { JobsModule } from '../modules/jobs/jobs.module';
-import { SentencesModule } from '../modules/sentences/sentences.module';
 import { ErrorsModule } from '../modules/errors/errors.module';
 import { GlossaryModule } from '../modules/glossary/glossary.module';
 import { ChatModule } from '../modules/chat/chat.module';
@@ -34,7 +33,6 @@ import { AppService } from './app.service';
     GenresModule,
     ModelsModule,
     JobsModule,
-    SentencesModule,
     ErrorsModule,
     GlossaryModule,
     ChatModule,

@@ -1,13 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinIOService } from '../files/minio.service';
-import { PageStatus, Priority, JobType, JobStatus, SentenceStatus } from '@prisma/client';
-import axios from 'axios';
+import { PageStatus, Priority, JobType, JobStatus } from '@prisma/client';
 
 @Injectable()
 export class ExtractionService {
   private readonly logger = new Logger(ExtractionService.name);
-  private readonly nlpUrl = process.env.NLP_SERVICE_URL || 'http://localhost:8001';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -95,7 +93,7 @@ export class ExtractionService {
         data: {
           projectId: project.id,
           pageNumber: pageNum,
-          originalText: pageData.text,
+          originalHtml: pageData.text,
           status: PageStatus.PENDING,
           priority: Priority.MEDIUM,
         },
@@ -154,61 +152,14 @@ export class ExtractionService {
       data: { status: PageStatus.EXTRACTING },
     });
 
-    const pageText = page.originalText || '';
-
-    // Segment paragraphs by splitting on structural Markdown boundaries
-    const paragraphs = pageText.split('\n\n').map(p => p.trim()).filter(Boolean);
-    let sentenceCounter = 1;
-    let finalSourceMarkdown = '';
-
-    for (const paragraph of paragraphs) {
-      let sentences: string[] = [];
-
-      // Call spaCy sidecar segmenter
-      try {
-        const response = await axios.post(`${this.nlpUrl}/segment`, { text: paragraph }, { timeout: 5000 });
-        sentences = response.data.sentences || [];
-      } catch (err) {
-        this.logger.warn(`spaCy sidecar segmentation failed: ${(err as Error).message}. Falling back to regex split.`);
-        // Fallback robust sentence splitter regex
-        sentences = paragraph
-          .split(/(?<=[.!?])\s+(?=[A-Z"])/)
-          .map(s => s.trim())
-          .filter(Boolean);
-      }
-
-      if (sentences.length === 0) {
-        sentences = [paragraph];
-      }
-
-      let paragraphMarkdown = paragraph;
-
-      for (const sentText of sentences) {
-        const sentenceNum = sentenceCounter++;
-
-        // Create Sentence record
-        await this.prisma.sentence.create({
-          data: {
-            pageId: page.id,
-            sentenceNumber: sentenceNum,
-            originalText: sentText,
-            status: SentenceStatus.PENDING,
-          },
-        });
-
-        // Insert placeholder into page markdown
-        // Replace exact sentence text with placeholder {{SENTENCE_X}}
-        paragraphMarkdown = paragraphMarkdown.replace(sentText, `{{SENTENCE_${sentenceNum}}}`);
-      }
-
-      finalSourceMarkdown += paragraphMarkdown + '\n\n';
-    }
-
-    // Save final skeleton markdown & update page status
+    // In our new page-level visual OCR architecture, we do not segment paragraphs locally.
+    // We initialize originalHtml and translatedHtml as empty placeholder strings,
+    // and let the translation agent visually ingest the page screenshot from MinIO and generate them.
     await this.prisma.page.update({
       where: { id: page.id },
       data: {
-        sourceMarkdown: finalSourceMarkdown.trim(),
+        originalHtml: '',
+        translatedHtml: '',
         status: PageStatus.EXTRACTED,
       },
     });
@@ -266,163 +217,38 @@ export class ExtractionService {
       data: { chapterId: null },
     });
 
-    // 1. Load all pages in order with sentences
+    // 1. Load all pages in order
     const pages = await this.prisma.page.findMany({
       where: { projectId },
       orderBy: { pageNumber: 'asc' },
-      include: {
-        sentences: {
-          orderBy: { sentenceNumber: 'asc' },
-        },
-      },
     });
 
-    // 2. Cross-Page Sentence boundary stitching
-    for (let i = 0; i < pages.length - 1; i++) {
-      const currentPage = pages[i];
-      const nextPage = pages[i + 1];
+    // 2. Sliding-window visual batch planning
+    // Each batch has up to 4 pages: 3 target pages, and the 4th page acts as bleed-over/context.
+    const batches: string[][] = [];
+    for (let i = 0; i < pages.length; i += 3) {
+      const targetPages = pages.slice(i, i + 3);
+      const batchPageIds = targetPages.map(p => p.id);
 
-      if (currentPage.sentences.length === 0 || nextPage.sentences.length === 0) {
-        continue;
+      // If there is a next page after the target list, include it as context/borrow page
+      if (i + 3 < pages.length) {
+        batchPageIds.push(pages[i + 3].id);
       }
-
-      const s1 = currentPage.sentences[currentPage.sentences.length - 1];
-      const s2 = nextPage.sentences[0];
-
-      // If last sentence of page N has no punctuation, and first sentence of page N+1 starts with lowercase or conjunction
-      const hasNoPunctuation = !/[.!?:;]/.test(s1.originalText.slice(-1));
-      const startsWithLowercaseOrConjunction = /^[a-z]|^and\b|^or\b|^but\b|^for\b|^with\b|^by\b|^to\b/i.test(s2.originalText);
-
-      if (hasNoPunctuation && startsWithLowercaseOrConjunction) {
-        this.logger.log(`Stitching cross-page boundary sentences between Page ${currentPage.pageNumber} and Page ${nextPage.pageNumber}`);
-
-        // Update s1
-        const mergedText = `${s1.originalText} ${s2.originalText}`;
-        await this.prisma.sentence.update({
-          where: { id: s1.id },
-          data: { originalText: mergedText },
-        });
-        s1.originalText = mergedText; // local sync
-
-        // Delete s2
-        await this.prisma.sentence.delete({ where: { id: s2.id } });
-
-        // Renumber remaining sentences on Page N+1
-        const remainingSentences = nextPage.sentences.slice(1);
-        for (let idx = 0; idx < remainingSentences.length; idx++) {
-          const sent = remainingSentences[idx];
-          const newNum = idx + 1;
-          await this.prisma.sentence.update({
-            where: { id: sent.id },
-            data: { sentenceNumber: newNum },
-          });
-          sent.sentenceNumber = newNum; // local sync
-        }
-
-        // Update Page N+1 sourceMarkdown skeleton
-        if (nextPage.sourceMarkdown) {
-          // Remove {{SENTENCE_1}} and shift remaining sentence placeholders down by 1
-          let markdown = nextPage.sourceMarkdown.replace('{{SENTENCE_1}}', '');
-          for (let idx = 0; idx < remainingSentences.length; idx++) {
-            const oldPlaceholder = `{{SENTENCE_${idx + 2}}}`;
-            const newPlaceholder = `{{SENTENCE_${idx + 1}}}`;
-            markdown = markdown.replace(oldPlaceholder, newPlaceholder);
-          }
-          await this.prisma.page.update({
-            where: { id: nextPage.id },
-            data: { sourceMarkdown: markdown },
-          });
-          nextPage.sourceMarkdown = markdown; // local sync
-        }
-
-        // Adjust local next-page list
-        nextPage.sentences = remainingSentences;
-      }
+      batches.push(batchPageIds);
     }
 
-    // 3. Chapter Detection
-    let activeChapterNum = 0;
-    let activeChapterId: string | null = null;
-
-    for (const page of pages) {
-      const pageText = page.originalText || '';
-
-      // Check if page starts with Chapter header
-      const match = pageText.match(/^#+\s+(?:Chapter|அதிகாரம்)\s+(\d+)/i);
-      if (match) {
-        activeChapterNum = parseInt(match[1], 10);
-        const chapter = await this.prisma.chapter.create({
-          data: {
-            projectId,
-            number: activeChapterNum,
-            title: `Chapter ${activeChapterNum}`,
-          },
-        });
-        activeChapterId = chapter.id;
-      }
-
-      if (!activeChapterId && pages.length > 0) {
-        // Fallback: Default Chapter 1 if none found
-        activeChapterNum = 1;
-        const chapter = await this.prisma.chapter.create({
-          data: {
-            projectId,
-            number: activeChapterNum,
-            title: 'Chapter 1',
-          },
-        });
-        activeChapterId = chapter.id;
-      }
-
-      if (activeChapterId) {
-        await this.prisma.page.update({
-          where: { id: page.id },
-          data: { chapterId: activeChapterId },
-        });
-        page.chapterId = activeChapterId; // local sync
-      }
-    }
-
-    // 4. Token-budget translation batch planning
-    const MAX_BATCH_TOKENS = 2000;
-    let currentBatch: string[] = [];
-    let currentBatchTokens = 0;
-
-    for (const page of pages) {
-      // Estimate token count = character count / 4
-      const pageTextLength = page.sentences.reduce((sum, s) => sum + s.originalText.length, 0);
-      const pageTokens = Math.ceil(pageTextLength / 4);
-
-      if (currentBatchTokens + pageTokens > MAX_BATCH_TOKENS && currentBatch.length > 0) {
-        // Create translation job for this batch
-        await this.prisma.job.create({
-          data: {
-            type: JobType.TRANSLATE_BATCH,
-            status: JobStatus.QUEUED,
-            projectId,
-            payload: { projectId, pageIds: currentBatch },
-          },
-        });
-
-        currentBatch = [page.id];
-        currentBatchTokens = pageTokens;
-      } else {
-        currentBatch.push(page.id);
-        currentBatchTokens += pageTokens;
-      }
-    }
-
-    if (currentBatch.length > 0) {
+    // 3. Enqueue TRANSLATE_BATCH jobs
+    for (const batchPageIds of batches) {
       await this.prisma.job.create({
         data: {
           type: JobType.TRANSLATE_BATCH,
           status: JobStatus.QUEUED,
           projectId,
-          payload: { projectId, pageIds: currentBatch },
+          payload: { projectId, pageIds: batchPageIds },
         },
       });
     }
 
-    this.logger.log(`DETECT_CHAPTERS complete: chapter splitting and translation batch enqueuing finished.`);
+    this.logger.log(`DETECT_CHAPTERS complete: 4-page sliding-window batch planning finished.`);
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OllamaService } from './ollama.service';
+import { GeminiService } from './gemini.service';
 
 export interface MemoryMatch {
   originalText: string;
@@ -14,11 +14,11 @@ export class MemoryService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly ollama: OllamaService,
+    private readonly gemini: GeminiService,
   ) {}
 
   /**
-   * Generates embeddings and indexes all translated sentences on a page into Translation Memory.
+   * Generates embeddings and indexes all translated paragraphs on a page into Translation Memory.
    */
   async indexPage(pageId: string): Promise<void> {
     this.logger.log(`Starting Translation Memory indexing for page ${pageId}`);
@@ -27,50 +27,54 @@ export class MemoryService {
       where: { id: pageId },
       include: {
         project: true,
-        sentences: {
-          where: {
-            translatedText: { not: null },
-          },
-        },
       },
     });
 
-    if (!page) {
-      this.logger.error(`Failed to index page ${pageId}: page not found`);
+    if (!page || !page.originalHtml || !page.translatedHtml) {
+      this.logger.warn(`Failed to index page ${pageId}: page, originalHtml, or translatedHtml not found`);
       return;
     }
 
-    const { project, sentences } = page;
+    const { project, originalHtml, translatedHtml } = page;
 
-    for (const sentence of sentences) {
-      if (!sentence.originalText || !sentence.translatedText) {
+    // Split HTML-lite strings on paragraph tags to get paragraph texts, stripping residual tags
+    const originalParas = originalHtml.match(/<p[^>]*>([\s\S]*?)<\/p>/gi)?.map(p => p.replace(/<[^>]+>/g, '').trim()).filter(Boolean) || [];
+    const translatedParas = translatedHtml.match(/<p[^>]*>([\s\S]*?)<\/p>/gi)?.map(p => p.replace(/<[^>]+>/g, '').trim()).filter(Boolean) || [];
+
+    // Clean out old Translation Memory references for this specific page first (idempotence)
+    await this.prisma.translationMemory.deleteMany({
+      where: { pageId },
+    });
+
+    const minLength = Math.min(originalParas.length, translatedParas.length);
+    for (let i = 0; i < minLength; i++) {
+      const origText = originalParas[i];
+      const transText = translatedParas[i];
+
+      if (!origText || !transText) {
         continue;
       }
 
       try {
-        this.logger.log(`Indexing sentence ${sentence.id} into TM`);
+        this.logger.log(`Indexing paragraph ${i} from page ${page.id} into TM`);
 
-        // 1. Generate 768-dimensional embedding
-        const embedding = await this.ollama.getEmbedding(sentence.originalText, 'nomic-embed-text');
+        // 1. Generate 768-dimensional embedding using Google's text-embedding-004
+        const embedding = await this.gemini.getEmbedding768(origText);
 
         if (!embedding || embedding.length !== 768) {
           throw new Error(`Invalid embedding length generated: ${embedding?.length ?? 0}`);
         }
 
-        // 2. Upsert standard database record (excluding vector)
-        const tm = await this.prisma.translationMemory.upsert({
-          where: { sentenceId: sentence.id },
-          create: {
-            sentenceId: sentence.id,
+        // 2. Save translation memory database record
+        const tm = await this.prisma.translationMemory.create({
+          data: {
+            pageId: page.id,
             projectId: project.id,
             genreId: project.genreId,
             sourceLang: project.sourceLang,
             targetLang: project.targetLang,
-            originalText: sentence.originalText,
-            translatedText: sentence.translatedText,
-          },
-          update: {
-            translatedText: sentence.translatedText,
+            originalText: origText,
+            translatedText: transText,
           },
         });
 
@@ -82,9 +86,9 @@ export class MemoryService {
           tm.id,
         );
 
-        this.logger.log(`Successfully indexed sentence ${sentence.id} with embedding`);
+        this.logger.log(`Successfully indexed paragraph ${i} with embedding`);
       } catch (error) {
-        this.logger.error(`Failed to index sentence ${sentence.id} in TM: ${(error as Error).message}`);
+        this.logger.error(`Failed to index paragraph ${i} on page ${page.id}: ${(error as Error).message}`);
       }
     }
 
@@ -92,19 +96,19 @@ export class MemoryService {
   }
 
   /**
-   * Retrieves top 3 matching translated sentences matching the exact genre, language, and similarity threshold.
+   * Retrieves top 3 matching translated sentences/paragraphs matching the exact genre, language, and similarity threshold.
    */
   async retrieve(
     originalText: string,
     genreId: string,
     sourceLang: string,
     targetLang: string,
-    limit: number = 3,
+    limit = 3,
   ): Promise<MemoryMatch[]> {
     try {
       this.logger.log(`Retrieving Translation Memory matches for: "${originalText.slice(0, 30)}..."`);
 
-      const embedding = await this.ollama.getEmbedding(originalText, 'nomic-embed-text');
+      const embedding = await this.gemini.getEmbedding768(originalText);
 
       if (!embedding || embedding.length !== 768) {
         this.logger.warn(`Failed to generate valid embedding for TM search`);

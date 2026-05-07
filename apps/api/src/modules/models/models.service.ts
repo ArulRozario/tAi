@@ -172,7 +172,7 @@ export class ModelsService implements OnModuleInit {
     return { online: false, latencyMs: 0, error: 'Unknown provider' };
   }
 
-  async getAgentLogs(agentType: string, limit: number = 50): Promise<{ logs: string[] }> {
+  async getAgentLogs(agentType: string, limit = 50): Promise<{ logs: string[] }> {
     const records = await this.prisma.activityLog.findMany({
       where: {
         action: 'agent.prompt_execution',
