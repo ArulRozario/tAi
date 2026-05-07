@@ -7,13 +7,14 @@ import { MenuItem } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { FormsModule } from '@angular/forms';
+import { MenuModule } from 'primeng/menu';
 import { UiService } from './core/services/ui.service';
 import { ApiService } from './core/services/api.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterModule, MenubarModule, ButtonModule, CommonModule, DialogModule, InputTextModule, FormsModule],
+  imports: [RouterOutlet, RouterModule, MenubarModule, ButtonModule, CommonModule, DialogModule, InputTextModule, FormsModule, MenuModule],
   template: `
     <div class="min-h-screen font-sans selection:bg-primary/30 relative text-slate-200 bg-slate-950">
       <!-- Global Background Effects -->
@@ -23,35 +24,29 @@ import { ApiService } from './core/services/api.service';
         <div class="absolute top-[20%] left-[10%] w-[30%] h-[30%] rounded-full bg-indigo-500/5 blur-[100px]"></div>
       </div>
 
-      <!-- NAVIGATION: Intelligence Command Bar (Slim) -->
+      <!-- NAVIGATION: Intelligence Command Bar -->
       <header class="fixed top-0 left-0 w-full z-50 px-6 py-4" *ngIf="!isLoginPage()">
-        <nav class="glass-card h-14 !rounded-2xl border-white/5 bg-slate-950/40 backdrop-blur-3xl shadow-2xl flex items-center justify-between px-6">
+        <nav class="bg-surface-1/80 backdrop-blur-md h-14 rounded-2xl border border-border shadow-sm flex items-center justify-between px-6">
           <!-- BRAND -->
-          <div class="flex items-center gap-3 group cursor-pointer" routerLink="/">
-            <div class="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.4)] group-hover:rotate-6 transition-all duration-500">
-               <i class="pi pi-bolt text-white text-base"></i>
-            </div>
-            <div class="flex flex-col">
-              <span class="text-lg font-black text-white tracking-tighter leading-none">tAI</span>
-              <span class="text-[7px] font-black text-slate-500 uppercase tracking-[0.3em] mt-0.5">Core</span>
-            </div>
+          <div class="flex items-center gap-3 cursor-pointer" routerLink="/">
+            <span class="text-lg font-bold text-text-1 tracking-tight">tAI</span>
+            <div class="w-px h-6 bg-border mx-2"></div>
           </div>
 
-          <!-- NAV LINKS (Compact) -->
-          <div class="hidden md:flex items-center bg-slate-950/40 p-1 rounded-xl border border-white/5 shadow-inner">
-            <a routerLink="/projects" routerLinkActive="!bg-primary !text-white shadow-lg" class="px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-all">Projects</a>
-            <a routerLink="/review" routerLinkActive="!bg-primary !text-white shadow-lg" class="px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-all">Review</a>
-            <a routerLink="/settings" routerLinkActive="!bg-primary !text-white shadow-lg" class="px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-all">Settings</a>
+          <!-- NAV LINKS -->
+          <div class="hidden md:flex items-center gap-1">
+            <a routerLink="/dashboard" routerLinkActive="bg-surface-2 text-text-1" class="px-3 py-1.5 rounded-lg text-sm font-medium text-text-2 hover:text-text-1 hover:bg-surface-2 transition-colors">Dashboard</a>
+            <a routerLink="/projects" routerLinkActive="bg-surface-2 text-text-1" class="px-3 py-1.5 rounded-lg text-sm font-medium text-text-2 hover:text-text-1 hover:bg-surface-2 transition-colors">Projects</a>
+            <a routerLink="/queue" routerLinkActive="bg-surface-2 text-text-1" class="px-3 py-1.5 rounded-lg text-sm font-medium text-text-2 hover:text-text-1 hover:bg-surface-2 transition-colors">Queue</a>
+            <a routerLink="/genres" routerLinkActive="bg-surface-2 text-text-1" class="px-3 py-1.5 rounded-lg text-sm font-medium text-text-2 hover:text-text-1 hover:bg-surface-2 transition-colors">Genres</a>
+            
+            <p-menu #adminMenu [model]="adminItems" [popup]="true"></p-menu>
+            <button pButton label="Admin" icon="pi pi-chevron-down" iconPos="right" [text]="true" (click)="adminMenu.toggle($event)" class="!text-text-2 hover:!text-text-1"></button>
           </div>
 
           <!-- ACTIONS -->
           <div class="flex items-center gap-3">
-            <button pButton label="New Container" icon="pi pi-plus" 
-                    (click)="ui.openNewProjectDialog()"
-                    class="!bg-primary !border-none !h-9 !px-4 !rounded-xl shadow-lg shadow-primary/10 font-black text-[9px] uppercase tracking-widest active:scale-95 transition-all"></button>
-            <div class="w-px h-6 bg-white/10 mx-1"></div>
-            <button pButton icon="pi pi-power-off" (click)="logout()"
-                    class="p-button-text !p-0 !w-9 !h-9 !text-slate-700 hover:!text-rose-500 !rounded-xl transition-all"></button>
+            <button pButton icon="pi pi-power-off" [text]="true" (click)="logout()" class="!w-8 !h-8 !p-0 !text-text-2 hover:!text-error"></button>
           </div>
         </nav>
       </header>
@@ -187,13 +182,11 @@ export class AppComponent implements OnInit {
   
   displayNewProject = false;
   creating = false;
-  newProject = { name: '', sourceLang: 'English', targetLang: 'Tamil', description: '' };
+  newProject = { name: '', sourceLang: 'en', targetLang: 'ta', description: '', genreId: '' };
 
-  menuItems: MenuItem[] = [
-    { label: 'Dashboard', icon: 'pi pi-chart-bar', routerLink: '/dashboard', routerLinkActiveOptions: { exact: true } },
-    { label: 'Repository', icon: 'pi pi-box', routerLink: '/projects' },
-    { label: 'Review Queue', icon: 'pi pi-verified', routerLink: '/queue' },
-    { label: 'Protocols', icon: 'pi pi-sliders-h', routerLink: '/settings' }
+  adminItems: MenuItem[] = [
+    { label: 'Team', icon: 'pi pi-users', routerLink: '/admin/team' },
+    { label: 'Settings', icon: 'pi pi-cog', routerLink: '/admin/settings' }
   ];
 
   constructor() {
@@ -224,7 +217,7 @@ export class AppComponent implements OnInit {
         this.creating = false;
         this.ui.closeNewProjectDialog();
         this.router.navigate(['/projects', res.id]);
-        this.newProject = { name: '', sourceLang: 'English', targetLang: 'Tamil', description: '' };
+        this.newProject = { name: '', sourceLang: 'en', targetLang: 'ta', description: '', genreId: '' };
       },
       error: () => {
         this.creating = false;

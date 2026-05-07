@@ -2,109 +2,322 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'REVIEWER' | 'MASTER' | 'ADMIN';
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface Genre {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  projectCount?: number;
+  lastUpdatedBy?: User;
+  currentVersion?: GenreVersion;
+}
+
+export interface GenreVersion {
+  id: string;
+  genreId: string;
+  versionNumber: string;
+  content: string;
+  note?: string;
+  createdAt: string;
+  createdBy?: User;
+}
+
 export interface Project {
   id: string;
   name: string;
   description?: string;
   sourceLang: string;
   targetLang: string;
-  sourceFile?: string;
-  totalPages: number;
   status: string;
-  settings: Record<string, unknown>;
+  genreId: string;
+  genre?: Genre;
+  owner?: User;
+  pageCount?: number;
+  completedCount?: number;
+  progress?: number;
+  avgQuality?: number;
   createdAt: string;
   updatedAt: string;
-  owner?: { id: string; name: string; email: string };
-  _count?: { pages: number };
 }
 
-export interface ProjectStats {
-  total: number;
-  pending: number;
-  extracting: number;
-  extracted: number;
-  translating: number;
-  translated: number;
-  reviewing: number;
-  humanReview: number;
-  approved: number;
-  rejected: number;
-  error: number;
+export interface Chapter {
+  id: string;
+  projectId: string;
+  number: number;
+  title?: string;
 }
 
 export interface Page {
   id: string;
   projectId: string;
+  chapterId?: string;
   pageNumber: number;
-  originalText?: string;
-  translatedText?: string;
   status: string;
-  qualityScore?: number;
   priority: string;
-  createdAt: string;
-  updatedAt: string;
-  assignedReviewer?: { id: string; name: string };
+  quality?: number;
+  notes?: string;
+  assignedAt?: string;
+  lastAiRunAt?: string;
+  reviewers?: User[];
 }
 
-export interface PaginationResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+export interface Sentence {
+  id: string;
+  pageId: string;
+  sentenceNumber: number;
+  originalText: string;
+  translatedText?: string;
+  aiTranslatedText?: string;
+  status: string;
+  isApproved: boolean;
+  confidence?: number;
+}
+
+export interface PageDetail extends Page {
+  sourceMarkdown?: string;
+  sentences: Sentence[];
+}
+
+export interface DashboardStats {
+  activeProjects: number;
+  activeProjectsDeltaMonth: number;
+  pagesTranslated: number;
+  pagesTranslatedDeltaWeek: number;
+  pendingReview: number;
+  pendingReviewDelta: number;
+  userQueueCount: number;
+  escalationCount: number;
+  avgQuality: number;
+  avgQualityDelta: number;
+  lastSyncAt: string | null;
+}
+
+export interface Job {
+  id: string;
+  type: string;
+  status: string;
+  progress: number;
+  result?: { fileUrl?: string };
+  errorMessage?: string;
+  createdAt: string;
+}
+
+export interface GlossaryTerm {
+  id: string;
+  genreId: string;
+  sourceTerm: string;
+  targetTerm: string;
+  context?: string;
+  notes?: string;
 }
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
-  private baseUrl = '/api';
+  readonly base = '/api/v1';
 
-  // Projects
-  getProjects(page = 1, limit = 20): Observable<PaginationResponse<Project>> {
-    const params = new HttpParams()
-      .set('page', page.toString())
-      .set('limit', limit.toString());
-    return this.http.get<PaginationResponse<Project>>(`${this.baseUrl}/projects`, { params });
+  // ── Auth ──────────────────────────────────────────────────────────────────
+
+  getMe(): Observable<User> {
+    return this.http.get<User>(`${this.base}/auth/me`);
+  }
+
+  // ── Dashboard ─────────────────────────────────────────────────────────────
+
+  getDashboardStats(): Observable<DashboardStats> {
+    return this.http.get<DashboardStats>(`${this.base}/dashboard/stats`);
+  }
+
+  getDashboardThroughput(metric: 'pages' | 'words' = 'pages', weeks = 12): Observable<{ week: string; value: number }[]> {
+    return this.http.get<{ week: string; value: number }[]>(`${this.base}/dashboard/throughput`, {
+      params: new HttpParams().set('metric', metric).set('weeks', weeks),
+    });
+  }
+
+  getMyQueue(limit = 5): Observable<Page[]> {
+    return this.http.get<Page[]>(`${this.base}/dashboard/my-queue`, {
+      params: new HttpParams().set('limit', limit),
+    });
+  }
+
+  getRecentProjects(limit = 4): Observable<Project[]> {
+    return this.http.get<Project[]>(`${this.base}/dashboard/recent-projects`, {
+      params: new HttpParams().set('limit', limit),
+    });
+  }
+
+  getActivityFeed(limit = 10): Observable<unknown[]> {
+    return this.http.get<unknown[]>(`${this.base}/dashboard/activity`, {
+      params: new HttpParams().set('limit', limit),
+    });
+  }
+
+  // ── Projects ──────────────────────────────────────────────────────────────
+
+  getProjects(q?: string, status?: string, limit = 20, offset = 0): Observable<Project[]> {
+    let params = new HttpParams().set('limit', limit).set('offset', offset);
+    if (q) params = params.set('q', q);
+    if (status) params = params.set('status', status);
+    return this.http.get<Project[]>(`${this.base}/projects`, { params });
   }
 
   getProject(id: string): Observable<Project> {
-    return this.http.get<Project>(`${this.baseUrl}/projects/${id}`);
+    return this.http.get<Project>(`${this.base}/projects/${id}`);
   }
 
-  getProjectStats(id: string): Observable<ProjectStats> {
-    return this.http.get<ProjectStats>(`${this.baseUrl}/projects/${id}/stats`);
+  createProject(data: { name: string; description?: string; genreId: string; sourceFileId?: string; sourceLang: string; targetLang: string }): Observable<Project> {
+    return this.http.post<Project>(`${this.base}/projects`, data);
   }
 
-  createProject(data: { name: string; description?: string; sourceLang?: string; targetLang?: string }): Observable<Project> {
-    return this.http.post<Project>(`${this.baseUrl}/projects`, data);
-  }
-
-  updateProject(id: string, data: Partial<Project>): Observable<Project> {
-    return this.http.put<Project>(`${this.baseUrl}/projects/${id}`, data);
+  patchProject(id: string, data: Partial<Project>): Observable<Project> {
+    return this.http.patch<Project>(`${this.base}/projects/${id}`, data);
   }
 
   deleteProject(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/projects/${id}`);
+    return this.http.delete<void>(`${this.base}/projects/${id}`);
   }
 
-  // Pages
-  getProjectPages(projectId: string, page = 1, limit = 50): Observable<PaginationResponse<Page>> {
-    const params = new HttpParams()
-      .set('page', page.toString())
-      .set('limit', limit.toString());
-    return this.http.get<PaginationResponse<Page>>(`${this.baseUrl}/pages/project/${projectId}`, { params });
+  // ── Files ─────────────────────────────────────────────────────────────────
+
+  uploadFile(file: File): Observable<{ fileId: string; filename: string; size: number; url: string }> {
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.http.post<{ fileId: string; filename: string; size: number; url: string }>(`${this.base}/files/upload`, fd);
   }
 
-  getPage(id: string): Observable<Page> {
-    return this.http.get<Page>(`${this.baseUrl}/pages/${id}`);
+  // ── Pages ─────────────────────────────────────────────────────────────────
+
+  getPages(projectId?: string, chapterId?: string, status?: string, limit = 50, offset = 0): Observable<{ data: Page[]; total: number }> {
+    let params = new HttpParams().set('limit', limit).set('offset', offset);
+    if (projectId) params = params.set('projectId', projectId);
+    if (chapterId) params = params.set('chapterId', chapterId);
+    if (status) params = params.set('status', status);
+    return this.http.get<{ data: Page[]; total: number }>(`${this.base}/pages`, { params });
   }
 
-  getReviewQueue(reviewerId?: string, priority?: string, limit = 20): Observable<Page[]> {
-    let params = new HttpParams().set('limit', limit.toString());
-    if (reviewerId) params = params.set('reviewerId', reviewerId);
-    if (priority) params = params.set('priority', priority);
-    return this.http.get<Page[]>(`${this.baseUrl}/pages/queue`, { params });
+  getPage(id: string): Observable<PageDetail> {
+    return this.http.get<PageDetail>(`${this.base}/pages/${id}`);
+  }
+
+  approvePage(id: string, notes?: string): Observable<Page> {
+    return this.http.post<Page>(`${this.base}/pages/${id}/approve`, { notes });
+  }
+
+  requestChanges(id: string, note: string): Observable<Page> {
+    return this.http.post<Page>(`${this.base}/pages/${id}/request-changes`, { note });
+  }
+
+  // ── Sentences ─────────────────────────────────────────────────────────────
+
+  patchSentence(id: string, data: Partial<Sentence>): Observable<Sentence> {
+    return this.http.patch<Sentence>(`${this.base}/sentences/${id}`, data);
+  }
+
+  // ── Genres ────────────────────────────────────────────────────────────────
+
+  getGenres(q?: string, limit = 50): Observable<Genre[]> {
+    let params = new HttpParams().set('limit', limit);
+    if (q) params = params.set('q', q);
+    return this.http.get<Genre[]>(`${this.base}/genres`, { params });
+  }
+
+  getGenre(id: string): Observable<Genre> {
+    return this.http.get<Genre>(`${this.base}/genres/${id}`);
+  }
+
+  createGenre(data: { name: string; description?: string; icon?: string; color?: string }): Observable<Genre> {
+    return this.http.post<Genre>(`${this.base}/genres`, data);
+  }
+
+  getGenreVersions(id: string): Observable<GenreVersion[]> {
+    return this.http.get<GenreVersion[]>(`${this.base}/genres/${id}/versions`);
+  }
+
+  createGenreVersion(id: string, content: string, note?: string): Observable<GenreVersion> {
+    return this.http.post<GenreVersion>(`${this.base}/genres/${id}/versions`, { content, note });
+  }
+
+  getVersionDiff(genreId: string, versionId: string): Observable<{ diff: string }> {
+    return this.http.get<{ diff: string }>(`${this.base}/genres/${genreId}/versions/${versionId}/diff`);
+  }
+
+  testGenre(id: string, sampleText: string): Observable<{ translation: string; tokensUsed: number }> {
+    return this.http.post<{ translation: string; tokensUsed: number }>(`${this.base}/genres/${id}/test`, { sampleText });
+  }
+
+  // ── Glossary ──────────────────────────────────────────────────────────────
+
+  lookupGlossary(term: string, genreId: string): Observable<GlossaryTerm[]> {
+    return this.http.get<GlossaryTerm[]>(`${this.base}/glossary/lookup`, {
+      params: new HttpParams().set('term', term).set('genreId', genreId),
+    });
+  }
+
+  getGlossary(genreId: string, limit = 100, offset = 0): Observable<{ data: GlossaryTerm[]; total: number }> {
+    return this.http.get<{ data: GlossaryTerm[]; total: number }>(`${this.base}/glossary`, {
+      params: new HttpParams().set('genreId', genreId).set('limit', limit).set('offset', offset),
+    });
+  }
+
+  // ── Queue ─────────────────────────────────────────────────────────────────
+
+  getQueue(params?: Record<string, string>): Observable<{ data: Page[]; total: number }> {
+    let hp = new HttpParams();
+    if (params) Object.entries(params).forEach(([k, v]) => (hp = hp.set(k, v)));
+    return this.http.get<{ data: Page[]; total: number }>(`${this.base}/queue`, { params: hp });
+  }
+
+  getQueueErrorStats(): Observable<unknown[]> {
+    return this.http.get<unknown[]>(`${this.base}/queue/error-stats`);
+  }
+
+  // ── Users ─────────────────────────────────────────────────────────────────
+
+  getUsers(): Observable<User[]> {
+    return this.http.get<User[]>(`${this.base}/users`);
+  }
+
+  inviteUser(data: { name: string; email: string; role: string }): Observable<User> {
+    return this.http.post<User>(`${this.base}/users/invite`, data);
+  }
+
+  patchUser(id: string, data: Partial<User>): Observable<User> {
+    return this.http.patch<User>(`${this.base}/users/${id}`, data);
+  }
+
+  // ── Models ────────────────────────────────────────────────────────────────
+
+  getModels(): Observable<unknown[]> {
+    return this.http.get<unknown[]>(`${this.base}/models`);
+  }
+
+  updateModel(agentType: string, data: unknown): Observable<unknown> {
+    return this.http.put<unknown>(`${this.base}/models/${agentType}`, data);
+  }
+
+  testModelConnection(data: unknown): Observable<{ online: boolean; latencyMs: number; error?: string }> {
+    return this.http.post<{ online: boolean; latencyMs: number; error?: string }>(`${this.base}/models/test`, data);
+  }
+
+  // ── Jobs ──────────────────────────────────────────────────────────────────
+
+  getJob(id: string): Observable<Job> {
+    return this.http.get<Job>(`${this.base}/jobs/${id}`);
+  }
+
+  // ── Export ────────────────────────────────────────────────────────────────
+
+  exportProject(projectId: string, format = 'text', scope = 'approved'): Observable<{ jobId: string }> {
+    return this.http.post<{ jobId: string }>(`${this.base}/export/project/${projectId}`, { format, scope });
   }
 }
