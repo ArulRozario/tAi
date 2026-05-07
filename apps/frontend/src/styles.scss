@@ -31,6 +31,8 @@
 
   --font-sans: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+
+  --text: var(--text-1);
 }
 
 @layer base {
@@ -62,7 +64,7 @@
   }
 
   .card {
-    @apply bg-surface-1 border border-border rounded-xl p-5 shadow-sm;
+    @apply bg-surface-1 border border-border rounded-lg p-5 shadow-sm;
   }
 
   .card-header {
@@ -158,6 +160,84 @@
 
   .p-avatar {
     @apply bg-surface-2 text-text-1 border border-border text-xs font-medium !important;
+  }
+
+  /* ── Workbench ─────────────────────────────────────────────────────────── */
+
+  .toolbar {
+    @apply flex items-center h-12 border-b border-border bg-surface-1 px-3 gap-1 shrink-0;
+  }
+
+  .toolbar__sep {
+    @apply w-px h-5 bg-border mx-1;
+  }
+
+  .toolbar__spacer {
+    @apply flex-1;
+  }
+
+  .toolbar__group {
+    @apply flex items-center gap-1;
+  }
+
+  .workbench {
+    display: grid;
+    grid-template-columns: 240px 1fr 360px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .workbench__sidebar {
+    @apply bg-surface-1 border-r border-border overflow-y-auto p-3 flex flex-col gap-1;
+  }
+
+  .workbench__main {
+    @apply flex overflow-hidden;
+  }
+
+  .workbench__inspector {
+    @apply bg-surface-1 border-l border-border overflow-y-auto p-4 flex flex-col gap-4;
+  }
+
+  .pdf-pane {
+    @apply flex-1 flex flex-col overflow-hidden border-r border-border;
+    &:last-child { @apply border-r-0; }
+  }
+
+  .pdf-pane__header {
+    @apply flex items-center justify-between px-4 py-2 border-b border-border text-xs bg-bg shrink-0;
+  }
+
+  .pdf-pane__body {
+    @apply flex-1 overflow-y-auto p-6;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+
+  .sentence-row {
+    @apply flex gap-3 py-1.5 px-2 rounded cursor-pointer transition-colors hover:bg-surface-2;
+    &.is-selected { @apply bg-surface-2; }
+    &.has-error-high { @apply border-l-2 border-error pl-1.5; }
+    &.has-error-med { @apply border-l-2 border-warning pl-1.5; }
+  }
+
+  .approve-toggle {
+    @apply w-4 h-4 rounded border border-border flex items-center justify-center cursor-pointer shrink-0 mt-0.5 transition-colors;
+    &.is-approved { @apply bg-success border-success; }
+  }
+
+  .error-card {
+    @apply border rounded-lg p-3 mb-3;
+    &.severity-CRITICAL, &.severity-HIGH {
+      @apply border-error bg-error-soft;
+    }
+    &.severity-MEDIUM {
+      @apply border-warning bg-warning-soft;
+    }
+    &.severity-LOW {
+      @apply border-border bg-surface-2;
+    }
   }
 }
 

@@ -13,6 +13,18 @@ export const routes: Routes = [
     loadComponent: () => import('./features/login/reset-password.component').then(m => m.ResetPasswordComponent),
   },
   {
+    path: 'workbench/:pageId',
+    loadComponent: () => import('./features/workbench/workbench.component').then(m => m.WorkbenchComponent),
+    canActivate: [authGuard],
+    data: { mode: 'browse' },
+  },
+  {
+    path: 'review/:pageId',
+    loadComponent: () => import('./features/workbench/workbench.component').then(m => m.WorkbenchComponent),
+    canActivate: [authGuard],
+    data: { mode: 'queue' },
+  },
+  {
     path: '',
     component: AppLayoutComponent,
     canActivate: [authGuard],
@@ -29,16 +41,6 @@ export const routes: Routes = [
       {
         path: 'projects/:id',
         loadComponent: () => import('./features/projects/project-detail.component').then(m => m.ProjectDetailComponent),
-      },
-      {
-        path: 'workbench/:pageId',
-        loadComponent: () => import('./features/workbench/workbench.component').then(m => m.WorkbenchComponent),
-        data: { mode: 'browse' },
-      },
-      {
-        path: 'review/:pageId',
-        loadComponent: () => import('./features/workbench/workbench.component').then(m => m.WorkbenchComponent),
-        data: { mode: 'queue' },
       },
       {
         path: 'queue',

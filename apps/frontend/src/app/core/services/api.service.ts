@@ -73,6 +73,22 @@ export interface Page {
   chapter?: { id: string; number: number; title?: string };
 }
 
+export interface SentenceError {
+  id: string;
+  sentenceId: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  category: string;
+  location?: string;
+  currentText?: string;
+  suggestedText?: string;
+  issueDescription: string;
+  reference?: string;
+  aiNote?: string;
+  status: 'OPEN' | 'APPLIED' | 'DISMISSED' | 'ESCALATED';
+  appliedAt?: string;
+  createdAt: string;
+}
+
 export interface Sentence {
   id: string;
   pageId: string;
@@ -83,6 +99,7 @@ export interface Sentence {
   status: string;
   isApproved: boolean;
   confidence?: number;
+  errors?: SentenceError[];
 }
 
 export interface PageDetail extends Page {
@@ -255,12 +272,28 @@ export class ApiService {
     return this.http.get<PageDetail>(`${this.base}/pages/${id}`);
   }
 
+  patchPage(id: string, data: Partial<Page>): Observable<Page> {
+    return this.http.patch<Page>(`${this.base}/pages/${id}`, data);
+  }
+
   approvePage(id: string, notes?: string): Observable<Page> {
     return this.http.post<Page>(`${this.base}/pages/${id}/approve`, { notes });
   }
 
   requestChanges(id: string, note: string): Observable<Page> {
     return this.http.post<Page>(`${this.base}/pages/${id}/request-changes`, { note });
+  }
+
+  escalatePage(id: string, reason: string): Observable<Page> {
+    return this.http.post<Page>(`${this.base}/pages/${id}/escalate`, { reason });
+  }
+
+  getNextInQueue(id: string): Observable<{ nextPageId: string | null }> {
+    return this.http.get<{ nextPageId: string | null }>(`${this.base}/pages/${id}/next-in-queue`);
+  }
+
+  applyError(errorId: string): Observable<SentenceError> {
+    return this.http.post<SentenceError>(`${this.base}/errors/${errorId}/apply`, {});
   }
 
   // ── Sentences ─────────────────────────────────────────────────────────────
