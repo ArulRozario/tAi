@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { faro } from '@grafana/faro-web-sdk';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -172,7 +173,7 @@ export class GenreListComponent implements OnInit {
   ngOnInit() {
     this.api.getGenres(undefined, 100).subscribe({
       next: (data) => { this.genres.set(data); this.loading = false; },
-      error: () => { this.loading = false; },
+      error: (err) => { this.loading = false; faro.api?.pushError(new Error('Failed to load genres list'), { context: { error: String(err) } }); },
     });
   }
 
@@ -204,7 +205,7 @@ export class GenreListComponent implements OnInit {
         this.showCreate = false;
         this.router.navigate(['/genres', g.id]);
       },
-      error: () => { this.creating = false; },
+      error: (err) => { this.creating = false; faro.api?.pushError(new Error('Failed to create genre'), { context: { error: String(err) } }); },
     });
   }
 

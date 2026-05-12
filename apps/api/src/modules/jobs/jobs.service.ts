@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobType, JobStatus, Job } from '@prisma/client';
 
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger(JobsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -29,7 +31,7 @@ export class JobsService {
       }
     }
 
-    return this.prisma.job.create({
+    const job = await this.prisma.job.create({
       data: {
         type: data.type,
         status: JobStatus.QUEUED,
@@ -39,6 +41,8 @@ export class JobsService {
         parentJobId: data.parentJobId,
       },
     });
+    this.logger.log(`Enqueued ${job.type} job ${job.id}${projectId ? ` for project ${projectId}` : ''}${pageId ? ` page ${pageId}` : ''}`);
+    return job;
   }
 
   /**
@@ -67,6 +71,8 @@ export class JobsService {
     if (!job) {
       throw new NotFoundException(`Job with ID '${id}' not found.`);
     }
+
+    this.logger.warn(`Cancelling job ${id} (${job.type}) and descendants`);
 
     // Cancel parent job
     await this.prisma.job.update({

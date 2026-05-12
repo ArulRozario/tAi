@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed, DestroyRef } from '@angular/core';
+import { faro } from '@grafana/faro-web-sdk';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -686,7 +687,7 @@ export class GenreEditorComponent implements OnInit {
         this.glossaryTerms.update(existing => [...existing, ...res.data]);
         this.loadingMoreTerms = false;
       },
-      error: () => { this.loadingMoreTerms = false; },
+      error: (err) => { this.loadingMoreTerms = false; faro.api?.pushError(new Error('Failed to load more glossary terms'), { context: { genreId: this.genreId, error: String(err) } }); },
     });
   }
 
@@ -738,7 +739,7 @@ export class GenreEditorComponent implements OnInit {
         this.activeVersionId = v.id;
         this.genre.update(g => g ? { ...g, currentVersion: v } : g);
       },
-      error: () => { this.saving = false; },
+      error: (err) => { this.saving = false; faro.api?.pushError(new Error('Failed to save genre version'), { context: { genreId: this.genreId, error: String(err) } }); },
     });
   }
 
@@ -751,7 +752,7 @@ export class GenreEditorComponent implements OnInit {
         this.testing = false;
         this.testOutput = res.translation;
       },
-      error: () => { this.testing = false; },
+      error: (err) => { this.testing = false; faro.api?.pushError(new Error('Failed to run genre test translation'), { context: { genreId: this.genreId, error: String(err) } }); },
     });
   }
 
@@ -764,7 +765,7 @@ export class GenreEditorComponent implements OnInit {
         this.diffResult = res;
         this.loadingDiff = false;
       },
-      error: () => { this.loadingDiff = false; },
+      error: (err) => { this.loadingDiff = false; faro.api?.pushError(new Error('Failed to load version diff'), { context: { genreId: this.genreId, error: String(err) } }); },
     });
   }
 
@@ -793,7 +794,7 @@ export class GenreEditorComponent implements OnInit {
         this.unsaved = false;
         this.genre.update(g => g ? { ...g, currentVersion: v } : g);
       },
-      error: () => { this.restoring = false; },
+      error: (err) => { this.restoring = false; faro.api?.pushError(new Error('Failed to restore genre version'), { context: { genreId: this.genreId, error: String(err) } }); },
     });
   }
 
@@ -840,7 +841,7 @@ export class GenreEditorComponent implements OnInit {
         this.glossaryTerms.update(ts => [t, ...ts]);
         this.glossaryTotal++;
       },
-      error: () => { this.savingTerm = false; },
+      error: (err) => { this.savingTerm = false; faro.api?.pushError(new Error('Failed to create glossary term'), { context: { genreId: this.genreId, error: String(err) } }); },
     });
   }
 
@@ -862,7 +863,7 @@ export class GenreEditorComponent implements OnInit {
         this.editingTermId = null;
         this.glossaryTerms.update(ts => ts.map(t => t.id === updated.id ? updated : t));
       },
-      error: () => { this.savingTerm = false; },
+      error: (err) => { this.savingTerm = false; faro.api?.pushError(new Error('Failed to update glossary term'), { context: { genreId: this.genreId, error: String(err) } }); },
     });
   }
 

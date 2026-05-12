@@ -246,7 +246,7 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
           this.pageData.update((p) => (p ? { ...p, targetHtml: this.sanitizer.bypassSecurityTrustHtml(compiled) } : p));
         }
       },
-      error: (err) => console.error('Failed to load edits', err),
+      error: (err) => faro.api?.pushError(new Error('Failed to load page edits'), { context: { pageId, error: String(err) } }),
     });
   }
 
@@ -256,7 +256,7 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
         this.pageErrors.set(errors);
         this.applyErrorStyles();
       },
-      error: (err) => console.error('Failed to load errors', err),
+      error: (err) => faro.api?.pushError(new Error('Failed to load page errors'), { context: { pageId, error: String(err) } }),
     });
   }
 
@@ -292,7 +292,7 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
         this.prevPageId.set(siblings.prevPageId);
         this.nextPageId.set(siblings.nextPageId);
       },
-      error: (err) => console.error('Failed to load siblings', err),
+      error: (err) => faro.api?.pushError(new Error('Failed to load page siblings'), { context: { pageId, error: String(err) } }),
     });
   }
 

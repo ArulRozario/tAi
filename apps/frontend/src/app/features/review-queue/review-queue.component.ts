@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { faro } from '@grafana/faro-web-sdk';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -384,7 +385,7 @@ export class ReviewQueueComponent implements OnInit {
         this.total = res.total;
         this.loading = false;
       },
-      error: () => { this.loading = false; },
+      error: (err) => { this.loading = false; faro.api?.pushError(new Error('Failed to load review queue'), { context: { error: String(err) } }); },
     });
   }
 
@@ -405,7 +406,7 @@ export class ReviewQueueComponent implements OnInit {
         this.total = res.total;
         this.loadingMore = false;
       },
-      error: () => { this.loadingMore = false; },
+      error: (err) => { this.loadingMore = false; faro.api?.pushError(new Error('Failed to load more queue pages'), { context: { error: String(err) } }); },
     });
   }
 
@@ -416,7 +417,7 @@ export class ReviewQueueComponent implements OnInit {
         this.errorStats.set(stats.sort((a, b) => b.count - a.count));
         this.loadingStats = false;
       },
-      error: () => { this.loadingStats = false; },
+      error: (err) => { this.loadingStats = false; faro.api?.pushError(new Error('Failed to load queue error stats'), { context: { error: String(err) } }); },
     });
   }
 
@@ -427,7 +428,7 @@ export class ReviewQueueComponent implements OnInit {
         this.escalations.set(data);
         this.loadingEscalations = false;
       },
-      error: () => { this.loadingEscalations = false; },
+      error: (err) => { this.loadingEscalations = false; faro.api?.pushError(new Error('Failed to load escalations'), { context: { error: String(err) } }); },
     });
   }
 
