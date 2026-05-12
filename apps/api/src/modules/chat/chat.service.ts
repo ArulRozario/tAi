@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatContext, ChatMode, MessageRole, ChatSession, Provider } from '@prisma/client';
 import axios from 'axios';
@@ -6,6 +6,8 @@ import { Subject, Observable } from 'rxjs';
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async findSessions(userId: string, filters: { context?: string; entityId?: string }) {
@@ -76,7 +78,7 @@ export class ChatService {
     const ctx = (context?.toUpperCase() as ChatContext) || ChatContext.GENERAL;
     const md = (mode?.toUpperCase() as ChatMode) || ChatMode.PLAN;
 
-    if (ctx === ChatContext.GENRE) {
+    if (ctx === ChatContext.STYLE_GUIDE) {
       if (md === ChatMode.PLAN) {
         return [
           'Draft a structural outline for our glossary terms',
@@ -145,8 +147,8 @@ export class ChatService {
     }
 
     try {
-      if (context === ChatContext.GENRE) {
-        const genre = await this.prisma.genre.findUnique({
+      if (context === ChatContext.STYLE_GUIDE) {
+        const styleGuide = await this.prisma.styleGuide.findUnique({
           where: { id: entityId },
           include: {
             versions: {
@@ -155,9 +157,9 @@ export class ChatService {
             },
           },
         });
-        if (genre) {
-          const styleGuide = genre.versions[0]?.content || 'No style guide defined yet.';
-          return `${baseInstruction}\nContext: You are working on the Genre "${genre.name}".\nCurrent Style Guide content:\n"""\n${styleGuide}\n"""`;
+        if (styleGuide) {
+          const styleGuideContent = styleGuide.versions[0]?.content || 'No style guide defined yet.';
+          return `${baseInstruction}\nContext: You are working on the Style Guide "${styleGuide.name}".\nCurrent Style Guide content:\n"""\n${styleGuideContent}\n"""`;
         }
       } else if (context === ChatContext.REVIEW) {
         const page = await this.prisma.page.findUnique({
@@ -176,12 +178,12 @@ export class ChatService {
         }
       } else if (context === ChatContext.GLOSSARY) {
         const terms = await this.prisma.glossaryTerm.findMany({
-          where: { genreId: entityId },
+          where: { styleGuideId: entityId },
           orderBy: { sourceTerm: 'asc' },
           take: 20,
         });
         if (terms.length > 0) {
-          let glossContext = 'Context: Active Glossary Terms for this Genre:\n';
+          let glossContext = 'Context: Active Glossary Terms for this Style Guide:\n';
           for (const t of terms) {
             glossContext += `- ${t.sourceTerm} -> ${t.targetTerm} (Context: ${t.context || 'N/A'})\n`;
           }
@@ -189,7 +191,7 @@ export class ChatService {
         }
       }
     } catch (e: any) {
-      console.warn('[Chat] Failed to enrich system context:', e.message);
+      this.logger.warn(`Failed to enrich system context: ${e.message}`);
     }
 
     return baseInstruction;
@@ -267,7 +269,7 @@ export class ChatService {
     });
 
     // 6. Support draft version updates for BUILD mode GENRE context
-    if (session.context === ChatContext.GENRE && mode === ChatMode.BUILD) {
+    if (session.context === ChatContext.STYLE_GUIDE && mode === ChatMode.BUILD) {
       return {
         ...savedMessage,
         genreVersionDraft: responseText,
@@ -379,7 +381,7 @@ export class ChatService {
         });
 
         // Emit final BUILD draft for GENRE contexts
-        if (session.context === ChatContext.GENRE && mode === ChatMode.BUILD) {
+        if (session.context === ChatContext.STYLE_GUIDE && mode === ChatMode.BUILD) {
           subject.next({ data: JSON.stringify({ genreVersionDraft: accumulatedResponse }) });
         }
 
@@ -399,7 +401,7 @@ export class ChatService {
             },
           });
         } catch (dbErr) {
-          console.error('[Chat] Failed to save stream error message:', dbErr);
+          this.logger.error(`Failed to save stream error message: ${dbErr}`);
         }
         subject.next({ data: JSON.stringify({ error: errorMsg }) });
         subject.next({ data: '[DONE]' });

@@ -591,17 +591,11 @@ export class GenreEditorComponent implements OnInit {
   canEdit = computed(() => this.auth.hasRole('MASTER', 'ADMIN'));
   isAdmin = computed(() => this.auth.hasRole('ADMIN'));
 
-  viewAiDraftDiff() {
-    console.log('viewAiDraftDiff stubbed');
-  }
+  viewAiDraftDiff() {}
 
-  saveAiDraft() {
-    console.log('saveAiDraft stubbed');
-  }
+  saveAiDraft() {}
 
-  discardAiDraft() {
-    console.log('discardAiDraft stubbed');
-  }
+  discardAiDraft() {}
 
   setChatMode(mode: ChatMode) {
     this.chatMode = mode;

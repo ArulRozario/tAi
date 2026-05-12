@@ -1,15 +1,19 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  ConflictException 
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto';
 import { JobsService } from '../jobs/jobs.service';
-import { JobType, ProjectStatus, JobStatus } from '@prisma/client';
+import { JobType, ProjectStatus, JobStatus, PageStatus } from '@prisma/client';
 
 @Injectable()
 export class ProjectsService {
+  private readonly logger = new Logger(ProjectsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jobsService: JobsService,
@@ -21,12 +25,12 @@ export class ProjectsService {
    */
   async create(ownerId: string, createProjectDto: CreateProjectDto) {
     // 1. Verify target genre exists
-    const genre = await this.prisma.genre.findUnique({
+    const genre = await this.prisma.styleGuide.findUnique({
       where: { id: createProjectDto.genreId },
     });
 
     if (!genre) {
-      throw new NotFoundException(`Genre with ID '${createProjectDto.genreId}' not found.`);
+      throw new NotFoundException(`StyleGuide with ID '${createProjectDto.genreId}' not found.`);
     }
 
     // 2. Persist the project in DRAFT status
@@ -36,13 +40,13 @@ export class ProjectsService {
         description: createProjectDto.description,
         sourceLang: createProjectDto.sourceLang,
         targetLang: createProjectDto.targetLang,
-        genreId: createProjectDto.genreId,
+        styleGuideId: createProjectDto.genreId,
         ownerId,
         status: ProjectStatus.DRAFT,
         sourceFileId: createProjectDto.sourceFileId,
       },
       include: {
-        genre: true,
+        styleGuide: true,
         owner: {
           select: { id: true, name: true, email: true },
         },
@@ -62,11 +66,12 @@ export class ProjectsService {
         });
 
         // Set project status to PROCESSING
+        this.logger.log(`Project created: ${project.id} "${project.name}" (${project.sourceLang}→${project.targetLang}), status→PROCESSING`);
         return await this.prisma.project.update({
           where: { id: project.id },
           data: { status: ProjectStatus.PROCESSING },
           include: {
-            genre: true,
+            styleGuide: true,
             owner: {
               select: { id: true, name: true, email: true },
             },
@@ -81,6 +86,7 @@ export class ProjectsService {
       }
     }
 
+    this.logger.log(`Project created: ${project.id} "${project.name}" (DRAFT, no source file)`);
     return project;
   }
 
@@ -99,7 +105,7 @@ export class ProjectsService {
           owner: {
             select: { id: true, name: true, email: true },
           },
-          genre: {
+          styleGuide: {
             select: { id: true, name: true },
           },
           _count: {
@@ -131,7 +137,7 @@ export class ProjectsService {
         owner: {
           select: { id: true, name: true, email: true },
         },
-        genre: {
+        styleGuide: {
           select: { id: true, name: true },
         },
         pages: {
@@ -173,7 +179,7 @@ export class ProjectsService {
         owner: {
           select: { id: true, name: true, email: true },
         },
-        genre: {
+        styleGuide: {
           select: { id: true, name: true },
         },
       }
@@ -190,6 +196,7 @@ export class ProjectsService {
       where: { id },
     });
 
+    this.logger.warn(`Project deleted: ${id}`);
     return { success: true };
   }
 
@@ -245,7 +252,7 @@ export class ProjectsService {
     const project = await this.findOne(projectId); // Ensure project exists and retrieve metadata
 
     return this.prisma.glossaryTerm.findMany({
-      where: { genreId: project.genreId },
+      where: { styleGuideId: project.styleGuideId },
       orderBy: { sourceTerm: 'asc' },
     });
   }
@@ -297,6 +304,7 @@ export class ProjectsService {
   async pause(id: string): Promise<void> {
     await this.findOne(id); // Ensure project exists
 
+    this.logger.log(`Project paused: ${id}`);
     await this.prisma.$transaction([
       this.prisma.project.update({
         where: { id },
@@ -318,6 +326,7 @@ export class ProjectsService {
   async resume(id: string): Promise<void> {
     await this.findOne(id); // Ensure project exists
 
+    this.logger.log(`Project resumed: ${id}`);
     await this.prisma.$transaction([
       this.prisma.project.update({
         where: { id },
@@ -349,6 +358,39 @@ export class ProjectsService {
       data: {
         status: JobStatus.CANCELLED,
         completedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Enqueues a REVIEW_PAGE job for all translated pages in the project.
+   */
+  async enqueueReview(projectId: string) {
+    await this.findOne(projectId);
+
+    const pagesToReview = await this.prisma.page.findMany({
+      where: {
+        projectId,
+        translatedHtml: { not: null },
+        status: { in: [PageStatus.TRANSLATED, PageStatus.HUMAN_REVIEW, PageStatus.REJECTED] },
+      },
+      select: { id: true },
+    });
+
+    if (pagesToReview.length === 0) {
+      throw new BadRequestException('No translated pages found to review in this project.');
+    }
+
+    return this.prisma.job.create({
+      data: {
+        type: JobType.REVIEW_PAGE,
+        status: JobStatus.QUEUED,
+        projectId,
+        payload: {
+          projectId,
+          pageIds: pagesToReview.map((p) => p.id),
+          isBatchReview: true,
+        },
       },
     });
   }

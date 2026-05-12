@@ -330,7 +330,7 @@ export class ProjectDetailComponent implements OnInit {
 
       // Fatal error from the backend
       if (data.type === 'fatal-error') {
-        console.error('[Translation] Fatal error:', data.error);
+        faro.api?.pushError(new Error(`Translation fatal error: ${data.error}`), { context: { projectId: this.project()?.id ?? '' } });
         this.isTranslating.set(false);
         eventSource.close();
         this.messageService.add({
