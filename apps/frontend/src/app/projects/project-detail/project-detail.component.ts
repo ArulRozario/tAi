@@ -182,7 +182,7 @@ export class ProjectDetailComponent implements OnInit {
     this.extractionProgress.set({ currentPage: 0, totalPages: 0, status: 'extracting' });
     this.extractionError.set(null);
 
-    const eventSource = new EventSource(`/api/v1/projects/${id}/extract`);
+    const eventSource = new EventSource(this.projectService.withToken(`/api/v1/projects/${id}/extract`));
 
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -278,7 +278,8 @@ export class ProjectDetailComponent implements OnInit {
 
     this.isTranslating.set(true);
     const model = this.selectedModel();
-    const eventSource = new EventSource(`/api/v1/projects/${id}/translate${model ? `?model=${encodeURIComponent(model)}` : ''}`);
+    const baseUrl = `/api/v1/projects/${id}/translate${model ? `?model=${encodeURIComponent(model)}` : ''}`;
+    const eventSource = new EventSource(this.projectService.withToken(baseUrl));
 
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);

@@ -109,7 +109,7 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   sourceImageUrl = computed(() => {
     const p = this.pageData();
     if (!p) return null;
-    return `/api/v1/projects/${p.projectId}/pages/${p.pageNum}/image`;
+    return this.projectService.withToken(`/api/v1/projects/${p.projectId}/pages/${p.pageNum}/image`);
   });
 
   /** True when the source image fails to load */

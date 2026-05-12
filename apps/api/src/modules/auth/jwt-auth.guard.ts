@@ -26,18 +26,22 @@ export class JwtAuthGuard implements CanActivate {
       return true;
     }
 
-    // 2. Extract Bearer token from Authorization header
+    // 2. Extract Bearer token — header for normal requests, ?token= query param for SSE/image
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 
-    if (!authHeader) {
+    let token: string | undefined;
+
+    if (authHeader) {
+      const [type, headerToken] = authHeader.split(' ');
+      if (type !== 'Bearer' || !headerToken) {
+        throw new UnauthorizedException('Invalid authorization header format. Expected Bearer <token>');
+      }
+      token = headerToken;
+    } else if (request.query?.token) {
+      token = request.query.token as string;
+    } else {
       throw new UnauthorizedException('Authorization header is missing');
-    }
-
-    const [type, token] = authHeader.split(' ');
-
-    if (type !== 'Bearer' || !token) {
-      throw new UnauthorizedException('Invalid authorization header format. Expected Bearer <token>');
     }
 
     // 3. Verify JWT token
