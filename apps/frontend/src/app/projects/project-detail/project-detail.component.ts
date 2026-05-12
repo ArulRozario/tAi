@@ -145,7 +145,7 @@ export class ProjectDetailComponent implements OnInit {
           this.startExtraction();
         }
       },
-      error: (err) => console.error('Failed to load project', err)
+      error: (err) => faro.api?.pushError(new Error('Failed to load project detail'), { context: { projectId: this.projectId() ?? '', error: String(err) } })
     });
 
     this.projectService.getChapters(id).subscribe({
@@ -155,7 +155,7 @@ export class ProjectDetailComponent implements OnInit {
           this.selectedChapterId.set(ch[0].id);
         }
       },
-      error: (err) => console.error('Failed to load chapters', err)
+      error: (err) => faro.api?.pushError(new Error('Failed to load chapters'), { context: { projectId: this.projectId() ?? '', error: String(err) } })
     });
 
     this.projectService.getStats(id).subscribe({
@@ -164,7 +164,7 @@ export class ProjectDetailComponent implements OnInit {
         this.loading.set(false);
       },
       error: (err) => {
-        console.error('Failed to load stats', err);
+        faro.api?.pushError(new Error('Failed to load project stats'), { context: { projectId: this.projectId() ?? '', error: String(err) } });
         this.loading.set(false);
       }
     });

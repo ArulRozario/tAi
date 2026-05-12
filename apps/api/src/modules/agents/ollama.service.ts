@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
@@ -41,6 +41,7 @@ export interface ConnectionTestResult {
 
 @Injectable()
 export class OllamaService implements OnModuleInit {
+  private readonly logger = new Logger(OllamaService.name);
   private baseUrl: string;
   private defaultModel = 'qwen2.5:7b';
 
@@ -92,6 +93,7 @@ export class OllamaService implements OnModuleInit {
 
       return response.data;
     } catch (error) {
+      this.logger.error(`Ollama generate failed (model: ${modelToUse}): ${(error as Error).message}`);
       throw new Error(`Ollama generation failed: ${(error as Error).message}`);
     }
   }
@@ -131,6 +133,7 @@ export class OllamaService implements OnModuleInit {
         done: true,
       };
     } catch (error) {
+      this.logger.error(`Ollama chat failed (model: ${modelToUse}): ${(error as Error).message}`);
       throw new Error(`Ollama chat failed: ${(error as Error).message}`);
     }
   }
@@ -149,6 +152,7 @@ export class OllamaService implements OnModuleInit {
 
       return response.data.embedding;
     } catch (error) {
+      this.logger.error(`Ollama embedding failed (model: ${model}): ${(error as Error).message}`);
       throw new Error(`Ollama embedding failed: ${(error as Error).message}`);
     }
   }
@@ -181,6 +185,7 @@ export class OllamaService implements OnModuleInit {
         modelLoaded: true,
       };
     } catch (error) {
+      this.logger.warn(`Ollama unreachable at ${this.baseUrl}: ${(error as Error).message}`);
       return {
         online: false,
         latencyMs: undefined,
@@ -201,6 +206,7 @@ export class OllamaService implements OnModuleInit {
 
       return { status: 'success' };
     } catch (error) {
+      this.logger.error(`Failed to pull model '${model}': ${(error as Error).message}`);
       throw new Error(`Failed to pull model: ${(error as Error).message}`);
     }
   }

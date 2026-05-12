@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { MinIOService } from './minio.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class FilesService {
+  private readonly logger = new Logger(FilesService.name);
+
   constructor(
     private readonly minioService: MinIOService,
     private readonly prisma: PrismaService,
@@ -14,14 +16,14 @@ export class FilesService {
    */
   async uploadGeneralFile(filename: string, buffer: Buffer, contentType: string) {
     const key = `uploads/${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
-    const url = await this.minioService.uploadBuffer(buffer, key, contentType);
-
-    return {
-      fileId: key,
-      filename,
-      size: buffer.length,
-      url,
-    };
+    try {
+      const url = await this.minioService.uploadBuffer(buffer, key, contentType);
+      this.logger.log(`File uploaded: ${key} (${buffer.length} bytes)`);
+      return { fileId: key, filename, size: buffer.length, url };
+    } catch (err) {
+      this.logger.error(`Failed to upload file '${filename}': ${(err as Error).message}`);
+      throw err;
+    }
   }
 
   /**
@@ -45,7 +47,12 @@ export class FilesService {
 
     // 2. Generate key and upload to MinIO
     const key = this.minioService.generateKey(projectId, filename);
-    await this.minioService.uploadBuffer(buffer, key, contentType);
+    try {
+      await this.minioService.uploadBuffer(buffer, key, contentType);
+    } catch (err) {
+      this.logger.error(`Failed to upload project file '${filename}' for project ${projectId}: ${(err as Error).message}`);
+      throw err;
+    }
 
     // 3. Auto-link source document if empty
     if (!project.sourceFileId) {
@@ -55,6 +62,7 @@ export class FilesService {
       });
     }
 
+    this.logger.log(`Project file uploaded: ${key} (${buffer.length} bytes) for project ${projectId}`);
     return {
       id: key,
       name: filename,

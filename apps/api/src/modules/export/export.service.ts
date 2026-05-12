@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinIOService } from '../files/minio.service';
 import { JobType, JobStatus, PageStatus } from '@prisma/client';
@@ -8,6 +8,8 @@ import { Document, Paragraph, TextRun, HeadingLevel, Packer } from 'docx';
 
 @Injectable()
 export class ExportService {
+  private readonly logger = new Logger(ExportService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly minio: MinIOService,
@@ -53,7 +55,7 @@ export class ExportService {
 
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { genre: { select: { name: true } } },
+      include: { styleGuide: { select: { name: true } } },
     });
     if (!project) throw new NotFoundException('Project not found');
 
@@ -86,12 +88,14 @@ export class ExportService {
     }
 
     const key = `exports/${projectId}/${Date.now()}-export.${ext}`;
+    this.logger.log(`Exporting project ${projectId} as ${format} (${scope}): ${pages.length} pages → ${key}`);
     const fileUrl = await this.minio.uploadBuffer(buffer, key, contentType);
 
     await this.prisma.job.update({
       where: { id: jobId },
       data: { result: { fileUrl } },
     });
+    this.logger.log(`Export complete for project ${projectId}: ${fileUrl}`);
   }
 
   async runExportPageReport(jobId: string, pageId: string) {
@@ -137,12 +141,14 @@ export class ExportService {
 
     const buffer = Buffer.from(lines.join('\n'), 'utf8');
     const key = `exports/${page.projectId}/reports/${Date.now()}-page-${page.pageNumber}-report.txt`;
+    this.logger.log(`Generating page report for page ${pageId} (${page.errors.length} errors)`);
     const fileUrl = await this.minio.uploadBuffer(buffer, key, 'text/plain');
 
     await this.prisma.job.update({
       where: { id: jobId },
       data: { result: { fileUrl } },
     });
+    this.logger.log(`Page report complete for page ${pageId}: ${fileUrl}`);
   }
 
   async runExportAdminReport(jobId: string, projectIds: string[], format: string) {
@@ -176,12 +182,14 @@ export class ExportService {
 
     const buffer = Buffer.from(lines.join('\n'), 'utf8');
     const key = `exports/admin/${Date.now()}-admin-report.txt`;
+    this.logger.log(`Generating admin report: ${projects.length} projects`);
     const fileUrl = await this.minio.uploadBuffer(buffer, key, 'text/plain');
 
     await this.prisma.job.update({
       where: { id: jobId },
       data: { result: { fileUrl } },
     });
+    this.logger.log(`Admin report complete: ${fileUrl}`);
   }
 
   private async generatePdf(title: string, pages: { pageNumber: number; content: string }[]): Promise<Buffer> {

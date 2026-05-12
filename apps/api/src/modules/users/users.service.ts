@@ -72,23 +72,7 @@ export class UsersService {
       }
     });
 
-    // 4. Log mock transactional email to developer console
-    this.logger.log(`
-================================================================================
-[TRANSACTIONAL EMAIL] User Invitation Sent
-To: ${newUser.email}
-Name: ${newUser.name}
-Role: ${newUser.role}
---------------------------------------------------------------------------------
-Your account has been created on tAI.
-Please log in using these temporary credentials:
-
-Email: ${newUser.email}
-Password: ${tempPassword}
-
-Security Warning: You must update your password immediately upon your first login.
-================================================================================
-`);
+    this.logger.log(`User invited: ${newUser.email} (${newUser.role}) — temporary credentials issued`);
 
     return newUser;
   }
@@ -152,20 +136,6 @@ Security Warning: You must update your password immediately upon your first logi
       `Administratively reset password for user '${user.email}'. Revoked ${revokedSessions.count} active login session(s).`
     );
 
-    // 5. Log mock password reset transactional email
-    this.logger.log(`
-================================================================================
-[TRANSACTIONAL EMAIL] Administrative Password Reset
-To: ${user.email}
-Name: ${user.name}
---------------------------------------------------------------------------------
-An administrator has reset your tAI account password.
-Please log in using this temporary password:
-
-Password: ${tempPassword}
-
-Security Warning: Please change your password under your settings profile immediately.
-================================================================================
-`);
+    this.logger.log(`Password reset issued for user '${user.email}'. Temporary credentials delivered out-of-band.`);
   }
 }

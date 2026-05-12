@@ -149,6 +149,7 @@ export class ModelsService implements OnModuleInit {
           latencyMs: Date.now() - startTime,
         };
       } catch (err: any) {
+        this.logger.warn(`Ollama connection test failed at ${dto.endpoint || 'default'}: ${err.message}`);
         return {
           online: false,
           latencyMs: Date.now() - startTime,
@@ -169,6 +170,7 @@ export class ModelsService implements OnModuleInit {
         return { online: true, latencyMs: Date.now() - startTime };
       } catch (err: any) {
         const msg = err.response?.data?.error?.message ?? err.message;
+        this.logger.warn(`Anthropic connection test failed: ${msg}`);
         return { online: false, latencyMs: Date.now() - startTime, error: msg };
       }
     }
