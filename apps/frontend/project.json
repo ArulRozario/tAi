@@ -37,6 +37,12 @@
             }
           ],
           "outputHashing": "all",
+          "fileReplacements": [
+            {
+              "replace": "apps/frontend/src/environments/environment.ts",
+              "with": "apps/frontend/src/environments/environment.prod.ts"
+            }
+          ],
           "optimization": {
             "scripts": true,
             "styles": {

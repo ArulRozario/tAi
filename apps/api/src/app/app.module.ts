@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LoggerModule } from 'nestjs-pino';
 import { PrismaModule } from '../modules/prisma/prisma.module';
 import { FilesModule } from '../modules/files/files.module';
 import { AgentsModule } from '../modules/agents/agents.module';
@@ -22,6 +23,15 @@ import { AppService } from './app.service';
 
 @Module({
   imports: [
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env['NODE_ENV'] === 'production' ? 'info' : 'debug',
+        transport: process.env['NODE_ENV'] !== 'production'
+          ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
+          : undefined,
+        redact: ['req.headers.authorization', 'req.headers.cookie'],
+      },
+    }),
     PrismaModule,
     FilesModule,
     AgentsModule,

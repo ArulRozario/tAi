@@ -1,15 +1,17 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class GlossaryService {
+  private readonly logger = new Logger(GlossaryService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async findMany(filters: { genreId?: string; q?: string; limit: number }) {
     const where: any = {};
 
     if (filters.genreId) {
-      where.genreId = filters.genreId;
+      where.styleGuideId = filters.genreId;
     }
 
     if (filters.q) {
@@ -46,8 +48,8 @@ export class GlossaryService {
     // Check if duplicate sourceTerm for this genre
     const existing = await this.prisma.glossaryTerm.findUnique({
       where: {
-        genreId_sourceTerm: {
-          genreId: data.genreId,
+        styleGuideId_sourceTerm: {
+          styleGuideId: data.genreId,
           sourceTerm: data.sourceTerm,
         },
       },
@@ -61,7 +63,7 @@ export class GlossaryService {
 
     return this.prisma.glossaryTerm.create({
       data: {
-        genreId: data.genreId,
+        styleGuideId: data.genreId,
         sourceTerm: data.sourceTerm,
         targetTerm: data.targetTerm,
         context: data.context || null,
@@ -112,8 +114,8 @@ export class GlossaryService {
 
       await this.prisma.glossaryTerm.upsert({
         where: {
-          genreId_sourceTerm: {
-            genreId: data.genreId,
+          styleGuideId_sourceTerm: {
+            styleGuideId: data.genreId,
             sourceTerm: term.sourceTerm,
           },
         },
@@ -122,7 +124,7 @@ export class GlossaryService {
           context: term.context || undefined,
         },
         create: {
-          genreId: data.genreId,
+          styleGuideId: data.genreId,
           sourceTerm: term.sourceTerm,
           targetTerm: term.targetTerm,
           context: term.context || undefined,
@@ -132,6 +134,7 @@ export class GlossaryService {
       created++;
     }
 
+    this.logger.log(`Bulk created ${created} glossary terms for genre ${data.genreId}`);
     return { created };
   }
 }

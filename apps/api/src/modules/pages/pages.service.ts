@@ -4,19 +4,27 @@ import {
   BadRequestException,
   ForbiddenException,
   UnprocessableEntityException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ReviewAgent } from '../agents/review.agent';
 import {
   PageStatus,
   Priority,
   JobType,
   JobStatus,
   ErrorStatus,
+  ErrorSeverity,
 } from '@prisma/client';
 
 @Injectable()
 export class PagesService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(PagesService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private reviewAgent: ReviewAgent,
+  ) {}
 
   async findByFilters(filters: {
     projectId?: string;
@@ -72,7 +80,7 @@ export class PagesService {
       where: { id },
       include: {
         project: {
-          select: { id: true, name: true, sourceLang: true, targetLang: true, genreId: true },
+          select: { id: true, name: true, sourceLang: true, targetLang: true, styleGuideId: true },
         },
         reviewers: {
           include: {
@@ -92,6 +100,136 @@ export class PagesService {
     }
 
     return page;
+  }
+
+  /**
+   * Runs AI review on a single page.
+   * Clears old OPEN errors, runs the review agent, creates new Error records with segmentId,
+   * calculates quality score, and transitions page to HUMAN_REVIEW.
+   */
+  async reviewPage(id: string, user: any, modelOverride?: string) {
+    const page = await this.findOne(id);
+
+    if (!page.translatedHtml) {
+      throw new BadRequestException('Page has not been translated yet. Run translation first.');
+    }
+
+    const { errors, modelUsed } = await this.reviewAgent.reviewPage(
+      page.projectId,
+      page.id,
+      page.originalHtml || '',
+      page.translatedHtml,
+      modelOverride,
+    );
+
+    await this.prisma.error.deleteMany({
+      where: { pageId: id, status: ErrorStatus.OPEN },
+    });
+
+    for (const err of errors) {
+      await this.prisma.error.create({
+        data: {
+          pageId: id,
+          segmentId: err.segmentId || null,
+          severity: err.severity,
+          category: err.category,
+          location: err.location,
+          currentText: err.currentText,
+          suggestedText: err.suggestedText,
+          issueDescription: err.issueDescription,
+          reference: err.reference,
+          aiNote: err.aiNote,
+        },
+      });
+    }
+
+    let criticalCount = 0, highCount = 0, medCount = 0, lowCount = 0;
+    let worstSeverity: ErrorSeverity | null = null;
+
+    for (const err of errors) {
+      if (err.severity === ErrorSeverity.CRITICAL) {
+        criticalCount++;
+        worstSeverity = ErrorSeverity.CRITICAL;
+      } else if (err.severity === ErrorSeverity.HIGH) {
+        highCount++;
+        if (worstSeverity !== ErrorSeverity.CRITICAL) worstSeverity = ErrorSeverity.HIGH;
+      } else if (err.severity === ErrorSeverity.MEDIUM) {
+        medCount++;
+        if (worstSeverity !== ErrorSeverity.CRITICAL && worstSeverity !== ErrorSeverity.HIGH) worstSeverity = ErrorSeverity.MEDIUM;
+      } else if (err.severity === ErrorSeverity.LOW) {
+        lowCount++;
+        if (!worstSeverity) worstSeverity = ErrorSeverity.LOW;
+      }
+    }
+
+    const pageQuality = Math.max(0, Math.round(100 - (criticalCount * 5 + highCount * 2 + medCount * 1 + lowCount * 0.5)));
+
+    let priority: Priority = Priority.MEDIUM;
+    if (worstSeverity === ErrorSeverity.CRITICAL) priority = Priority.CRITICAL;
+    else if (worstSeverity === ErrorSeverity.HIGH) priority = Priority.HIGH;
+    else if (worstSeverity === ErrorSeverity.MEDIUM) priority = Priority.MEDIUM;
+    else if (worstSeverity === ErrorSeverity.LOW) priority = Priority.LOW;
+
+    const reviewers = await this.prisma.user.findMany({
+      where: { role: 'REVIEWER', isActive: true },
+    });
+
+    if (reviewers.length > 0) {
+      let bestReviewerId = reviewers[0].id;
+      let lowestCount = Infinity;
+
+      for (const rev of reviewers) {
+        const count = await this.prisma.pageReviewer.count({
+          where: {
+            userId: rev.id,
+            page: { status: PageStatus.HUMAN_REVIEW },
+          },
+        });
+        if (count < lowestCount) {
+          lowestCount = count;
+          bestReviewerId = rev.id;
+        }
+      }
+
+      await this.prisma.pageReviewer.upsert({
+        where: { pageId_userId: { pageId: page.id, userId: bestReviewerId } },
+        create: { pageId: page.id, userId: bestReviewerId, isPrimary: true },
+        update: { isPrimary: true },
+      });
+    }
+
+    const updatedPage = await this.prisma.page.update({
+      where: { id },
+      data: {
+        status: PageStatus.HUMAN_REVIEW,
+        quality: pageQuality,
+        priority,
+        assignedAt: new Date(),
+        lastAiRunAt: new Date(),
+        reviewModel: modelUsed,
+      },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        action: 'page.reviewed',
+        entityType: 'page',
+        entityId: id,
+        entityHref: `/projects/${page.projectId}`,
+        details: { pageNumber: page.pageNumber, projectName: page.project?.name, errorCount: errors.length, quality: pageQuality },
+      },
+    });
+
+    return {
+      pageId: id,
+      status: updatedPage.status,
+      quality: pageQuality,
+      priority,
+      errorCount: errors.length,
+      modelUsed,
+      errors: errors.map((e) => ({ segmentId: e.segmentId, severity: e.severity, category: e.category, issueDescription: e.issueDescription })),
+    };
   }
 
   async createFromPDF(projectId: string, totalPages: number) {
@@ -158,6 +296,7 @@ export class PagesService {
         where: { pageId: id, status: ErrorStatus.OPEN },
       });
       if (openErrorsCount > 0) {
+        this.logger.warn(`Approval blocked for page ${id}: ${openErrorsCount} open errors`);
         throw new ForbiddenException('Cannot approve page with open linting errors');
       }
     }
@@ -187,6 +326,7 @@ export class PagesService {
       },
     });
 
+    this.logger.log(`Page approved: ${id} by user ${user.id} (${user.role})`);
     return updatedPage;
   }
 
@@ -198,6 +338,7 @@ export class PagesService {
     const page = await this.findOne(id);
 
     if (page.retryCount >= page.maxRetries) {
+      this.logger.warn(`Page ${id} exceeded max retries (${page.maxRetries})`);
       throw new UnprocessableEntityException({
         statusCode: 422,
         error: 'Unprocessable Entity',
@@ -226,6 +367,7 @@ export class PagesService {
       },
     });
 
+    this.logger.log(`Changes requested for page ${id} (retry ${updatedPage.retryCount}/${page.maxRetries}) by user ${user.id}`);
     return updatedPage;
   }
 
@@ -336,13 +478,15 @@ export class PagesService {
 
     const page = await this.findOne(id);
 
-    return this.prisma.page.update({
+    const result = await this.prisma.page.update({
       where: { id },
       data: {
         status: PageStatus.ESCALATED,
         notes: `${page.notes || ''}\nEscalation by ${user.name || 'reviewer'}: ${reason}`.trim(),
       },
     });
+    this.logger.warn(`Page escalated: ${id} by user ${user.id}`);
+    return result;
   }
 
   async resolveEscalation(id: string, resolution: string) {
@@ -379,6 +523,7 @@ export class PagesService {
       });
     }
 
+    this.logger.log(`Escalation resolved for page ${id}`);
     return this.findOne(id);
   }
 

@@ -163,11 +163,7 @@ export class AuthService {
 
     this.resetTokens.set(token, { email, expiresAt });
 
-    this.logger.log(`\n================================================================================`);
-    this.logger.log(`[PASS RESET] Ephemeral token generated for ${email}`);
-    this.logger.log(`Token: ${token}`);
-    this.logger.log(`Link: http://localhost:4200/auth/reset-password?token=${token}`);
-    this.logger.log(`================================================================================\n`);
+    this.logger.log(`Password reset token issued for: ${email}`);
   }
 
   /**

@@ -1,6 +1,7 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OllamaService } from '../agents/ollama.service';
+import { GeminiService } from '../agents/gemini.service';
 import { AgentType, Provider, ModelConfig } from '@prisma/client';
 import { encrypt } from '../auth/crypto.util';
 import { HttpService } from '@nestjs/axios';
@@ -8,9 +9,12 @@ import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class ModelsService implements OnModuleInit {
+  private readonly logger = new Logger(ModelsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     public readonly ollama: OllamaService,
+    private readonly gemini: GeminiService,
     private readonly httpService: HttpService,
   ) {}
 
@@ -20,7 +24,7 @@ export class ModelsService implements OnModuleInit {
       return;
     }
 
-    console.log('[Models] Seeding default ModelConfig values into PostgreSQL...');
+    this.logger.log('Seeding default ModelConfig values');
 
     const defaultSeedData = [
       {
@@ -59,7 +63,7 @@ export class ModelsService implements OnModuleInit {
       });
     }
 
-    console.log('[Models] Successfully seeded default ModelConfig records!');
+    this.logger.log('Default ModelConfig records seeded');
   }
 
   async listConfigs(): Promise<ModelConfig[]> {
@@ -199,8 +203,40 @@ export class ModelsService implements OnModuleInit {
     agentType: AgentType,
     prompt: string,
     options?: { temperature?: number; max_tokens?: number },
+    modelOverride?: string,
   ): Promise<{ text: string; model: string }> {
     const startTime = Date.now();
+
+    // If a Gemini model override is provided, use Gemini directly with fallback
+    if (modelOverride) {
+      const result = await this.gemini.generateContent(prompt, modelOverride, {
+        temperature: options?.temperature,
+        maxTokens: options?.max_tokens,
+      });
+
+      const durationMs = Date.now() - startTime;
+
+      try {
+        await this.prisma.activityLog.create({
+          data: {
+            action: 'agent.prompt_execution',
+            entityType: 'agent',
+            entityId: agentType,
+            details: {
+              prompt,
+              response: result.text,
+              durationMs,
+              provider: 'GOOGLE',
+              model: result.modelUsed,
+            },
+          },
+        });
+      } catch (logErr: any) {
+        this.logger.error(`Failed to write prompt activity audit: ${logErr.message}`);
+      }
+
+      return { text: result.text, model: result.modelUsed };
+    }
 
     let config = await this.prisma.modelConfig.findFirst({
       where: { agentType, isDefault: true, isActive: true },
@@ -222,9 +258,16 @@ export class ModelsService implements OnModuleInit {
     }
 
     let responseText = '';
-    const executionModel = config.modelName;
+    let executionModel = config.modelName;
 
-    if (config.provider === Provider.OLLAMA) {
+    if (config.provider === Provider.GOOGLE) {
+      const result = await this.gemini.generateContent(prompt, config.modelName, {
+        temperature: options?.temperature,
+        maxTokens: options?.max_tokens,
+      });
+      responseText = result.text;
+      executionModel = result.modelUsed;
+    } else if (config.provider === Provider.OLLAMA) {
       const ollamaResult = await this.ollama.generate(prompt, config.modelName, {
         temperature: options?.temperature,
         max_tokens: options?.max_tokens,
@@ -256,7 +299,7 @@ export class ModelsService implements OnModuleInit {
         },
       });
     } catch (logErr: any) {
-      console.error('[Models] Failed to write prompt activity audit:', logErr.message);
+      this.logger.error(`Failed to write prompt activity audit: ${logErr.message}`);
     }
 
     return {

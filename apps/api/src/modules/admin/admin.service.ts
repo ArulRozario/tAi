@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PageStatus, ErrorStatus } from '@prisma/client';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async getPages(filters: {
@@ -73,6 +75,7 @@ export class AdminService {
       updated++;
     }
 
+    this.logger.log(`Bulk reassign: ${updated} pages assigned to reviewer ${reviewerId}`);
     return { updated };
   }
 
@@ -100,6 +103,7 @@ export class AdminService {
       updated++;
     }
 
+    this.logger.log(`Bulk approve: ${updated} approved, ${skipped} skipped (open errors)`);
     return { updated, skipped };
   }
 
@@ -117,6 +121,7 @@ export class AdminService {
       },
     });
 
+    this.logger.warn(`Admin override: page ${pageId} set to ${status} — ${reason}`);
     return updated;
   }
 }

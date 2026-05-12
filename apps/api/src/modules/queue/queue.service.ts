@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PageStatus, ErrorStatus, ErrorCategory } from '@prisma/client';
 
 @Injectable()
 export class QueueService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(QueueService.name);
+
+  constructor(private prisma: PrismaService) {
+    // logger available for future queue diagnostics
+    void this.logger;
+  }
 
   async getQueue(filters: {
     sort?: 'priority' | 'waitTime' | 'quality';

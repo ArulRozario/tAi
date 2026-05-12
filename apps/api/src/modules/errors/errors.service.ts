@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ErrorStatus, PageStatus } from '@prisma/client';
 
 @Injectable()
 export class ErrorsService {
+  private readonly logger = new Logger(ErrorsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async findMany(filters: { pageId?: string; status?: string }) {
@@ -79,16 +81,19 @@ export class ErrorsService {
       }),
     ]);
 
+    this.logger.log(`Error fix applied: ${id} by user ${user.id}`);
     return { error: updatedError, page: updatedPage };
   }
 
   async reject(id: string) {
     await this.findOne(id);
 
-    return this.prisma.error.update({
+    const result = await this.prisma.error.update({
       where: { id },
       data: { status: ErrorStatus.REJECTED },
     });
+    this.logger.log(`Error rejected: ${id}`);
+    return result;
   }
 
   async exception(id: string, data: { sourceTerm?: string; note?: string }) {
@@ -104,11 +109,11 @@ export class ErrorsService {
 
     let glossaryTerm = null;
     if (data.sourceTerm) {
-      const genreId = error.page.project.genreId;
+      const styleGuideId = error.page.project.styleGuideId;
       glossaryTerm = await this.prisma.glossaryTerm.upsert({
         where: {
-          genreId_sourceTerm: {
-            genreId,
+          styleGuideId_sourceTerm: {
+            styleGuideId,
             sourceTerm: data.sourceTerm,
           },
         },
@@ -117,7 +122,7 @@ export class ErrorsService {
           notes: data.note || undefined,
         },
         create: {
-          genreId,
+          styleGuideId,
           sourceTerm: data.sourceTerm,
           targetTerm: error.currentText,
           notes: data.note || undefined,
@@ -125,6 +130,9 @@ export class ErrorsService {
       });
     }
 
+    if (glossaryTerm) {
+      this.logger.log(`Glossary term created/updated for error ${id}: "${data.sourceTerm}"`);
+    }
     return { error: updatedError, glossaryTerm };
   }
 

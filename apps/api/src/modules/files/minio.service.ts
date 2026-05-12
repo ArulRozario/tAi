@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { 
   S3Client, 
   PutObjectCommand, 
@@ -13,6 +13,7 @@ import { Readable } from 'stream';
 
 @Injectable()
 export class MinIOService implements OnModuleInit {
+  private readonly logger = new Logger(MinIOService.name);
   private s3Client!: S3Client;
   private bucket!: string;
   private endpoint!: string;
@@ -42,9 +43,9 @@ export class MinIOService implements OnModuleInit {
     } catch (err) {
       try {
         await this.s3Client.send(new CreateBucketCommand({ Bucket: this.bucket }));
-        console.log(`[MinIO] Successfully created bucket: ${this.bucket}`);
+        this.logger.log(`Bucket created: ${this.bucket}`);
       } catch (createErr: any) {
-        console.error(`[MinIO] Failed to create bucket '${this.bucket}':`, createErr.message);
+        this.logger.error(`Failed to create bucket '${this.bucket}': ${createErr.message}`);
       }
     }
   }
