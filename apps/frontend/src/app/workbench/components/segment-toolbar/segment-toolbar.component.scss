@@ -1,0 +1,126 @@
+// Positioned absolutely inside .scroll-content (position: relative).
+// The parent sets [style.top.px] to anchor it just above the active segment.
+:host {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+
+  --toolbar-bg: #374151;        /* gray-700 — neutral on light canvas */
+  --toolbar-text: #f9fafb;
+  --toolbar-sep: rgba(255, 255, 255, 0.2);
+  --toolbar-hover: rgba(255, 255, 255, 0.1);
+  --toolbar-muted: rgba(249, 250, 251, 0.55);
+}
+
+:host-context(html.dark) {
+  --toolbar-bg: #4b5563;        /* gray-600 — lighter to stand out on dark canvas */
+}
+
+.seg-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--toolbar-bg);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  padding: 4px 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.tool-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--toolbar-sep);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--toolbar-text);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+  line-height: 1;
+
+  .pi {
+    font-size: 12px;
+  }
+
+  span {
+    font-size: 11px;
+    letter-spacing: 0.01em;
+  }
+
+  &:hover {
+    background: var(--toolbar-hover);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  &.save-btn {
+    background: var(--accent-success);
+    color: #fff;
+    font-weight: 700;
+
+    &:hover {
+      filter: brightness(1.1);
+    }
+  }
+
+  &.close-btn {
+    padding: 0 8px;
+    color: var(--toolbar-muted);
+
+    &:hover {
+      color: #fff;
+      background: rgba(244, 63, 94, 0.4);
+    }
+  }
+
+  // AI button highlighted with accent-primary colour.
+  &:first-child:not(.save-btn):not(.close-btn) {
+    color: #fda4af; /* rose-300 — readable on gray in both themes */
+
+    &:hover {
+      background: rgba(244, 63, 94, 0.2);
+    }
+  }
+}
+
+.editing-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fda4af; /* rose-300 */
+  background: rgba(244, 63, 94, 0.2);
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+
+  .pi {
+    font-size: 12px;
+  }
+}

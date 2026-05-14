@@ -157,6 +157,54 @@ export class GeminiService {
   }
 
   /**
+   * Streams text content token-by-token for a chat turn, with fallback on quota errors.
+   */
+  async *streamContent(
+    userPrompt: string,
+    systemPrompt: string,
+    history: Array<{ role: string; content: string }>,
+    preferredModel?: string,
+  ): AsyncGenerator<string> {
+    const chain = this.registry.getFallbackChain(preferredModel || this.defaultModel);
+
+    for (const model of chain) {
+      try {
+        const contents = [
+          ...history.map((h) => ({
+            role: h.role === 'assistant' ? 'model' : h.role,
+            parts: [{ text: h.content }],
+          })),
+          { role: 'user', parts: [{ text: userPrompt }] },
+        ];
+
+        const stream = await this.ai.models.generateContentStream({
+          model,
+          contents,
+          config: {
+            systemInstruction: systemPrompt || undefined,
+            temperature: 0.3,
+          },
+        });
+
+        for await (const chunk of stream) {
+          const text = (chunk as any).text;
+          if (text) yield text;
+        }
+        return;
+      } catch (err) {
+        if (isQuotaError(err as Error)) {
+          this.registry.markExhausted(model);
+          this.logger.warn(`Model ${model} quota exceeded, trying fallback...`);
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    throw new Error('All Gemini models exhausted. Please retry later.');
+  }
+
+  /**
    * Encodes a standard text embedding of 768 dimensions.
    */
   async getEmbedding768(text: string): Promise<number[]> {

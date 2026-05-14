@@ -6,6 +6,7 @@ import {
   Param,
   Query,
   Body,
+  Res,
   UseGuards,
   ParseUUIDPipe,
   HttpCode,
@@ -13,6 +14,7 @@ import {
   Sse,
   MessageEvent,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -24,6 +26,21 @@ import { Observable } from 'rxjs';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
+
+  @Post()
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  async streamDirect(
+    @Body() body: any,
+    @CurrentUser() user: any,
+    @Res() res: Response
+  ): Promise<void> {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders();
+    await this.chatService.streamDirect(body, res);
+  }
 
   @Get('sessions')
   @Roles('ADMIN', 'MASTER', 'REVIEWER')

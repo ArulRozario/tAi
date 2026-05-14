@@ -1,4 +1,4 @@
-import { Component, signal, computed, ViewChild, ElementRef, AfterViewInit, effect, HostListener, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, ViewChild, ElementRef, AfterViewInit, effect, untracked, inject, OnInit } from '@angular/core';
 import { faro } from '@grafana/faro-web-sdk';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
@@ -30,7 +30,6 @@ import { ApiService, User } from '../core/services/api.service';
 import { AuthService } from '../auth/auth.service';
 import { WorkbenchStateService, WorkbenchPage } from './services/workbench-state.service';
 import { PageContentRendererComponent } from './components/page-content-renderer/page-content-renderer.component';
-import { InlineSegmentEditorComponent } from './components/inline-segment-editor/inline-segment-editor.component';
 
 @Component({
   selector: 'app-workbench',
@@ -56,7 +55,6 @@ import { InlineSegmentEditorComponent } from './components/inline-segment-editor
     PageThumbnailSidebarComponent,
     ModelPickerComponent,
     PageContentRendererComponent,
-    InlineSegmentEditorComponent,
   ],
   providers: [
     UnifiedChatService,
@@ -78,9 +76,6 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   public state = inject(WorkbenchStateService);
 
   @ViewChild('aiChat') aiChat!: AiChatComponent;
-
-  private isSyncing = false;
-  private isAutoScrolling = false;
 
   edits = signal<{ segmentId: string; editedText: string }[]>([]);
   baseTargetHtml = signal<string>('');
@@ -153,6 +148,7 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
         this.projectService.savePageEdit(pageId, segmentId, content).subscribe({
           next: () => {
             this.messageService.add({ severity: 'success', summary: 'Applied', detail: 'AI translation applied.', life: 1500 });
+            this.state.setActiveSegment(null);
             this.loadEdits(pageId);
           },
           error: (err: any) => {
@@ -162,6 +158,36 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
         });
       }
     });
+
+    effect(() => {
+      const segId = this.state.activeSegmentId();
+      const sourceText = this.state.activeSourceText();
+      if (!segId) return;
+
+      const pageId = untracked(() => this.pageData()?.id);
+
+      const translationEl = document.querySelector(`.target-col [id="${CSS.escape(segId)}"]`);
+      const translationText = translationEl?.textContent?.trim() || '';
+
+      this.unifiedChat.configure({
+        context: 'workbench',
+        entityId: pageId,
+        segmentId: segId,
+        currentContent: translationText,
+      });
+
+      const greeting = [
+        '**Segment selected**',
+        '',
+        `**Source:** ${sourceText || '—'}`,
+        '',
+        `**Current translation:** ${translationText || '—'}`,
+        '',
+        'How would you like to refine this translation?',
+      ].join('\n');
+
+      this.aiChat?.reset(greeting);
+    }, { allowSignalWrites: true });
   }
 
   ngOnInit(): void {
@@ -232,7 +258,9 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   loadEdits(pageId: string, baseHtml?: string) {
     this.projectService.getPageEdits(pageId).subscribe({
       next: (edits) => {
-        this.edits.set(edits.map((e) => ({ segmentId: e.segmentId, editedText: e.editedText })));
+        const mapped = edits.map((e) => ({ segmentId: e.segmentId, editedText: e.editedText }));
+        this.edits.set(mapped);
+        this.state.pageEdits.set(mapped);
         const html = baseHtml || this.baseTargetHtml();
         if (html) {
           const compiled = this.compileHtml(html, this.edits());
@@ -252,6 +280,8 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     });
   }
 
+  private readonly INLINE_DIFF_THRESHOLD = 3;
+
   compileHtml(baseHtml: string, edits: { segmentId: string; editedText: string }[]): string {
     if (!edits.length) return baseHtml;
     const parser = new DOMParser();
@@ -261,17 +291,23 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
       if (el) {
         const original = el.textContent || '';
         const diffs = Diff.diffWords(original, edit.editedText);
-        let newHtml = '';
-        diffs.forEach((part: any) => {
-          if (part.added) {
-            newHtml += `<ins class="diff-added">${part.value}</ins>`;
-          } else if (part.removed) {
-            newHtml += `<del class="diff-removed">${part.value}</del>`;
-          } else {
-            newHtml += `<span>${part.value}</span>`;
-          }
-        });
-        el.innerHTML = newHtml;
+        const changedCount = diffs.filter((p: any) => p.added || p.removed).length;
+
+        if (changedCount > this.INLINE_DIFF_THRESHOLD) {
+          el.innerHTML = `<span class="diff-stacked"><span class="diff-stacked-original">${original}</span><span class="diff-stacked-edited">${edit.editedText}</span></span>`;
+        } else {
+          let newHtml = '';
+          diffs.forEach((part: any) => {
+            if (part.added) {
+              newHtml += `<ins class="diff-added">${part.value}</ins>`;
+            } else if (part.removed) {
+              newHtml += `<del class="diff-removed">${part.value}</del>`;
+            } else {
+              newHtml += `<span>${part.value}</span>`;
+            }
+          });
+          el.innerHTML = newHtml;
+        }
       }
     }
     return doc.body.innerHTML;
@@ -422,19 +458,6 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
 
   toggleRightPanel() {
     this.state.rightPanelCollapsed.update(v => !v);
-  }
-
-  onScroll(event: any, source: 'source' | 'target') {
-    if (this.isSyncing) return;
-
-    this.isSyncing = true;
-    const scrollPercentage = event.detail.scrollPercentage;
-    
-    window.dispatchEvent(new CustomEvent('workbench-sync-scroll', { 
-      detail: { source, scrollPercentage } 
-    }));
-    
-    setTimeout(() => this.isSyncing = false, 50);
   }
 
   goBack() {

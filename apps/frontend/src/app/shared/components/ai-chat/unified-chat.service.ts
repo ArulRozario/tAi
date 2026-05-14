@@ -1,13 +1,12 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient, HttpEventType, HttpDownloadProgressEvent } from '@angular/common/http';
 import { AiChatService } from './ai-chat.service';
 import { AiChatComponent } from './ai-chat.component';
 
-/**
- * Unified chat service that calls the single /api/v1/chat endpoint
- * with context-specific parameters.
- */
 @Injectable()
 export class UnifiedChatService extends AiChatService {
+  private http = inject(HttpClient);
+
   private context: string = 'general';
   private entityId?: string;
   private segmentId?: string;
@@ -26,24 +25,6 @@ export class UnifiedChatService extends AiChatService {
   }
 
   sendPrompt(prompt: string, model: string, chat: AiChatComponent): void {
-    this.doSend(prompt, model, chat).catch((err: any) => {
-      const id = chat.beginAssistantResponse();
-      chat.finishAssistantMessage(
-        id,
-        `Sorry, an unexpected error occurred: ${err.message || 'Please try again.'}`
-      );
-    });
-  }
-
-  acceptContent(content: string, chat: AiChatComponent): void {
-    this.contentAcceptedSubject.next(content);
-  }
-
-  private async doSend(
-    prompt: string,
-    model: string,
-    chat: AiChatComponent
-  ): Promise<void> {
     const assistantId = chat.beginAssistantResponse();
 
     const history = chat
@@ -63,50 +44,45 @@ export class UnifiedChatService extends AiChatService {
       history,
     };
 
-    const response = await fetch('/api/v1/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.body) {
-      throw new Error('No response body');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+    let processedLength = 0;
     let rawContent = '';
 
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
+    this.http
+      .post('/api/v1/chat', body, {
+        observe: 'events',
+        responseType: 'text',
+        reportProgress: true,
+      })
+      .subscribe({
+        next: (event) => {
+          if (event.type === HttpEventType.DownloadProgress) {
+            const partial = (event as HttpDownloadProgressEvent).partialText ?? '';
+            const newData = partial.slice(processedLength);
+            processedLength = partial.length;
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+            const lines = newData.split('\n');
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const chunk = line.slice(6);
+              if (chunk === '[DONE]') continue;
+              rawContent += chunk;
+              chat.updateAssistantMessage(assistantId, rawContent);
+            }
+          }
+        },
+        error: (err) => {
+          chat.finishAssistantMessage(
+            assistantId,
+            `Sorry, an error occurred: ${err?.message ?? 'Please try again.'}`
+          );
+        },
+        complete: () => {
+          chat.finishAssistantMessage(assistantId, rawContent);
+        },
+      });
+  }
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const chunk = line.substring(6);
-          if (chunk === '[DONE]') continue;
-          rawContent += chunk;
-          chat.updateAssistantMessage(assistantId, rawContent);
-        }
-      }
-    }
-
-    // Flush remaining buffer
-    if (buffer.trim()) {
-      if (buffer.startsWith('data: ')) {
-        const chunk = buffer.substring(6);
-        if (chunk !== '[DONE]') {
-          rawContent += chunk;
-          chat.updateAssistantMessage(assistantId, rawContent);
-        }
-      }
-    }
-
-    chat.finishAssistantMessage(assistantId, rawContent);
+  acceptContent(content: string, _chat: AiChatComponent): void {
+    this.contentAcceptedSubject.next(content);
   }
 }

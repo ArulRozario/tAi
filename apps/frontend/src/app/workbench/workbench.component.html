@@ -112,10 +112,9 @@
           </div>
           
           @if (state.sourceViewMode() === 'html') {
-            <app-page-content-renderer 
-              mode="source" 
-              [content]="sourceHtml"
-              (scroll)="onScroll($event, 'source')">
+            <app-page-content-renderer
+              mode="source"
+              [content]="sourceHtml">
             </app-page-content-renderer>
           } @else {
             <div class="scroll-content">
@@ -190,21 +189,12 @@
             </div>
           </div>
           
-          <div class="scroll-content" style="position: relative;">
-            <app-page-content-renderer 
-              mode="target" 
+          <app-page-content-renderer
+              mode="target"
               [content]="targetHtml"
-              (scroll)="onScroll($event, 'target')">
+              [pageId]="pageData()!.id"
+              (contentChanged)="loadEdits(pageData()!.id)">
             </app-page-content-renderer>
-
-            <!-- ── Inline Segment Editor ─────────────────────── -->
-            @if (state.editingSegmentId()) {
-              <app-inline-segment-editor 
-                [sourceText]="state.activeSourceText()" 
-                [style.top.px]="state.editorTop()">
-              </app-inline-segment-editor>
-            }
-          </div>
         </section>
       </main>
 
@@ -212,9 +202,9 @@
       <aside class="side-panel right-panel" [class.collapsed]="state.rightPanelCollapsed()">
         <app-ai-chat
           #aiChat
-          *ngIf="!state.rightPanelCollapsed()"
+          [hidden]="state.rightPanelCollapsed()"
           title="Translation assistant"
-          greeting="Hello! I'm your translation assistant. Select a segment and click the sparkle icon to retranslate it with AI."
+          greeting="Select a segment in the translation to refine it with AI."
           [showPlanMode]="false"
           userInitials="RK"
           placeholder="Ask about this segment...">

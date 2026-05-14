@@ -36,3 +36,4 @@ apps/api/node_modules/@prisma/
 #NX
 .nx/cache
 .nx/workspace-data
+.angular

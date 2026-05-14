@@ -1,14 +1,21 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatContext, ChatMode, MessageRole, ChatSession, Provider } from '@prisma/client';
 import axios from 'axios';
 import { Subject, Observable } from 'rxjs';
+import { GeminiService } from '../agents/gemini.service';
+import { PromptBuilder } from './prompt.builder';
 
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private geminiService: GeminiService,
+    private promptBuilder: PromptBuilder,
+  ) {}
 
   async findSessions(userId: string, filters: { context?: string; entityId?: string }) {
     const where: any = { userId };
@@ -281,6 +288,65 @@ export class ChatService {
   /**
    * Streams responses using Server-Sent Events (SSE) lines.
    */
+  /**
+   * Stateless single-shot streaming endpoint for workbench / segment chat.
+   * Writes SSE directly to the Express Response so callers can fetch-stream it.
+   */
+  async streamDirect(
+    body: {
+      context: string;
+      entityId?: string;
+      segmentId?: string;
+      prompt: string;
+      model?: string;
+      mode?: string;
+      currentContent?: string;
+      history?: Array<{ role: string; content: string }>;
+    },
+    res: Response
+  ): Promise<void> {
+    const contextMap: Record<string, string> = {
+      workbench: 'segment',
+      segment: 'segment',
+      styleGuide: 'styleGuide',
+      review: 'pageReview',
+      glossary: 'general',
+      general: 'general',
+    };
+
+    const builderContext = contextMap[body.context] ?? 'general';
+
+    const { systemPrompt, userPrompt } = await this.promptBuilder.build(
+      builderContext,
+      body.prompt,
+      {
+        entityId: body.entityId,
+        segmentId: body.segmentId,
+        currentContent: body.currentContent,
+        mode: body.mode,
+      }
+    );
+
+    try {
+      const stream = this.geminiService.streamContent(
+        userPrompt,
+        systemPrompt,
+        body.history ?? [],
+        body.model,
+      );
+
+      for await (const chunk of stream) {
+        res.write(`data: ${chunk}\n\n`);
+      }
+    } catch (err: any) {
+      this.logger.error(`streamDirect failed: ${err.message}`);
+      res.write(`data: [Error: ${err.message}]\n\n`);
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+
   async streamResponse(
     id: string,
     userId: string,

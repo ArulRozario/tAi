@@ -47,8 +47,8 @@ export class WorkbenchStateService {
   activeSegmentId = signal<string | null>(null);
   editingSegmentId = signal<string | null>(null);
   hoveredSegmentId = signal<string | null>(null);
-  scrollPercentage = signal<{ source: string, percentage: number } | null>(null);
   maxPageHeight = signal<number>(0);
+  syncScroll = signal<{ from: 'source' | 'target'; percentage: number } | null>(null);
   
   // --- Editor State ---
   isSaving = signal(false);
@@ -60,6 +60,7 @@ export class WorkbenchStateService {
   // --- Page Metadata ---
   approvedSegmentIds = signal<Set<string>>(new Set());
   pageErrors = signal<{ segmentId: string; severity: string; message: string }[]>([]);
+  pageEdits = signal<{ segmentId: string; editedText: string }[]>([]);
 
   // --- Helpers ---
   setPageData(data: WorkbenchPage | null) {

@@ -1,12 +1,16 @@
-import { Component, Input, effect, inject, ElementRef, ViewChild, OnDestroy, AfterViewInit, Signal } from '@angular/core';
+import {
+  Component, Input, Output, EventEmitter, effect, inject,
+  ElementRef, ViewChild, OnDestroy, AfterViewInit, Signal, signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { WorkbenchStateService } from '../../services/workbench-state.service';
 import { SafeHtml } from '@angular/platform-browser';
+import { SegmentToolbarComponent } from '../segment-toolbar/segment-toolbar.component';
 
 @Component({
   selector: 'app-page-content-renderer',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, SegmentToolbarComponent],
   template: `
     <div #container
          class="scroll-content"
@@ -19,21 +23,31 @@ import { SafeHtml } from '@angular/platform-browser';
            class="page-paper"
            [style.min-height.px]="state.maxPageHeight() > 0 ? state.maxPageHeight() : null"
            [innerHTML]="content()"></div>
+
+      @if (mode === 'target' && pageId && toolbarTop() !== null) {
+        <app-segment-toolbar
+          [pageId]="pageId"
+          [style.top.px]="toolbarTop()"
+          (contentChanged)="contentChanged.emit()" />
+      }
     </div>
   `,
-  styleUrls: ['./page-content-renderer.component.scss']
+  styleUrls: ['./page-content-renderer.component.scss'],
 })
 export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
   @Input({ required: true }) mode!: 'source' | 'target';
   @Input({ required: true }) content!: Signal<SafeHtml | null>;
+  @Input() pageId?: string;
+  @Output() contentChanged = new EventEmitter<void>();
 
   @ViewChild('container') container!: ElementRef<HTMLElement>;
   @ViewChild('paper') paper!: ElementRef<HTMLElement>;
 
   public state = inject<WorkbenchStateService>(WorkbenchStateService);
-  private isAutoScrolling = false;
-  private lastScrollTime = 0;
   private resizeObserver: ResizeObserver | null = null;
+  private lastSyncAt = 0;
+
+  toolbarTop = signal<number | null>(null);
 
   constructor() {
     effect(() => {
@@ -44,22 +58,42 @@ export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
       this.updateDomStyles(activeId, hoveredId, approvedIds, errors);
     });
 
+    // Scroll to the active segment and position the toolbar above it.
     effect(() => {
-      const sync = this.state.scrollPercentage();
-      if (sync && sync.source !== this.mode) {
-        this.syncScroll(sync.percentage);
+      const activeId = this.state.activeSegmentId();
+
+      if (!activeId) {
+        this.toolbarTop.set(null);
+        return;
       }
+
+      setTimeout(() => {
+        this.scrollToSegment(activeId);
+        if (this.mode === 'target') {
+          this.positionToolbar(activeId);
+        }
+      }, 0);
+    });
+
+    // Mirror free-scroll from the other column.
+    effect(() => {
+      const sync = this.state.syncScroll();
+      if (!sync || sync.from === this.mode) return;
+      const el = this.container?.nativeElement;
+      if (!el) return;
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll <= 0) return;
+      this.lastSyncAt = Date.now();
+      el.scrollTop = sync.percentage * maxScroll;
     });
   }
 
   ngAfterViewInit() {
     this.initHeightObserver();
-    this.initGlobalScrollListener();
   }
 
   ngOnDestroy() {
     this.resizeObserver?.disconnect();
-    window.removeEventListener('workbench-sync-scroll', this.handleGlobalScroll);
   }
 
   private initHeightObserver() {
@@ -75,61 +109,49 @@ export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
     this.resizeObserver.observe(this.paper.nativeElement);
   }
 
-  private initGlobalScrollListener() {
-    window.addEventListener('workbench-sync-scroll', this.handleGlobalScroll);
+  private scrollToSegment(segId: string) {
+    const containerEl = this.container?.nativeElement;
+    if (!containerEl) return;
+    const el = containerEl.querySelector(`#${CSS.escape(segId)}`) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  private handleGlobalScroll = (event: Event) => {
-    const e = event as CustomEvent<{ source: string; scrollPercentage: number }>;
-    if (e.detail.source === this.mode) return;
-    this.syncScroll(e.detail.scrollPercentage);
-  };
+  // Position the toolbar just above the active segment using content-relative coordinates.
+  private positionToolbar(segId: string) {
+    const containerEl = this.container?.nativeElement;
+    if (!containerEl) return;
+    const segEl = containerEl.querySelector(`#${CSS.escape(segId)}`) as HTMLElement | null;
+    if (!segEl) {
+      this.toolbarTop.set(null);
+      return;
+    }
 
-  private syncScroll(percentage: number) {
-    if (!this.container?.nativeElement) return;
+    const containerRect = containerEl.getBoundingClientRect();
+    const segRect = segEl.getBoundingClientRect();
+    // Convert viewport-relative position to scroll-content-relative.
+    const contentTop = segRect.top - containerRect.top + containerEl.scrollTop;
 
-    const el = this.container.nativeElement;
-    const maxScroll = el.scrollHeight - el.clientHeight;
-    if (maxScroll <= 0) return;
-
-    const targetTop = percentage * maxScroll;
-    const currentTop = el.scrollTop;
-
-    if (Math.abs(currentTop - targetTop) < 2) return;
-
-    this.isAutoScrolling = true;
-    el.scrollTo({ top: targetTop, behavior: 'smooth' });
-
-    setTimeout(() => {
-      this.isAutoScrolling = false;
-    }, 150);
+    const TOOLBAR_HEIGHT = 32;
+    const GAP = 4;
+    this.toolbarTop.set(Math.max(0, contentTop - TOOLBAR_HEIGHT - GAP));
   }
 
   onScroll(event: Event) {
-    if (this.isAutoScrolling) return;
-
-    const now = Date.now();
-    if (now - this.lastScrollTime < 16) return;
-    this.lastScrollTime = now;
-
-    const scrolledEl = event.target as HTMLElement;
-    const maxScroll = scrolledEl.scrollHeight - scrolledEl.clientHeight;
+    if (Date.now() - this.lastSyncAt < 50) return;
+    const el = event.target as HTMLElement;
+    const maxScroll = el.scrollHeight - el.clientHeight;
     if (maxScroll <= 0) return;
-
-    const scrollPercentage = scrolledEl.scrollTop / maxScroll;
-
-    window.dispatchEvent(new CustomEvent('workbench-sync-scroll', {
-      detail: { source: this.mode, scrollPercentage }
-    }));
+    this.state.syncScroll.set({ from: this.mode, percentage: el.scrollTop / maxScroll });
   }
 
   onMouseMove(event: MouseEvent) {
     const target = event.target as HTMLElement;
     const segmentEl = target.closest('.segment');
-    const segId = segmentEl?.getAttribute('id');
+    const segId = segmentEl?.getAttribute('id') ?? null;
 
     if (segId !== this.state.hoveredSegmentId()) {
-      this.state.setHoveredSegment(segId ?? null);
+      this.state.setHoveredSegment(segId);
     }
   }
 
@@ -142,65 +164,24 @@ export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
     if (!segId) return;
 
     if (this.mode === 'target') {
-      this.state.setActiveSegment(segId);
-      this.state.setEditingSegment(segId);
-      this.enterEditMode(segmentEl);
-
-      this.positionEditor(segmentEl);
-
-      const sourceEl = document.querySelector(`.source-col [id="${CSS.escape(segId)}"]`);
-      this.state.activeSourceText.set(sourceEl?.textContent?.trim() || '');
-    } else {
-      const targetEl = document.querySelector(`.target-col [id="${CSS.escape(segId)}"]`);
-      if (targetEl) {
-        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const prev = this.state.activeSegmentId();
+      if (prev && prev !== segId) {
+        const prevEl = this.container.nativeElement.querySelector(`#${CSS.escape(prev)}`) as HTMLElement | null;
+        if (prevEl) prevEl.contentEditable = 'false';
       }
     }
+
+    const sourceEl = document.querySelector(`.source-col [id="${CSS.escape(segId)}"]`);
+    this.state.activeSourceText.set(sourceEl?.textContent?.trim() || '');
+    this.state.setActiveSegment(segId);
   }
 
-  private positionEditor(segmentEl: HTMLElement) {
-    const containerEl = this.container?.nativeElement;
-    if (!containerEl) return;
-
-    segmentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-    requestAnimationFrame(() => {
-      const containerTop = containerEl.getBoundingClientRect().top + containerEl.scrollTop;
-      const segmentTop = segmentEl.getBoundingClientRect().top + containerEl.scrollTop;
-      const segmentHeight = segmentEl.offsetHeight;
-      const containerHeight = containerEl.clientHeight;
-
-      let editorTop: number;
-      const editorHeight = 200;
-      const spaceBelow = containerTop + containerHeight - (segmentTop + segmentHeight);
-      const spaceAbove = segmentTop - containerTop;
-
-      if (spaceBelow >= editorHeight + 20) {
-        editorTop = segmentTop + segmentHeight + 8;
-      } else if (spaceAbove >= editorHeight + 20) {
-        editorTop = segmentTop - editorHeight - 8;
-      } else {
-        editorTop = segmentTop + segmentHeight + 8;
-      }
-
-      editorTop = Math.max(containerEl.scrollTop, Math.min(editorTop, containerEl.scrollTop + containerHeight - editorHeight));
-      this.state.editorTop.set(editorTop - containerTop);
-    });
-  }
-
-  private enterEditMode(segmentEl: HTMLElement) {
-    segmentEl.contentEditable = 'true';
-    segmentEl.focus();
-
-    const range = document.createRange();
-    const sel = window.getSelection();
-    range.selectNodeContents(segmentEl);
-    range.collapse(false);
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-  }
-
-  private updateDomStyles(activeId: string | null, hoveredId: string | null, approvedIds: Set<string>, errors: any[]) {
+  private updateDomStyles(
+    activeId: string | null,
+    hoveredId: string | null,
+    approvedIds: Set<string>,
+    errors: any[],
+  ) {
     const containerEl = this.container?.nativeElement;
     if (!containerEl) return;
 

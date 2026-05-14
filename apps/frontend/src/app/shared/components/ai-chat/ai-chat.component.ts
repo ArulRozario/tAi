@@ -174,6 +174,12 @@ export class AiChatComponent {
     }
   }
 
+  rejectMessage(id: string) {
+    this.messages.update(msgs =>
+      msgs.map(m => m.id === id ? { ...m, showActions: false } : m)
+    );
+  }
+
   retryMessage(id: string) {
     const msgs = this.messages();
     const idx = msgs.findIndex(m => m.id === id);
