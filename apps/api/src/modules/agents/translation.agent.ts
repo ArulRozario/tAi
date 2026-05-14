@@ -13,7 +13,7 @@ export interface PageTranslationResult {
   borrowedText?: string;
   isNewChapter?: boolean;
   chapterNumber?: number;
-  incompleteSentenceAtTheEnd?: string;
+  incompleteSentenceAtEnd?: string;
   modelUsed: string;
 }
 
@@ -171,7 +171,7 @@ export class TranslationAgent {
         borrowedText: translation.boundaryMetadata?.borrowedTextFromNextPage,
         isNewChapter: translation.isNewChapter,
         chapterNumber: translation.chapterNumber,
-        incompleteSentenceAtTheEnd: translation.incompleteSentenceAtTheEnd,
+        incompleteSentenceAtEnd: translation.incompleteSentenceAtEnd,
         modelUsed: translation.modelUsed,
       });
 

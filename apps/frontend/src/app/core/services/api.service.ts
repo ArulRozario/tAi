@@ -51,9 +51,9 @@ export interface Page {
   chapter?: { id: string; number: number; title?: string };
 }
 
-export interface SentenceError {
+export interface SegmentError {
   id: string;
-  sentenceId: string;
+  segmentId: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   category: string;
   location?: string;
@@ -67,22 +67,22 @@ export interface SentenceError {
   createdAt: string;
 }
 
-export interface Sentence {
+export interface Segment {
   id: string;
   pageId: string;
-  sentenceNumber: number;
+  segmentNumber: number;
   originalText: string;
   translatedText?: string;
   aiTranslatedText?: string;
   status: string;
   isApproved: boolean;
   confidence?: number;
-  errors?: SentenceError[];
+  errors?: SegmentError[];
 }
 
 export interface PageDetail extends Page {
   sourceMarkdown?: string;
-  sentences: Sentence[];
+  segments: Segment[];
 }
 
 export interface DashboardStats {
@@ -301,18 +301,14 @@ export class ApiService {
     return this.http.get<{ nextPageId: string | null }>(`${this.base}/pages/${id}/next-in-queue`);
   }
 
-  applyError(errorId: string): Observable<SentenceError> {
-    return this.http.post<SentenceError>(`${this.base}/errors/${errorId}/apply`, {});
+  applyError(errorId: string): Observable<SegmentError> {
+    return this.http.post<SegmentError>(`${this.base}/errors/${errorId}/apply`, {});
   }
 
-  // ── Sentences ─────────────────────────────────────────────────────────────
+  // ── Segments ──────────────────────────────────────────────────────────────
 
-  patchSentence(id: string, data: Partial<Sentence>): Observable<Sentence> {
-    return this.http.patch<Sentence>(`${this.base}/sentences/${id}`, data);
-  }
-
-  resetSentenceTranslation(id: string): Observable<Sentence> {
-    return this.http.post<Sentence>(`${this.base}/sentences/${id}/reset-translation`, {});
+  retranslateSegment(pageId: string, segmentId: string, prompt?: string): Observable<Segment> {
+    return this.http.post<Segment>(`${this.base}/pages/${pageId}/segments/${segmentId}/retranslate`, { prompt });
   }
 
   addReviewer(pageId: string, userId: string): Observable<Page> {

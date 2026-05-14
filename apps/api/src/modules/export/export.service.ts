@@ -208,7 +208,7 @@ export class ExportService {
         doc.addPage();
         doc.fontSize(12).text(`Page ${page.pageNumber}`, { underline: true });
         doc.moveDown(0.5);
-        const plainText = page.content.replace(/\{\{SENTENCE_\d+\}\}/g, '').replace(/#{1,6}\s/g, '').trim();
+        const plainText = page.content.replace(/#{1,6}\s/g, '').trim();
         doc.fontSize(10).text(plainText, { lineGap: 4 });
       }
 
@@ -233,7 +233,6 @@ export class ExportService {
       );
 
       const lines = page.content
-        .replace(/\{\{SENTENCE_\d+\}\}/g, '')
         .split('\n')
         .filter((l) => l.trim());
 

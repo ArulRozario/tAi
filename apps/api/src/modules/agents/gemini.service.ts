@@ -10,7 +10,7 @@ export interface TranslationOutput {
   };
   isNewChapter?: boolean;
   chapterNumber?: number;
-  incompleteSentenceAtTheEnd?: string;
+  incompleteSentenceAtEnd?: string;
 }
 
 function isQuotaError(err: Error): boolean {
@@ -121,7 +121,7 @@ export class GeminiService {
                 },
                 isNewChapter: { type: Type.BOOLEAN },
                 chapterNumber: { type: Type.INTEGER },
-                incompleteSentenceAtTheEnd: { type: Type.STRING },
+                incompleteSentenceAtEnd: { type: Type.STRING },
               },
               required: ['originalHtml', 'translatedHtml'],
             },
