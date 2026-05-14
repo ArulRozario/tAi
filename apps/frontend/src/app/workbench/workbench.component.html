@@ -62,6 +62,50 @@
           styleClass="chat-toggle-btn"
         />
         <p-button label="Open analysis" severity="secondary" [outlined]="true" size="small" styleClass="analysis-btn" />
+
+        <!-- Role-based primary action -->
+        @if (isMasterOrAdmin()) {
+          <p-button
+            label="Approve"
+            icon="pi pi-check"
+            severity="success"
+            size="small"
+            [loading]="isCompleting()"
+            (onClick)="completePage()"
+            styleClass="approve-btn"
+          />
+        } @else {
+          @if (pageData()?.submittedAt) {
+            <p-button
+              label="Submitted"
+              icon="pi pi-check-circle"
+              severity="secondary"
+              size="small"
+              [disabled]="true"
+              styleClass="submitted-btn"
+            />
+          } @else {
+            <p-button
+              label="Submit for Review"
+              icon="pi pi-send"
+              severity="success"
+              size="small"
+              [loading]="isCompleting()"
+              (onClick)="submitForReview()"
+              styleClass="submit-btn"
+            />
+          }
+        }
+
+        <p-button
+          icon="pi pi-ellipsis-v"
+          severity="secondary"
+          [text]="true"
+          size="small"
+          (onClick)="overflowMenu.toggle($event)"
+          styleClass="overflow-btn"
+        />
+        <p-menu #overflowMenu [model]="overflowMenuItems" [popup]="true" />
       </div>
     </header>
 

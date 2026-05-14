@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { roleGuard } from './core/guards/role.guard';
 import { AppComponent } from './app.component';
 
 export const routes: Routes = [
@@ -27,8 +28,30 @@ export const routes: Routes = [
         loadComponent: () => import('./projects/project-detail/project-detail.component').then(m => m.ProjectDetailComponent),
       },
       {
+        path: 'queue',
+        loadComponent: () => import('./queue/queue.component').then(m => m.QueueComponent),
+      },
+      {
         path: 'style-guides',
         loadComponent: () => import('./style-guides/style-guides.component').then(m => m.StyleGuidesComponent),
+      },
+      {
+        path: 'style-guides/create',
+        loadComponent: () => import('./style-guides/style-guide-detail.component').then(m => m.StyleGuideDetailComponent),
+      },
+      {
+        path: 'style-guides/:id',
+        loadComponent: () => import('./style-guides/style-guide-detail.component').then(m => m.StyleGuideDetailComponent),
+      },
+      {
+        path: 'profile',
+        loadComponent: () => import('./profile/profile.component').then(m => m.ProfileComponent),
+      },
+      {
+        path: 'admin/users',
+        loadComponent: () => import('./admin/users/users.component').then(m => m.UsersComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ADMIN'] },
       },
       {
         path: 'workbench/:pageId',

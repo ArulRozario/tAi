@@ -1,0 +1,271 @@
+<div class="queue-page">
+  <div class="queue-header">
+    <div>
+      <h1 class="page-title">Review Queue</h1>
+      <p class="page-subtitle">
+        {{ myQueuePages().length }} pages in your queue
+        @if (isMasterOrAdmin() && submittedPages().length > 0) {
+          · <strong>{{ submittedPages().length }} submitted for your review</strong>
+        }
+      </p>
+    </div>
+  </div>
+
+  <p-tabs [(value)]="activeTab">
+    <p-tablist>
+      <p-tab [value]="0">
+        <i class="pi pi-list"></i>
+        My Queue
+        @if (myQueuePages().length > 0) {
+          <span class="tab-badge">{{ myQueuePages().length }}</span>
+        }
+      </p-tab>
+
+      @if (isMasterOrAdmin()) {
+        <p-tab [value]="1">
+          <i class="pi pi-inbox"></i>
+          Submitted Reviews
+          @if (submittedPages().length > 0) {
+            <span class="tab-badge tab-badge--accent">{{ submittedPages().length }}</span>
+          }
+        </p-tab>
+      }
+
+      <p-tab [value]="isMasterOrAdmin() ? 2 : 1">
+        <i class="pi pi-exclamation-triangle"></i>
+        Escalations
+        @if (escalations().length > 0) {
+          <span class="tab-badge tab-badge--danger">{{ escalations().length }}</span>
+        }
+      </p-tab>
+    </p-tablist>
+
+    <!-- ── My Queue Tab ──────────────────────────────────────── -->
+    <p-tabpanel [value]="0">
+      @if (myQueueLoading()) {
+        <div class="skeleton-list">
+          @for (i of [1,2,3,4,5]; track i) {
+            <div class="queue-row skeleton-row">
+              <p-skeleton width="3rem" height="1rem" />
+              <p-skeleton width="8rem" height="1rem" />
+              <p-skeleton width="5rem" height="1rem" />
+              <p-skeleton width="4rem" height="1rem" />
+              <p-skeleton width="4rem" height="1rem" />
+            </div>
+          }
+        </div>
+      } @else if (!myQueuePages().length) {
+        <div class="empty-state">
+          <i class="pi pi-check-circle"></i>
+          <h3>Queue clear</h3>
+          <p>No pages are currently assigned to you.</p>
+        </div>
+      } @else {
+        <div class="queue-table">
+          <div class="queue-table-header">
+            <span>Page</span>
+            <span>Project</span>
+            <span>Quality</span>
+            <span>Errors</span>
+            <span>Priority</span>
+            <span>Wait</span>
+            <span></span>
+          </div>
+          @for (page of myQueuePages(); track page.id) {
+            <div class="queue-row" (click)="openPage(page.id)">
+              <span class="page-num">P{{ page.pageNumber }}</span>
+              <div class="project-info">
+                <span class="project-name">{{ page.project.name }}</span>
+                @if (page.chapter) {
+                  <span class="chapter-label">Ch.{{ page.chapter.number }}</span>
+                }
+              </div>
+              <div class="quality-cell">
+                @if (page.quality != null) {
+                  <span class="quality-val" [class]="'q-' + qualitySeverity(page.quality)">{{ page.quality }}%</span>
+                  <p-progressBar [value]="page.quality" [showValue]="false" styleClass="quality-bar" />
+                } @else {
+                  <span class="text-muted">—</span>
+                }
+              </div>
+              <span class="error-count" [class.has-errors]="page.errorCount > 0">
+                {{ page.errorCount }} {{ page.errorCount === 1 ? 'issue' : 'issues' }}
+              </span>
+              <p-tag [value]="page.priority" [severity]="prioritySeverity(page.priority)" styleClass="priority-tag" />
+              <span class="wait-time">{{ waitTime(page.assignedAt) }}</span>
+              <p-button
+                label="Review"
+                icon="pi pi-arrow-right"
+                size="small"
+                severity="secondary"
+                [outlined]="true"
+                (onClick)="$event.stopPropagation(); openPage(page.id)"
+              />
+            </div>
+          }
+        </div>
+      }
+    </p-tabpanel>
+
+    <!-- ── Submitted Reviews Tab (MASTER only) ───────────────── -->
+    @if (isMasterOrAdmin()) {
+      <p-tabpanel [value]="1">
+        @if (submittedLoading()) {
+          <div class="skeleton-list">
+            @for (i of [1,2,3]; track i) {
+              <div class="queue-row skeleton-row">
+                <p-skeleton width="3rem" height="1rem" />
+                <p-skeleton width="8rem" height="1rem" />
+                <p-skeleton width="4rem" height="1rem" />
+              </div>
+            }
+          </div>
+        } @else if (!submittedPages().length) {
+          <div class="empty-state">
+            <i class="pi pi-inbox"></i>
+            <h3>No submitted reviews</h3>
+            <p>Reviewers haven't submitted any pages for your approval yet.</p>
+          </div>
+        } @else {
+          <div class="submitted-header-note">
+            <i class="pi pi-info-circle"></i>
+            These pages have been reviewed and submitted by reviewers. Open each in the workbench to approve or request changes.
+          </div>
+          <div class="queue-table">
+            <div class="queue-table-header">
+              <span>Page</span>
+              <span>Project</span>
+              <span>Reviewers</span>
+              <span>Quality</span>
+              <span>Errors</span>
+              <span>Submitted</span>
+              <span></span>
+            </div>
+            @for (page of submittedPages(); track page.id) {
+              <div class="queue-row submitted-row" (click)="openPage(page.id)">
+                <span class="page-num">P{{ page.pageNumber }}</span>
+                <div class="project-info">
+                  <span class="project-name">{{ page.project.name }}</span>
+                  @if (page.chapter) {
+                    <span class="chapter-label">Ch.{{ page.chapter.number }}</span>
+                  }
+                </div>
+                <div class="reviewer-chips">
+                  @for (r of page.reviewers.slice(0,3); track r.id) {
+                    <span class="reviewer-chip" [pTooltip]="r.name">{{ getInitials(r.name) }}</span>
+                  }
+                  @if (page.reviewers.length > 3) {
+                    <span class="reviewer-chip reviewer-extra">+{{ page.reviewers.length - 3 }}</span>
+                  }
+                </div>
+                <div class="quality-cell">
+                  @if (page.quality != null) {
+                    <span class="quality-val" [class]="'q-' + qualitySeverity(page.quality)">{{ page.quality }}%</span>
+                  } @else {
+                    <span class="text-muted">—</span>
+                  }
+                </div>
+                <span class="error-count" [class.has-errors]="page.errorCount > 0">
+                  {{ page.errorCount }} {{ page.errorCount === 1 ? 'issue' : 'issues' }}
+                </span>
+                <span class="wait-time">{{ waitTime(page.submittedAt ?? undefined) }}</span>
+                <p-button
+                  label="Review & Approve"
+                  icon="pi pi-check"
+                  size="small"
+                  severity="success"
+                  [outlined]="true"
+                  (onClick)="$event.stopPropagation(); openPage(page.id)"
+                />
+              </div>
+            }
+          </div>
+        }
+      </p-tabpanel>
+    }
+
+    <!-- ── Escalations Tab ──────────────────────────────────── -->
+    <p-tabpanel [value]="isMasterOrAdmin() ? 2 : 1">
+      @if (escalationsLoading()) {
+        <div class="skeleton-list">
+          @for (i of [1,2]; track i) {
+            <div class="escalation-card skeleton-card">
+              <p-skeleton width="12rem" height="1rem" />
+              <p-skeleton width="8rem" height="1rem" />
+            </div>
+          }
+        </div>
+      } @else if (!escalations().length) {
+        <div class="empty-state">
+          <i class="pi pi-shield"></i>
+          <h3>No escalations</h3>
+          <p>All clear — no pages have been escalated.</p>
+        </div>
+      } @else {
+        <div class="escalation-list">
+          @for (esc of escalations(); track esc.pageId) {
+            <div class="escalation-card">
+              <div class="esc-header">
+                <span class="esc-page">P{{ esc.chapter?.number }}-{{ esc.pageId.slice(0,6) }}</span>
+                <span class="esc-project">{{ esc.project.name }}</span>
+                @if (esc.chapter) {
+                  <span class="esc-chapter">Ch.{{ esc.chapter.number }}</span>
+                }
+                @if (esc.errorCategory) {
+                  <p-tag [value]="esc.errorCategory" severity="warn" />
+                }
+              </div>
+              @if (esc.summary) {
+                <blockquote class="esc-quote">"{{ esc.summary }}"</blockquote>
+              }
+              <div class="esc-footer">
+                <span class="esc-time">{{ waitTime(esc.escalatedAt) }} ago</span>
+                <div class="esc-actions">
+                  <p-button
+                    label="View"
+                    icon="pi pi-eye"
+                    size="small"
+                    severity="secondary"
+                    [text]="true"
+                    (onClick)="openPage(esc.pageId)"
+                  />
+                  @if (isMasterOrAdmin()) {
+                    <p-button
+                      label="Resolve"
+                      icon="pi pi-check"
+                      size="small"
+                      severity="primary"
+                      (onClick)="openResolveDialog(esc.pageId)"
+                    />
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </p-tabpanel>
+  </p-tabs>
+</div>
+
+<!-- ── Resolve Escalation Dialog ─────────────────────────────── -->
+<p-dialog
+  [(visible)]="showResolveDialog"
+  [modal]="true"
+  [style]="{ width: '400px' }"
+  header="Resolve escalation"
+>
+  <p class="dialog-hint">Provide a resolution note and re-assign to a reviewer.</p>
+  <textarea
+    pTextarea
+    [(ngModel)]="resolveNote"
+    placeholder="Resolution note..."
+    rows="3"
+    class="w-full"
+  ></textarea>
+
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="showResolveDialog.set(false)" />
+    <p-button label="Resolve" icon="pi pi-check" severity="primary" (onClick)="submitResolve()" />
+  </ng-template>
+</p-dialog>

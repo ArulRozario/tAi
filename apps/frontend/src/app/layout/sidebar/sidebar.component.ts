@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { ThemeService } from '../../theme.service';
 import { LayoutService } from '../../layout.service';
-import { AuthService, AuthUser } from '../../core/services/auth.service';
+import { AuthService, User } from '../../auth/auth.service';
 
 /* Import PrimeNG Modules & types */
 import { MenuModule } from 'primeng/menu';
@@ -32,14 +32,14 @@ export class SidebarComponent implements OnInit {
   public router = inject(Router);
   private authService = inject(AuthService);
 
-  user: AuthUser | null = null;
+  user: User | null = null;
   userInitials = '';
 
   /* Dynamic Menu Items array representing the dashboard sub-pages */
   sidebarMenuItems: MenuItem[] = [];
 
   ngOnInit() {
-    const u = this.authService.user();
+    const u = this.authService.getCurrentUser();
     this.user = u;
     this.userInitials = this.computeInitials(u?.name || '');
     this.buildMenu();
@@ -49,14 +49,15 @@ export class SidebarComponent implements OnInit {
     const workspaceItems: MenuItem[] = [
       { label: 'Dashboard', icon: 'pi pi-th-large', routerLink: '/dashboard' },
       { label: 'Projects', icon: 'pi pi-folder', routerLink: '/projects' },
+      { label: 'Queue', icon: 'pi pi-list', routerLink: '/queue' },
       { label: 'Workbench', icon: 'pi pi-desktop', routerLink: '/workbench' },
     ];
 
     const adminItems: MenuItem[] = [
       { label: 'Style Guides', icon: 'pi pi-tags', routerLink: '/style-guides' },
+      { label: 'User Management', icon: 'pi pi-users', routerLink: '/admin/users' },
     ];
 
-    // Show admin section only for ADMIN and MASTER
     const showAdmin = this.user && ['ADMIN', 'MASTER'].includes(this.user.role);
 
     this.sidebarMenuItems = [
@@ -65,6 +66,7 @@ export class SidebarComponent implements OnInit {
       {
         label: 'ACCOUNT',
         items: [
+          { label: 'Profile', icon: 'pi pi-user', routerLink: '/profile' },
           {
             label: 'Sign out',
             icon: 'pi pi-power-off',

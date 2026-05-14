@@ -1,6 +1,6 @@
 # tAI — Build Progress
 
-Last updated: 2026-05-07 (session 26)
+Last updated: 2026-05-14 (session 29)
 
 ## Current Status
 
@@ -77,6 +77,7 @@ Last updated: 2026-05-07 (session 26)
 | 2026-05-07 | 26 | Phase 22: WorkbenchComponent review-mode additions — goBack() routes to /queue in queue mode; queue-mode sidebar loads GET /queue?reviewerId=me; MASTER/ADMIN Add reviewer + Reassign buttons in inspector footer with user-picker dialogs; Reset to AI translation confirmation dialog on selected sentence; resetSentenceTranslation + addReviewer + reassignReviewers added to ApiService | review screen |
 | 2026-05-07 | 27 | Brainstormed, validated, and appended Specifications and Implementation Plans for Phase 20b (Workbench Manual Edits + Multi-Sentence Copilot Dialog) to .spec files and progression logs | spec update |
 | 2026-05-07 | 28 | Phase 23: Genre list (cards + search + creation), genre editor (markdown + modes), version drawer (restore/diff), glossary panel (table with CRUD), chat assistant, test translation; fixed lint errors | genres screen |
+| 2026-05-14 | 29 | Reviewer workflow: assign/unassign/reassign (per-page popover + bulk), reviewer avatars on page thumbnails, selection mode for bulk ops, two-stage review (HUMAN_REVIEW+submittedAt → APPROVE), Queue screen (My Queue + Submitted Reviews + Escalations tabs), workbench role-based toolbar (Submit for Review / Approve), REVIEWER-only project list, build fixed | reviewer workflow |
 
 ---
 

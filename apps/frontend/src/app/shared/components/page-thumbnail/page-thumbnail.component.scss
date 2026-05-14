@@ -147,3 +147,87 @@
   color: var(--text-muted);
   font-family: var(--font-mono);
 }
+
+// ── Reviewer avatars ────────────────────────────────────────
+.reviewer-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 18px;
+  width: 100%;
+
+  &.empty {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+}
+
+.thumbnail-item:hover .reviewer-row.empty {
+  opacity: 1;
+}
+
+.reviewer-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  color: #fff;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0;
+  border: 1px solid var(--bg-sidebar);
+  overflow: hidden;
+  flex-shrink: 0;
+
+  &.reviewer-extra {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: 6px;
+  }
+}
+
+.assign-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: var(--accent-primary-bg);
+    color: var(--accent-primary);
+  }
+}
+
+// ── Selection overlay ────────────────────────────────────────
+.selection-overlay {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 3;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  pointer-events: none;
+
+  &.is-selected {
+    color: var(--accent-primary);
+  }
+}
+
+.thumbnail-item.selected {
+  border-color: var(--accent-primary) !important;
+  background: var(--accent-primary-bg);
+}

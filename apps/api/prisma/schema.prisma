@@ -12,14 +12,15 @@ datasource db {
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  role         Role     @default(REVIEWER)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(uuid())
+  email             String   @unique
+  passwordHash      String
+  name              String
+  role              Role     @default(REVIEWER)
+  isActive          Boolean  @default(true)
+  mustChangePassword Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   refreshTokens       RefreshToken[]
   ownedProjects       Project[]        @relation("ProjectOwner")
@@ -138,6 +139,8 @@ model Page {
   maxRetries         Int        @default(3)
   translationModel   String?    // which Gemini model translated this page
   reviewModel        String?    // which Gemini model reviewed this page
+  submittedAt        DateTime?  // when a reviewer submitted this page for master review
+  submittedById      String?    // who submitted it
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 

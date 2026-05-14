@@ -83,8 +83,38 @@
     <ng-template pTemplate="title">
       <div class="card-header">
         <span class="card-title">Pages</span>
-        <span class="card-hint">Click any page to open in workbench</span>
+        <div class="card-header-actions">
+          @if (!selectionMode()) {
+            <span class="card-hint">Click any page to open in workbench</span>
+          } @else {
+            <span class="card-hint selection-hint">
+              {{ selectedCount }} selected
+              <button class="text-link" (click)="selectAll()">Select all</button>
+              <button class="text-link" (click)="clearSelection()">Clear</button>
+            </span>
+          }
+          @if (isMasterOrAdmin()) {
+            <p-button
+              [label]="selectionMode() ? 'Done' : 'Select pages'"
+              [icon]="selectionMode() ? 'pi pi-times' : 'pi pi-check-square'"
+              severity="secondary"
+              size="small"
+              [outlined]="true"
+              (onClick)="toggleSelectionMode()"
+            />
+          }
+        </div>
       </div>
+
+      <!-- Bulk action toolbar -->
+      @if (selectionMode() && selectedCount > 0 && isMasterOrAdmin()) {
+        <div class="bulk-action-bar">
+          <span class="bulk-count">{{ selectedCount }} page{{ selectedCount !== 1 ? 's' : '' }} selected</span>
+          <p-button label="Assign reviewer" icon="pi pi-user-plus" size="small" severity="primary" (onClick)="openBulkAction('assign')" />
+          <p-button label="Unassign reviewer" icon="pi pi-user-minus" size="small" severity="warn" [outlined]="true" (onClick)="openBulkAction('unassign')" />
+          <p-button label="Reassign" icon="pi pi-users" size="small" severity="secondary" [outlined]="true" (onClick)="openBulkAction('reassign')" />
+        </div>
+      }
     </ng-template>
 
     <div class="page-grid-scroll">
@@ -99,7 +129,10 @@
             <app-page-thumbnail
               [page]="page"
               [projectId]="projectId()!"
-              (select)="navigateToWorkbench($event)"
+              [selectionMode]="selectionMode()"
+              [selected]="isPageSelected(page.id)"
+              (select)="onPageClick($event)"
+              (assignClick)="onAssignClick($event)"
             />
           }
         }
@@ -120,3 +153,98 @@
   </p-card>
 
 }
+
+<!-- ── Single page assignment dialog ────────────────────────── -->
+<p-dialog
+  [(visible)]="showAssignDialog"
+  [modal]="true"
+  [closable]="true"
+  [style]="{ width: '480px' }"
+  [header]="'Reviewers · Page ' + assignTargetPage()?.pageNumber"
+>
+  @if (assignTargetPage()) {
+    <!-- Current reviewers list -->
+    @if (assignTargetPage()!.reviewers?.length) {
+      <div class="current-reviewers">
+        <span class="section-eyebrow">Current reviewers</span>
+        <div class="reviewer-list">
+          @for (r of assignTargetPage()!.reviewers!; track r.id) {
+            <div class="reviewer-row-item">
+              <span class="reviewer-avatar-lg">{{ getInitials(r.user.name) }}</span>
+              <div class="reviewer-info">
+                <span class="reviewer-name">{{ r.user.name }}</span>
+                @if (r.isPrimary) { <span class="primary-badge">Primary</span> }
+              </div>
+              <p-button
+                icon="pi pi-times"
+                [text]="true"
+                severity="danger"
+                size="small"
+                (onClick)="removeReviewerFromPage(assignTargetPage()!.id, r.userId)"
+              />
+            </div>
+          }
+        </div>
+      </div>
+      <p-divider />
+    }
+
+    <div class="assign-section">
+      <span class="section-eyebrow">Set reviewers</span>
+      <p-multiSelect
+        [options]="reviewerOptions"
+        [(ngModel)]="assignSelectedReviewerIds"
+        placeholder="Select reviewers"
+        styleClass="w-full"
+        display="chip"
+      />
+    </div>
+  }
+
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="showAssignDialog.set(false)" />
+    <p-button label="Save" icon="pi pi-check" severity="primary" (onClick)="saveAssignment()" />
+  </ng-template>
+</p-dialog>
+
+<!-- ── Bulk action dialog ─────────────────────────────────────── -->
+<p-dialog
+  [(visible)]="showBulkDialog"
+  [modal]="true"
+  [closable]="true"
+  [style]="{ width: '440px' }"
+  [header]="bulkAction() === 'assign' ? 'Assign reviewer · ' + selectedCount + ' pages'
+           : bulkAction() === 'unassign' ? 'Unassign reviewer · ' + selectedCount + ' pages'
+           : 'Reassign · ' + selectedCount + ' pages'"
+>
+  @if (bulkAction() === 'assign' || bulkAction() === 'unassign') {
+    <p class="dialog-hint">
+      {{ bulkAction() === 'assign' ? 'Add this reviewer to all selected pages.' : 'Remove this reviewer from all selected pages.' }}
+    </p>
+    <p-select
+      [options]="reviewerOptions"
+      [(ngModel)]="bulkSingleReviewerId"
+      placeholder="Select reviewer"
+      styleClass="w-full"
+    />
+  } @else {
+    <p class="dialog-hint">Replace all reviewers on selected pages with the following list.</p>
+    <p-multiSelect
+      [options]="reviewerOptions"
+      [(ngModel)]="bulkSelectedReviewerIds"
+      placeholder="Select reviewers"
+      styleClass="w-full"
+      display="chip"
+    />
+  }
+
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="showBulkDialog.set(false)" />
+    <p-button
+      [label]="bulkAction() === 'assign' ? 'Assign' : bulkAction() === 'unassign' ? 'Unassign' : 'Reassign'"
+      icon="pi pi-check"
+      severity="primary"
+      (onClick)="executeBulkAction()"
+    />
+  </ng-template>
+</p-dialog>

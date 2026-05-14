@@ -2,7 +2,13 @@
 <div class="page-header-row">
   <div class="title-meta">
     <h1 class="page-title">Projects</h1>
-    <p class="page-subtitle">{{ totalProjects() }} projects &bull; {{ totalProjects() > 0 ? (totalProjects() + ' total projects') : 'No data' }}</p>
+    <p class="page-subtitle">
+      @if (isReviewer()) {
+        {{ totalProjects() }} {{ totalProjects() === 1 ? 'project' : 'projects' }} assigned to you
+      } @else {
+        {{ totalProjects() }} projects &bull; {{ totalProjects() > 0 ? (totalProjects() + ' total projects') : 'No data' }}
+      }
+    </p>
   </div>
 
   <div class="header-controls">
@@ -11,14 +17,15 @@
       <p-inputIcon class="pi pi-search"></p-inputIcon>
       <input type="text" pInputText placeholder="Search projects" class="projects-search" />
     </p-iconField>
-    
+
     <!-- PrimeNG Filter Select Dropdown -->
     <div class="select-wrapper">
       <p-select [options]="filterOptions" [(ngModel)]="selectedFilter" optionLabel="label" optionValue="value" class="filter-select"></p-select>
     </div>
 
-    <!-- PrimeNG Button for new project instantiation -->
-    <p-button label="New project" icon="pi pi-plus" (click)="createModal.show()" class="new-project-btn-prime"></p-button>
+    @if (canCreateProject()) {
+      <p-button label="New project" icon="pi pi-plus" (click)="createModal.show()" class="new-project-btn-prime"></p-button>
+    }
   </div>
 </div>
 

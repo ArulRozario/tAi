@@ -1,4 +1,4 @@
-import { Component, ViewChild, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, ViewChild, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { faro } from '@grafana/faro-web-sdk';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -16,6 +16,7 @@ import { AvatarModule } from 'primeng/avatar';
 import { SelectModule } from 'primeng/select';
 import { CreateProjectModal } from './create-project-modal/create-project-modal';
 import { ProjectService, Project } from './projects.service';
+import { AuthService } from '../auth/auth.service';
 
 @Component({
   selector: 'app-projects',
@@ -42,6 +43,7 @@ import { ProjectService, Project } from './projects.service';
 export class ProjectsComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private projectService = inject(ProjectService);
+  private authService = inject(AuthService);
 
   @ViewChild('createModal') createModal!: CreateProjectModal;
 
@@ -52,6 +54,16 @@ export class ProjectsComponent implements OnInit, OnDestroy {
 
   filterOptions = [{ label: 'All', value: 'all' }];
   selectedFilter = 'all';
+
+  readonly isReviewer = computed(() => {
+    const u = this.authService.getCurrentUser();
+    return u?.role === 'REVIEWER';
+  });
+
+  readonly canCreateProject = computed(() => {
+    const u = this.authService.getCurrentUser();
+    return u?.role === 'ADMIN' || u?.role === 'MASTER';
+  });
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -66,7 +78,8 @@ export class ProjectsComponent implements OnInit, OnDestroy {
 
   loadProjects() {
     this.loading.set(true);
-    this.projectService.getProjects().subscribe({
+    const assignedToMe = this.isReviewer();
+    this.projectService.getProjects(1, 20, assignedToMe).subscribe({
       next: (res) => {
         this.projects.set(res.data);
         this.totalProjects.set(res.pagination.total);

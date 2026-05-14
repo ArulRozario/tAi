@@ -1,30 +1,33 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Patch, 
-  Body, 
-  Param, 
-  UseGuards, 
-  ParseUUIDPipe, 
-  HttpCode, 
-  HttpStatus 
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  ParseUUIDPipe,
+  HttpCode,
+  HttpStatus
 } from '@nestjs/common';
 import { UsersService } from './users.service';
-import { 
-  IsEmail, 
-  IsNotEmpty, 
-  IsString, 
-  IsEnum, 
-  IsOptional, 
-  IsBoolean 
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsBoolean
 } from 'class-validator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { Role } from '@prisma/client';
+import { ListUsersDto } from './dto';
 
-export class InviteUserDto {
+export class CreateUserDto {
   @IsString()
   @IsNotEmpty({ message: 'Name is required' })
   name!: string;
@@ -58,28 +61,39 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   /**
-   * Retrieves all users (excluding sensitive details).
+   * Retrieves users with pagination, search, and filtering.
    * Authorized: ADMIN and MASTER tiers.
    */
   @Get()
   @Roles('ADMIN', 'MASTER')
   @HttpCode(HttpStatus.OK)
-  async findAll() {
-    return this.usersService.findAll();
+  async findAll(@Query() query: ListUsersDto) {
+    return this.usersService.findAll(query);
   }
 
   /**
-   * Invites a user and generates temporary credentials.
+   * Retrieves a single user by ID with active sessions.
+   * Authorized: ADMIN and MASTER tiers.
+   */
+  @Get(':id')
+  @Roles('ADMIN', 'MASTER')
+  @HttpCode(HttpStatus.OK)
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.findOne(id);
+  }
+
+  /**
+   * Creates a new user with a temporary password that must be changed on first login.
    * Authorized: ADMIN tier only.
    */
-  @Post('invite')
+  @Post()
   @Roles('ADMIN')
   @HttpCode(HttpStatus.CREATED)
-  async invite(@Body() inviteUserDto: InviteUserDto) {
-    return this.usersService.invite(
-      inviteUserDto.name, 
-      inviteUserDto.email, 
-      inviteUserDto.role
+  async create(@Body() createUserDto: CreateUserDto) {
+    return this.usersService.create(
+      createUserDto.name,
+      createUserDto.email,
+      createUserDto.role
     );
   }
 
@@ -91,7 +105,7 @@ export class UsersController {
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   async update(
-    @Param('id', ParseUUIDPipe) id: string, 
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto
   ) {
     return this.usersService.update(id, updateUserDto);
@@ -106,5 +120,30 @@ export class UsersController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async resetPassword(@Param('id', ParseUUIDPipe) id: string) {
     await this.usersService.resetPassword(id);
+  }
+
+  /**
+   * Deactivates a user, preventing login and revoking all sessions.
+   * Authorized: ADMIN tier only.
+   */
+  @Post(':id/deactivate')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  async deactivate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() currentUser: any
+  ) {
+    return this.usersService.deactivate(id, currentUser.id);
+  }
+
+  /**
+   * Reactivates a deactivated user.
+   * Authorized: ADMIN tier only.
+   */
+  @Post(':id/reactivate')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.OK)
+  async reactivate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.reactivate(id);
   }
 }

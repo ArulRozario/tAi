@@ -32,6 +32,18 @@ export class QueueController {
     });
   }
 
+  @Get('queue/submitted')
+  @Roles('ADMIN', 'MASTER')
+  getSubmittedReviews(
+    @Query('limit') limit = '50',
+    @Query('offset') offset = '0',
+  ) {
+    return this.queueService.getSubmittedReviews({
+      limit: parseInt(limit, 10),
+      offset: parseInt(offset, 10),
+    });
+  }
+
   @Get('queue/error-stats')
   @Roles('ADMIN', 'MASTER', 'REVIEWER')
   getErrorStats() {

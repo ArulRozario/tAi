@@ -1,21 +1,21 @@
 import {
   BaseComponent,
   PARENT_INSTANCE
-} from "./chunk-5Q3QJLUY.js";
-import {
-  Bind
-} from "./chunk-FDDOVCH6.js";
+} from "./chunk-EEUMEGIZ.js";
 import {
   BaseStyle
-} from "./chunk-5LSILY4Y.js";
+} from "./chunk-6TZC7T2Y.js";
 import {
   SharedModule
-} from "./chunk-DFX2PQFP.js";
+} from "./chunk-QGSIXMK2.js";
+import {
+  Bind
+} from "./chunk-HKSBR2QA.js";
 import "./chunk-N457OPXR.js";
 import {
   CommonModule
-} from "./chunk-7WBDEVG2.js";
-import "./chunk-MIJCVNFH.js";
+} from "./chunk-42UEGY5K.js";
+import "./chunk-FFSGIWCW.js";
 import {
   ChangeDetectionStrategy,
   Component,
@@ -39,11 +39,11 @@ import {
   ɵɵprojection,
   ɵɵprojectionDef,
   ɵɵstyleMap
-} from "./chunk-IDZCX6FW.js";
+} from "./chunk-EXX4CQJK.js";
 import "./chunk-FX47LQWG.js";
 import "./chunk-BGJDQHGH.js";
 import "./chunk-KHPDHDQC.js";
-import "./chunk-46DXP6YY.js";
+import "./chunk-KWSTWQNB.js";
 
 // node_modules/.pnpm/primeng@21.1.6_3dc8455f034b4170dd0602a69855ad24/node_modules/primeng/fesm2022/primeng-avatargroup.mjs
 var _c0 = ["*"];

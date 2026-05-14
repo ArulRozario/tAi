@@ -1,0 +1,381 @@
+:host {
+  display: block;
+}
+
+// ─── Page Header ───────────────────────────────────────────
+.page-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+// ─── Table Card ────────────────────────────────────────────
+.table-card {
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+// ─── Filters Bar ───────────────────────────────────────────
+.filters-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+
+  .search-box-wrapper {
+    width: 240px;
+  }
+
+  .filter-selects {
+    display: flex;
+    gap: 8px;
+  }
+}
+
+// ─── Table ─────────────────────────────────────────────────
+.user-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.member-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.member-email {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.num-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+// ─── Role Pills ────────────────────────────────────────────
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+
+  &.pill--accent {
+    background: rgba(244, 63, 94, 0.12);
+    color: var(--accent-primary);
+    border: 1px solid rgba(244, 63, 94, 0.3);
+  }
+
+  &.pill--info {
+    background: var(--accent-info-bg);
+    color: var(--accent-info);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+  }
+
+  &.pill--secondary {
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+  }
+}
+
+// ─── Status Cell ───────────────────────────────────────────
+.status-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  &.active {
+    background: var(--accent-success);
+    box-shadow: 0 0 0 2px var(--accent-success-bg);
+  }
+}
+
+.status-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main);
+
+  &.muted {
+    color: var(--text-disabled);
+  }
+}
+
+// ─── Row Actions ───────────────────────────────────────────
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-disabled);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+
+  &:hover {
+    background: var(--bg-hover);
+    color: var(--text-main);
+  }
+}
+
+// ─── Empty State ───────────────────────────────────────────
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 0;
+  color: var(--text-disabled);
+  font-size: 13px;
+
+  i {
+    font-size: 2rem;
+    opacity: 0.5;
+  }
+}
+
+// ─── Load More ─────────────────────────────────────────────
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-color);
+}
+
+// ─── Invite Dialog ─────────────────────────────────────────
+.invite-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0;
+
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    input {
+      width: 100%;
+    }
+  }
+
+  .role-radios {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .radio-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: border-color 0.12s ease, background 0.12s ease;
+
+    &:hover {
+      background: var(--bg-hover);
+    }
+
+    &.selected {
+      border-color: var(--accent-primary);
+      background: rgba(244, 63, 94, 0.05);
+      color: var(--text-main);
+    }
+
+    .radio-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--border-color);
+      flex-shrink: 0;
+      transition: border-color 0.12s ease;
+
+      &.active {
+        border-color: var(--accent-primary);
+        background: var(--accent-primary);
+        box-shadow: inset 0 0 0 3px var(--bg-sidebar);
+      }
+    }
+  }
+}
+
+// ─── Detail Drawer ─────────────────────────────────────────
+.drawer-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.user-detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px;
+}
+
+.avatar-section {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+
+  .user-info {
+    h2 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    p {
+      margin: 4px 0 0 0;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+  }
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-disabled);
+}
+
+.detail-value {
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .session-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .session-info {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .no-sessions {
+    font-size: 13px;
+    color: var(--text-disabled);
+    font-style: italic;
+  }
+}
+
+.panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 48px 0;
+}
+
+// ─── PrimeNG Overrides ─────────────────────────────────────
+:host ::ng-deep {
+  .p-drawer-content {
+    padding: 0;
+  }
+
+  .members-table {
+    .p-datatable-header-row > th {
+      background: transparent;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--text-disabled);
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .p-datatable-tbody > tr > td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 13px;
+    }
+
+    .p-datatable-tbody > tr:last-child > td {
+      border-bottom: none;
+    }
+  }
+
+  .detail-avatar {
+    background: var(--accent-primary) !important;
+    color: #fff !important;
+    font-size: 1.2rem !important;
+    font-weight: 700 !important;
+  }
+
+  .member-avatar {
+    background: var(--bg-hover) !important;
+    color: var(--text-muted) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 10px !important;
+  }
+}

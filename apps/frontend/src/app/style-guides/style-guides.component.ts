@@ -32,7 +32,7 @@ import { StyleGuideCardComponent } from './style-guide-card.component';
 export class StyleGuidesComponent implements OnInit {
   styleGuides = signal<StyleGuide[]>([]);
   breadcrumbItems: MenuItem[] = [{ label: 'tAI', routerLink: '/' }, { label: 'Style Guides' }];
-  searchQuery = signal('');
+  searchQuery = '';
 
   constructor(
     private styleGuideService: StyleGuideService,
@@ -50,7 +50,7 @@ export class StyleGuidesComponent implements OnInit {
   }
 
   onSearch() {
-    this.styleGuideService.getStyleGuides(this.searchQuery()).subscribe(data => {
+    this.styleGuideService.getStyleGuides(this.searchQuery).subscribe(data => {
       this.styleGuides.set(data);
     });
   }

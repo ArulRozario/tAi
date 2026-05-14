@@ -151,6 +151,7 @@ export interface QueuePage {
   priority: string;
   quality?: number;
   assignedAt?: string;
+  submittedAt?: string | null;
   errorCount: number;
   reviewers: User[];
 }
@@ -315,8 +316,21 @@ export class ApiService {
     return this.http.post<Page>(`${this.base}/pages/${pageId}/add-reviewer`, { reviewerId: userId });
   }
 
+  removeReviewer(pageId: string, userId: string): Observable<Page> {
+    return this.http.post<Page>(`${this.base}/pages/${pageId}/remove-reviewer`, { reviewerId: userId });
+  }
+
   reassignReviewers(pageId: string, userIds: string[]): Observable<Page> {
     return this.http.post<Page>(`${this.base}/pages/${pageId}/reassign`, { reviewerIds: userIds });
+  }
+
+  submitPageForReview(pageId: string): Observable<Page> {
+    return this.http.post<Page>(`${this.base}/pages/${pageId}/submit`, {});
+  }
+
+  getSubmittedReviews(params: { limit?: number; offset?: number } = {}): Observable<{ data: QueuePage[]; total: number }> {
+    const p = new HttpParams().set('limit', params.limit ?? 50).set('offset', params.offset ?? 0);
+    return this.http.get<{ data: QueuePage[]; total: number }>(`${this.base}/queue/submitted`, { params: p });
   }
 
   // ── Glossary ──────────────────────────────────────────────────────────────

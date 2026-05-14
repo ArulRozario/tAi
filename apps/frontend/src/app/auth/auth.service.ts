@@ -12,6 +12,7 @@ export interface User {
   name: string;
   role: 'ADMIN' | 'MASTER' | 'REVIEWER';
   isActive: boolean;
+  mustChangePassword: boolean;
 }
 
 export interface LoginResponse {
@@ -202,6 +203,70 @@ export class AuthService {
             severity: 'error',
             summary: 'Reset failed',
             detail: err.error?.message || 'Could not reset password',
+          });
+          return throwError(() => err);
+        })
+      );
+  }
+
+  /** Update current user profile */
+  updateProfile(data: { name?: string; email?: string }): Observable<User> {
+    return this.http.patch<User>(`${this.API_URL}/me`, data).pipe(
+      tap((user) => {
+        this.currentUser$.next(user);
+        localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+      })
+    );
+  }
+
+  /** Change password */
+  changePassword(currentPassword: string, newPassword: string): Observable<{ message: string }> {
+    return this.http
+      .post<{ message: string }>(`${this.API_URL}/me/change-password`, {
+        currentPassword,
+        newPassword,
+      })
+      .pipe(
+        catchError((err) => {
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Password change failed',
+            detail: err.error?.message || 'Could not change password',
+          });
+          return throwError(() => err);
+        })
+      );
+  }
+
+  /** Get active sessions */
+  getSessions(params?: { page?: number; limit?: number }): Observable<{
+    sessions: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const refreshToken = this.getRefreshToken();
+    const queryParams: any = params ? { ...params } : {};
+    if (refreshToken) {
+      queryParams['refreshToken'] = refreshToken;
+    }
+    return this.http.get<any>(`${this.API_URL}/me/sessions`, { params: queryParams });
+  }
+
+  /** Revoke a session */
+  revokeSession(sessionId: string): Observable<void> {
+    const refreshToken = this.getRefreshToken();
+    return this.http
+      .delete<void>(`${this.API_URL}/me/sessions/${sessionId}`, {
+        params: { refreshToken: refreshToken || '' },
+      })
+      .pipe(
+        catchError((err) => {
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Failed',
+            detail: err.error?.message || 'Could not revoke session',
           });
           return throwError(() => err);
         })

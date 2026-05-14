@@ -1,34 +1,34 @@
 import {
-  AutoFocus
-} from "./chunk-GAS3RXEU.js";
-import "./chunk-PYYULY3E.js";
-import {
   BaseEditableHolder
-} from "./chunk-JUFGRIRL.js";
-import "./chunk-DXZ3JML4.js";
+} from "./chunk-HH2Q4YTA.js";
+import "./chunk-Q23NCOK6.js";
 import {
-  NG_VALUE_ACCESSOR
-} from "./chunk-FOE23LWJ.js";
+  AutoFocus
+} from "./chunk-2IN5UXYL.js";
+import "./chunk-5E4TIMQ3.js";
 import {
   PARENT_INSTANCE
-} from "./chunk-5Q3QJLUY.js";
-import {
-  Bind,
-  BindModule
-} from "./chunk-FDDOVCH6.js";
+} from "./chunk-EEUMEGIZ.js";
 import {
   BaseStyle
-} from "./chunk-5LSILY4Y.js";
+} from "./chunk-6TZC7T2Y.js";
 import {
   PrimeTemplate,
   SharedModule
-} from "./chunk-DFX2PQFP.js";
+} from "./chunk-QGSIXMK2.js";
+import {
+  Bind,
+  BindModule
+} from "./chunk-HKSBR2QA.js";
 import "./chunk-N457OPXR.js";
+import {
+  NG_VALUE_ACCESSOR
+} from "./chunk-2T3QUAE7.js";
 import {
   CommonModule,
   NgTemplateOutlet
-} from "./chunk-7WBDEVG2.js";
-import "./chunk-MIJCVNFH.js";
+} from "./chunk-42UEGY5K.js";
+import "./chunk-FFSGIWCW.js";
 import {
   ChangeDetectionStrategy,
   Component,
@@ -75,11 +75,11 @@ import {
   ɵɵstyleMap,
   ɵɵtemplate,
   ɵɵviewQuery
-} from "./chunk-IDZCX6FW.js";
+} from "./chunk-EXX4CQJK.js";
 import "./chunk-FX47LQWG.js";
 import "./chunk-BGJDQHGH.js";
 import "./chunk-KHPDHDQC.js";
-import "./chunk-46DXP6YY.js";
+import "./chunk-KWSTWQNB.js";
 
 // node_modules/.pnpm/@primeuix+styles@2.0.3/node_modules/@primeuix/styles/dist/toggleswitch/index.mjs
 var style = "\n    .p-toggleswitch {\n        display: inline-block;\n        width: dt('toggleswitch.width');\n        height: dt('toggleswitch.height');\n    }\n\n    .p-toggleswitch-input {\n        cursor: pointer;\n        appearance: none;\n        position: absolute;\n        top: 0;\n        inset-inline-start: 0;\n        width: 100%;\n        height: 100%;\n        padding: 0;\n        margin: 0;\n        opacity: 0;\n        z-index: 1;\n        outline: 0 none;\n        border-radius: dt('toggleswitch.border.radius');\n    }\n\n    .p-toggleswitch-slider {\n        cursor: pointer;\n        width: 100%;\n        height: 100%;\n        border-width: dt('toggleswitch.border.width');\n        border-style: solid;\n        border-color: dt('toggleswitch.border.color');\n        background: dt('toggleswitch.background');\n        transition:\n            background dt('toggleswitch.transition.duration'),\n            color dt('toggleswitch.transition.duration'),\n            border-color dt('toggleswitch.transition.duration'),\n            outline-color dt('toggleswitch.transition.duration'),\n            box-shadow dt('toggleswitch.transition.duration');\n        border-radius: dt('toggleswitch.border.radius');\n        outline-color: transparent;\n        box-shadow: dt('toggleswitch.shadow');\n    }\n\n    .p-toggleswitch-handle {\n        position: absolute;\n        top: 50%;\n        display: flex;\n        justify-content: center;\n        align-items: center;\n        background: dt('toggleswitch.handle.background');\n        color: dt('toggleswitch.handle.color');\n        width: dt('toggleswitch.handle.size');\n        height: dt('toggleswitch.handle.size');\n        inset-inline-start: dt('toggleswitch.gap');\n        margin-block-start: calc(-1 * calc(dt('toggleswitch.handle.size') / 2));\n        border-radius: dt('toggleswitch.handle.border.radius');\n        transition:\n            background dt('toggleswitch.transition.duration'),\n            color dt('toggleswitch.transition.duration'),\n            inset-inline-start dt('toggleswitch.slide.duration'),\n            box-shadow dt('toggleswitch.slide.duration');\n    }\n\n    .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {\n        background: dt('toggleswitch.checked.background');\n        border-color: dt('toggleswitch.checked.border.color');\n    }\n\n    .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-handle {\n        background: dt('toggleswitch.handle.checked.background');\n        color: dt('toggleswitch.handle.checked.color');\n        inset-inline-start: calc(dt('toggleswitch.width') - calc(dt('toggleswitch.handle.size') + dt('toggleswitch.gap')));\n    }\n\n    .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:hover) .p-toggleswitch-slider {\n        background: dt('toggleswitch.hover.background');\n        border-color: dt('toggleswitch.hover.border.color');\n    }\n\n    .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:hover) .p-toggleswitch-handle {\n        background: dt('toggleswitch.handle.hover.background');\n        color: dt('toggleswitch.handle.hover.color');\n    }\n\n    .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:hover).p-toggleswitch-checked .p-toggleswitch-slider {\n        background: dt('toggleswitch.checked.hover.background');\n        border-color: dt('toggleswitch.checked.hover.border.color');\n    }\n\n    .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:hover).p-toggleswitch-checked .p-toggleswitch-handle {\n        background: dt('toggleswitch.handle.checked.hover.background');\n        color: dt('toggleswitch.handle.checked.hover.color');\n    }\n\n    .p-toggleswitch:not(.p-disabled):has(.p-toggleswitch-input:focus-visible) .p-toggleswitch-slider {\n        box-shadow: dt('toggleswitch.focus.ring.shadow');\n        outline: dt('toggleswitch.focus.ring.width') dt('toggleswitch.focus.ring.style') dt('toggleswitch.focus.ring.color');\n        outline-offset: dt('toggleswitch.focus.ring.offset');\n    }\n\n    .p-toggleswitch.p-invalid > .p-toggleswitch-slider {\n        border-color: dt('toggleswitch.invalid.border.color');\n    }\n\n    .p-toggleswitch.p-disabled {\n        opacity: 1;\n    }\n\n    .p-toggleswitch.p-disabled .p-toggleswitch-slider {\n        background: dt('toggleswitch.disabled.background');\n    }\n\n    .p-toggleswitch.p-disabled .p-toggleswitch-handle {\n        background: dt('toggleswitch.handle.disabled.background');\n    }\n";

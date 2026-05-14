@@ -1,49 +1,49 @@
 import {
+  Tooltip,
+  TooltipModule
+} from "./chunk-SAC3T5ND.js";
+import "./chunk-6ONAYYXI.js";
+import {
   Badge
-} from "./chunk-C5DKQS6P.js";
+} from "./chunk-Y4JWVYKT.js";
+import {
+  ChevronRightIcon,
+  HomeIcon
+} from "./chunk-PPIMPCR5.js";
+import "./chunk-5E4TIMQ3.js";
+import "./chunk-R3ASG4FZ.js";
+import {
+  BaseComponent,
+  PARENT_INSTANCE
+} from "./chunk-EEUMEGIZ.js";
+import {
+  BaseStyle
+} from "./chunk-6TZC7T2Y.js";
+import {
+  PrimeTemplate,
+  SharedModule
+} from "./chunk-QGSIXMK2.js";
+import {
+  Bind
+} from "./chunk-HKSBR2QA.js";
+import "./chunk-N457OPXR.js";
 import {
   Router,
   RouterLink,
   RouterLinkActive,
   RouterModule
-} from "./chunk-AAS5JXTR.js";
-import {
-  Tooltip,
-  TooltipModule
-} from "./chunk-QL5QB4DI.js";
-import "./chunk-E243FPZG.js";
-import "./chunk-PYYULY3E.js";
-import {
-  ChevronRightIcon,
-  HomeIcon
-} from "./chunk-ILKOQHO4.js";
-import "./chunk-EK6MJUIH.js";
-import {
-  BaseComponent,
-  PARENT_INSTANCE
-} from "./chunk-5Q3QJLUY.js";
-import {
-  Bind
-} from "./chunk-FDDOVCH6.js";
-import {
-  BaseStyle
-} from "./chunk-5LSILY4Y.js";
-import {
-  PrimeTemplate,
-  SharedModule
-} from "./chunk-DFX2PQFP.js";
-import "./chunk-N457OPXR.js";
-import "./chunk-P6L2YQQQ.js";
-import "./chunk-NWZFUMFA.js";
-import "./chunk-W54INCC5.js";
+} from "./chunk-2Q2BHQBV.js";
+import "./chunk-LLHE6RVN.js";
+import "./chunk-HMCJXR2P.js";
 import {
   CommonModule,
   NgForOf,
   NgIf,
   NgStyle,
   NgTemplateOutlet
-} from "./chunk-7WBDEVG2.js";
-import "./chunk-MIJCVNFH.js";
+} from "./chunk-42UEGY5K.js";
+import "./chunk-ES3HBPKI.js";
+import "./chunk-FFSGIWCW.js";
 import {
   ChangeDetectionStrategy,
   Component,
@@ -96,11 +96,11 @@ import {
   ɵɵtemplateRefExtractor,
   ɵɵtext,
   ɵɵtextInterpolate
-} from "./chunk-IDZCX6FW.js";
+} from "./chunk-EXX4CQJK.js";
 import "./chunk-FX47LQWG.js";
 import "./chunk-BGJDQHGH.js";
 import "./chunk-KHPDHDQC.js";
-import "./chunk-46DXP6YY.js";
+import "./chunk-KWSTWQNB.js";
 
 // node_modules/.pnpm/@primeuix+styles@2.0.3/node_modules/@primeuix/styles/dist/breadcrumb/index.mjs
 var style = "\n    .p-breadcrumb {\n        background: dt('breadcrumb.background');\n        padding: dt('breadcrumb.padding');\n        overflow-x: auto;\n    }\n\n    .p-breadcrumb-list {\n        margin: 0;\n        padding: 0;\n        list-style-type: none;\n        display: flex;\n        align-items: center;\n        flex-wrap: nowrap;\n        gap: dt('breadcrumb.gap');\n    }\n\n    .p-breadcrumb-separator {\n        display: flex;\n        align-items: center;\n        color: dt('breadcrumb.separator.color');\n    }\n\n    .p-breadcrumb-separator-icon:dir(rtl) {\n        transform: rotate(180deg);\n    }\n\n    .p-breadcrumb::-webkit-scrollbar {\n        display: none;\n    }\n\n    .p-breadcrumb-item-link {\n        text-decoration: none;\n        display: flex;\n        align-items: center;\n        gap: dt('breadcrumb.item.gap');\n        transition:\n            background dt('breadcrumb.transition.duration'),\n            color dt('breadcrumb.transition.duration'),\n            outline-color dt('breadcrumb.transition.duration'),\n            box-shadow dt('breadcrumb.transition.duration');\n        border-radius: dt('breadcrumb.item.border.radius');\n        outline-color: transparent;\n        color: dt('breadcrumb.item.color');\n    }\n\n    .p-breadcrumb-item-link:focus-visible {\n        box-shadow: dt('breadcrumb.item.focus.ring.shadow');\n        outline: dt('breadcrumb.item.focus.ring.width') dt('breadcrumb.item.focus.ring.style') dt('breadcrumb.item.focus.ring.color');\n        outline-offset: dt('breadcrumb.item.focus.ring.offset');\n    }\n\n    .p-breadcrumb-item-link:hover .p-breadcrumb-item-label {\n        color: dt('breadcrumb.item.hover.color');\n    }\n\n    .p-breadcrumb-item-label {\n        transition: inherit;\n    }\n\n    .p-breadcrumb-item-icon {\n        color: dt('breadcrumb.item.icon.color');\n        transition: inherit;\n    }\n\n    .p-breadcrumb-item-link:hover .p-breadcrumb-item-icon {\n        color: dt('breadcrumb.item.icon.hover.color');\n    }\n";

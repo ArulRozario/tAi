@@ -343,6 +343,36 @@ export class PagesService {
     return updatedPage;
   }
 
+  async submitForReview(id: string, user: any) {
+    const page = await this.findOne(id);
+    if (page.status !== PageStatus.HUMAN_REVIEW) {
+      throw new BadRequestException('Page must be in HUMAN_REVIEW status to submit for master review');
+    }
+    const updated = await this.prisma.page.update({
+      where: { id },
+      data: { submittedAt: new Date(), submittedById: user.id },
+    });
+    await this.prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        action: 'page.submitted_for_review',
+        entityType: 'page',
+        entityId: id,
+        entityHref: `/workbench/${id}`,
+        details: { pageNumber: page.pageNumber },
+      },
+    });
+    return updated;
+  }
+
+  async unsubmit(id: string, user: any) {
+    await this.findOne(id);
+    return this.prisma.page.update({
+      where: { id },
+      data: { submittedAt: null, submittedById: null },
+    });
+  }
+
   async requestChanges(id: string, note: string, user: any) {
     if (!note || note.trim() === '') {
       throw new BadRequestException('A non-empty note is required to request changes');
@@ -482,6 +512,49 @@ export class PagesService {
     }
 
     return this.findOne(id);
+  }
+
+  async bulkAssign(pageIds: string[], reviewerId: string) {
+    const results = [];
+    for (const pageId of pageIds) {
+      const existing = await this.prisma.pageReviewer.findFirst({ where: { pageId, userId: reviewerId } });
+      if (!existing) {
+        const count = await this.prisma.pageReviewer.count({ where: { pageId } });
+        await this.prisma.pageReviewer.create({ data: { pageId, userId: reviewerId, isPrimary: count === 0 } });
+      }
+      results.push(pageId);
+    }
+    return { assigned: results.length };
+  }
+
+  async bulkUnassign(pageIds: string[], reviewerId: string) {
+    for (const pageId of pageIds) {
+      const reviewers = await this.prisma.pageReviewer.findMany({ where: { pageId } });
+      const entry = reviewers.find(r => r.userId === reviewerId);
+      if (!entry) continue;
+      if (reviewers.length === 1) continue; // don't remove last reviewer
+      await this.prisma.pageReviewer.delete({ where: { id: entry.id } });
+      if (entry.isPrimary) {
+        const remaining = reviewers.filter(r => r.userId !== reviewerId);
+        if (remaining.length > 0) {
+          await this.prisma.pageReviewer.update({ where: { id: remaining[0].id }, data: { isPrimary: true } });
+        }
+      }
+    }
+    return { unassigned: pageIds.length };
+  }
+
+  async bulkReassign(pageIds: string[], reviewerIds: string[]) {
+    for (const pageId of pageIds) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.pageReviewer.deleteMany({ where: { pageId } });
+        for (let i = 0; i < reviewerIds.length; i++) {
+          await tx.pageReviewer.create({ data: { pageId, userId: reviewerIds[i], isPrimary: i === 0 } });
+        }
+      });
+      await this.prisma.page.update({ where: { id: pageId }, data: { assignedAt: new Date() } });
+    }
+    return { reassigned: pageIds.length };
   }
 
   async escalate(id: string, reason: string, user: any) {

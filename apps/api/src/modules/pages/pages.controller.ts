@@ -57,13 +57,60 @@ export class PagesController {
   }
 
   @Post(':id/approve')
-  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  @Roles('ADMIN', 'MASTER')
   approve(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { notes?: string },
     @CurrentUser() user: any,
   ) {
     return this.pagesService.approve(id, body, user);
+  }
+
+  @Post('bulk/assign')
+  @Roles('ADMIN', 'MASTER')
+  @HttpCode(HttpStatus.OK)
+  bulkAssign(
+    @Body() body: { pageIds: string[]; reviewerId: string },
+  ) {
+    return this.pagesService.bulkAssign(body.pageIds, body.reviewerId);
+  }
+
+  @Post('bulk/unassign')
+  @Roles('ADMIN', 'MASTER')
+  @HttpCode(HttpStatus.OK)
+  bulkUnassign(
+    @Body() body: { pageIds: string[]; reviewerId: string },
+  ) {
+    return this.pagesService.bulkUnassign(body.pageIds, body.reviewerId);
+  }
+
+  @Post('bulk/reassign')
+  @Roles('ADMIN', 'MASTER')
+  @HttpCode(HttpStatus.OK)
+  bulkReassign(
+    @Body() body: { pageIds: string[]; reviewerIds: string[] },
+  ) {
+    return this.pagesService.bulkReassign(body.pageIds, body.reviewerIds);
+  }
+
+  @Post(':id/submit')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  @HttpCode(HttpStatus.OK)
+  submitForReview(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.pagesService.submitForReview(id, user);
+  }
+
+  @Post(':id/unsubmit')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  @HttpCode(HttpStatus.OK)
+  unsubmit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.pagesService.unsubmit(id, user);
   }
 
   @Post(':id/request-changes')

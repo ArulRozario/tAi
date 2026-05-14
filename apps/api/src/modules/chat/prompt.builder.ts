@@ -67,14 +67,14 @@ export class PromptBuilder {
 
     const promptTemplate = readFileSync(promptPath, 'utf-8');
 
-    const currentContentBlock = options.currentContent
-      ? `${options.currentContent}`
-      : '# New Style Guide\n\n## Overview\n\nDescribe the purpose...';
+    const currentContentBlock = options.currentContent?.trim()
+      ? options.currentContent.trim()
+      : '# New Style Guide\nEnglish → [Target Language] ([tradition/style])\n\n## Purpose\nDescribe the purpose of this style guide.\n\n## Core Rules\n1. Rule one\n2. Rule two\n\n## Terminology — Non-Negotiable Terms\n\nThese terms are fixed.\n\n| Source | Target | Incorrect (never use) |\n|--------|--------|----------------------|\n| Example | Example | — |\n\n## Register\n- Formal register throughout\n\n## Sentence Structure\n- Preserve source sentence weight\n\n## Proper Nouns\nUse established transliterations:\n- Example → Example\n\n## Common Pitfalls\n- Using informal register — maintain formal style\n\n## Examples\n\nSource: Example sentence.\nTarget: Translated sentence.';
 
     const planModeInstruction =
       options.mode === 'plan'
-        ? 'You are in PLAN MODE. Do not provide final content immediately. Instead, discuss proposed changes and get approval before suggesting the final text.'
-        : 'You are in DIRECT mode. Provide the final edited content directly.';
+        ? 'You are in PLAN MODE. Discuss the proposed changes with the user. Do NOT output the full document yet — explain what you would change and wait for approval.'
+        : 'You are in DIRECT MODE. Output the COMPLETE updated style guide document with the requested changes applied. Start directly with the `# ` title line.';
 
     const fullUserPrompt = promptTemplate
       .replace('{{currentContentBlock}}', currentContentBlock)
@@ -84,7 +84,8 @@ export class PromptBuilder {
     return {
       systemPrompt: '',
       userPrompt: fullUserPrompt,
-      systemInstruction: 'You are a helpful AI assistant for a translation platform.',
+      systemInstruction:
+        'You are a style guide editor for a translation platform. In DIRECT mode your entire response is the raw markdown document — no preamble, no code fences, starting with `# `. In PLAN mode you discuss changes conversationally.',
     };
   }
 

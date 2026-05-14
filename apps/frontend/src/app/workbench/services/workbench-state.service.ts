@@ -9,6 +9,7 @@ export interface WorkbenchPage {
   projectName: string;
   styleGuideName?: string;
   status: string;
+  submittedAt?: string | null;
   sourceLang: string;
   targetLang: string;
   assignedTo: string;

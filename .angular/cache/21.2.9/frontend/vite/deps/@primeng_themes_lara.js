@@ -1,7 +1,7 @@
 import {
   __spreadProps,
   __spreadValues
-} from "./chunk-46DXP6YY.js";
+} from "./chunk-KWSTWQNB.js";
 
 // node_modules/.pnpm/@primeuix+themes@2.0.3/node_modules/@primeuix/themes/dist/lara/accordion/index.mjs
 var o = { transitionDuration: "{transition.duration}" };

@@ -11,6 +11,55 @@ export class QueueService {
     void this.logger;
   }
 
+  async getSubmittedReviews(filters: { limit: number; offset: number }) {
+    const where: any = {
+      status: PageStatus.HUMAN_REVIEW,
+      submittedAt: { not: null },
+    };
+
+    const [pages, total] = await Promise.all([
+      this.prisma.page.findMany({
+        where,
+        skip: filters.offset,
+        take: filters.limit,
+        orderBy: [{ submittedAt: 'desc' }],
+        include: {
+          project: { select: { id: true, name: true, sourceLang: true, targetLang: true } },
+          chapter: { select: { id: true, number: true, title: true } },
+          reviewers: {
+            include: { user: { select: { id: true, name: true, email: true, role: true } } },
+          },
+          _count: { select: { errors: true } },
+        },
+      }),
+      this.prisma.page.count({ where }),
+    ]);
+
+    const result = await Promise.all(
+      pages.map(async (p) => {
+        const errorCount = await this.prisma.error.count({
+          where: { pageId: p.id, status: ErrorStatus.OPEN },
+        });
+        return {
+          id: p.id,
+          pageNumber: p.pageNumber,
+          project: p.project,
+          chapter: p.chapter,
+          status: p.status,
+          priority: p.priority,
+          quality: p.quality,
+          assignedAt: p.assignedAt,
+          submittedAt: (p as any).submittedAt,
+          submittedById: (p as any).submittedById,
+          errorCount,
+          reviewers: p.reviewers.map((r) => r.user),
+        };
+      }),
+    );
+
+    return { data: result, total };
+  }
+
   async getQueue(filters: {
     sort?: 'priority' | 'waitTime' | 'quality';
     errorTypes?: string[];

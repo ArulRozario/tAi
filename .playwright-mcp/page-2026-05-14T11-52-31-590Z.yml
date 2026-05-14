@@ -1,0 +1,31 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e6]: tAI
+    - generic [ref=e7]: TRANSLATION INTELLIGENCE
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - heading "Sign in" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Welcome back. Pick up where you left off.
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e16]: Email
+        - textbox "Email" [ref=e17]:
+          - /placeholder: ravi@tai.ws
+          - text: admin@tai.app
+      - generic [ref=e18]:
+        - generic [ref=e19]: Password
+        - generic [ref=e20]:
+          - textbox "••••••••" [ref=e21]: admin123
+          - img [ref=e22]
+      - generic [ref=e24]:
+        - checkbox [ref=e27] [cursor=pointer]
+        - link "Forgot password?" [ref=e29] [cursor=pointer]:
+          - /url: "#"
+      - button "Sign In" [ref=e31] [cursor=pointer]:
+        - generic [ref=e32]: Sign In
+    - generic [ref=e33]:
+      - generic [ref=e34]: Tamil
+      - generic [ref=e35]: •
+      - generic [ref=e36]: English
+      - generic [ref=e37]: •
+      - generic [ref=e38]: Thiruviviliam

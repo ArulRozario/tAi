@@ -1,0 +1,162 @@
+<p-toast></p-toast>
+<p-confirmDialog></p-confirmDialog>
+
+<div class="profile-page">
+  <div class="page-header-row">
+    <div class="title-meta">
+      <h1 class="page-title">Profile & Settings</h1>
+      <p class="page-subtitle">Manage your account information and security</p>
+    </div>
+  </div>
+
+  <div class="profile-stack">
+
+    <!-- Profile Information Card -->
+    <div class="profile-card">
+      <div class="card-header">
+        <span class="card-title">Profile Information</span>
+        @if (!isEditing()) {
+          <p-button
+            label="Edit"
+            icon="pi pi-pencil"
+            [text]="true"
+            severity="secondary"
+            size="small"
+            (click)="startEditing()"
+          />
+        }
+      </div>
+
+      @if (!isEditing()) {
+        <div class="info-rows">
+          <div class="info-row">
+            <span class="info-label">Name</span>
+            <span class="info-value">{{ user()?.name }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Email</span>
+            <span class="info-value">{{ user()?.email }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Role</span>
+            <p-tag
+              [value]="user()?.role || ''"
+              [severity]="getRoleSeverity(user()?.role || '')"
+            />
+          </div>
+          <div class="info-row no-border">
+            <span class="info-label">Member since</span>
+            <span class="info-value">{{ user()?.createdAt ? formatDate(user()!.createdAt) : 'N/A' }}</span>
+          </div>
+        </div>
+      } @else {
+        <div class="edit-form">
+          <div class="form-field">
+            <label class="form-label">Name</label>
+            <input
+              pInputText
+              class="w-full"
+              [(ngModel)]="editForm().name"
+              placeholder="Your name"
+            />
+          </div>
+          <div class="form-field">
+            <label class="form-label">Email</label>
+            <input
+              pInputText
+              type="email"
+              class="w-full"
+              [(ngModel)]="editForm().email"
+              placeholder="Your email"
+            />
+          </div>
+          <div class="form-actions">
+            <p-button label="Cancel" severity="secondary" [text]="true" size="small" (click)="cancelEditing()" />
+            <p-button label="Save Changes" icon="pi pi-check" size="small" [loading]="loading()" (click)="saveProfile()" />
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Change Password Card -->
+    <div class="profile-card">
+      <div class="card-header">
+        <span class="card-title">Change Password</span>
+        @if (!isChangingPassword()) {
+          <p-button
+            label="Change"
+            icon="pi pi-key"
+            [text]="true"
+            severity="secondary"
+            size="small"
+            (click)="startChangingPassword()"
+          />
+        }
+      </div>
+
+      @if (!isChangingPassword()) {
+        <p class="card-desc">Update your password to keep your account secure.</p>
+      } @else {
+        <div class="edit-form">
+          <div class="form-field">
+            <label class="form-label">Current Password</label>
+            <p-password [(ngModel)]="passwordForm().currentPassword" [feedback]="false" [toggleMask]="true" styleClass="w-full" />
+          </div>
+          <div class="form-field">
+            <label class="form-label">New Password</label>
+            <p-password [(ngModel)]="passwordForm().newPassword" [feedback]="true" [toggleMask]="true" styleClass="w-full">
+              <ng-template pTemplate="footer">
+                <p class="pw-hint">Must be at least 8 characters.</p>
+              </ng-template>
+            </p-password>
+          </div>
+          <div class="form-field">
+            <label class="form-label">Confirm New Password</label>
+            <p-password [(ngModel)]="passwordForm().confirmPassword" [feedback]="false" [toggleMask]="true" styleClass="w-full" />
+          </div>
+          <div class="form-actions">
+            <p-button label="Cancel" severity="secondary" [text]="true" size="small" (click)="cancelChangingPassword()" />
+            <p-button label="Update Password" icon="pi pi-check" size="small" [loading]="loading()" (click)="changePassword()" />
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Active Sessions Card -->
+    <div class="profile-card">
+      <div class="card-header">
+        <span class="card-title">Active Sessions</span>
+        <span class="session-badge">{{ sessionsTotal() }} active</span>
+      </div>
+
+      <p-table [value]="sessions()" [loading]="sessionsLoading()" [rowHover]="true" styleClass="sessions-table">
+        <ng-template pTemplate="body" let-session>
+          <tr>
+            <td>
+              <div class="session-info">
+                <div class="session-status">
+                  <span class="status-dot" [class.current]="session.isCurrent"></span>
+                  <span class="session-label">{{ session.isCurrent ? 'Current session' : 'Active session' }}</span>
+                </div>
+                <span class="session-time">Created {{ formatRelativeTime(session.createdAt) }}</span>
+              </div>
+            </td>
+            <td class="session-action-cell">
+              @if (!session.isCurrent) {
+                <p-button icon="pi pi-times" [text]="true" severity="danger" size="small" pTooltip="End session" tooltipPosition="left" (click)="revokeSession(session)" />
+              } @else {
+                <p-tag value="This device" severity="success" />
+              }
+            </td>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="2" class="empty-sessions">No active sessions found.</td>
+          </tr>
+        </ng-template>
+      </p-table>
+    </div>
+
+  </div>
+</div>

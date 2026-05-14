@@ -316,7 +316,7 @@ export class ChatService {
 
     const builderContext = contextMap[body.context] ?? 'general';
 
-    const { systemPrompt, userPrompt } = await this.promptBuilder.build(
+    const { systemPrompt, userPrompt, systemInstruction } = await this.promptBuilder.build(
       builderContext,
       body.prompt,
       {
@@ -327,10 +327,12 @@ export class ChatService {
       }
     );
 
+    const effectiveSystem = systemInstruction || systemPrompt;
+
     try {
       const stream = this.geminiService.streamContent(
         userPrompt,
-        systemPrompt,
+        effectiveSystem,
         body.history ?? [],
         body.model,
       );

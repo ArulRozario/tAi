@@ -127,8 +127,9 @@ export class ProjectService {
     return url.includes('?') ? `${url}&${param}` : `${url}?${param}`;
   }
 
-  getProjects(page = 1, limit = 20): Observable<PaginatedProjects> {
-    return this.http.get<PaginatedProjects>(`${this.apiUrl}?page=${page}&limit=${limit}`);
+  getProjects(page = 1, limit = 20, assignedToMe = false): Observable<PaginatedProjects> {
+    const param = assignedToMe ? '&assignedToMe=true' : '';
+    return this.http.get<PaginatedProjects>(`${this.apiUrl}?page=${page}&limit=${limit}${param}`);
   }
 
   getProject(id: string): Observable<Project> {
@@ -299,6 +300,27 @@ export class ProjectService {
   /** Cancel all active translation jobs for the project */
   cancelProjectJobs(projectId: string): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/${projectId}/cancel-jobs`, {});
+  }
+
+  /** Reviewer assignment helpers */
+  assignReviewersToPage(pageId: string, reviewerIds: string[]): Observable<Page> {
+    return this.http.post<Page>(`/api/v1/pages/${pageId}/reassign`, { reviewerIds });
+  }
+
+  removeReviewerFromPage(pageId: string, userId: string): Observable<Page> {
+    return this.http.post<Page>(`/api/v1/pages/${pageId}/remove-reviewer`, { reviewerId: userId });
+  }
+
+  bulkAssign(pageIds: string[], reviewerId: string): Observable<{ assigned: number }> {
+    return this.http.post<{ assigned: number }>('/api/v1/pages/bulk/assign', { pageIds, reviewerId });
+  }
+
+  bulkUnassign(pageIds: string[], reviewerId: string): Observable<{ unassigned: number }> {
+    return this.http.post<{ unassigned: number }>('/api/v1/pages/bulk/unassign', { pageIds, reviewerId });
+  }
+
+  bulkReassign(pageIds: string[], reviewerIds: string[]): Observable<{ reassigned: number }> {
+    return this.http.post<{ reassigned: number }>('/api/v1/pages/bulk/reassign', { pageIds, reviewerIds });
   }
 
   /** Queue AI review for all translated pages in a project */

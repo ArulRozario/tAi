@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { AuthService } from '../services/auth.service';
+import { AuthService } from '../../auth/auth.service';
 import { catchError, map, of } from 'rxjs';
 
 export const authGuard: CanActivateFn = () => {
@@ -9,13 +9,17 @@ export const authGuard: CanActivateFn = () => {
 
   if (auth.isAuthenticated()) return true;
 
-  if (!auth.hasRefreshToken()) {
+  if (!auth.getRefreshToken()) {
     router.navigate(['/login']);
     return false;
   }
 
-  return auth.loadCurrentUser().pipe(
-    map(() => true),
+  return auth.initAuth().pipe(
+    map((user) => {
+      if (user) return true;
+      router.navigate(['/login']);
+      return false;
+    }),
     catchError(() => {
       router.navigate(['/login']);
       return of(false);

@@ -1,8 +1,8 @@
-import { Component, input, output, signal, computed, inject, effect } from '@angular/core';
+import { Component, input, output, signal, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
-import { Page } from '../../../projects/projects.service';
+import { Page, PageReviewer } from '../../../projects/projects.service';
 
 const IMAGE_STATUSES = new Set(['READY', 'TRANSLATING', 'TRANSLATED', 'REVIEWING', 'HUMAN_REVIEW', 'APPROVED', 'REJECTED', 'RENDER_ERROR', 'TRANSLATION_ERROR']);
 
@@ -20,8 +20,32 @@ export class PageThumbnailComponent {
   page = input.required<Page>();
   projectId = input.required<string>();
   active = input<boolean>(false);
+  selected = input<boolean>(false);
+  selectionMode = input<boolean>(false);
 
   select = output<string>();
+  assignClick = output<{ pageId: string; event: MouseEvent }>();
+
+  get reviewers(): PageReviewer[] {
+    return this.page().reviewers ?? [];
+  }
+
+  get visibleReviewers(): PageReviewer[] {
+    return this.reviewers.slice(0, 3);
+  }
+
+  get extraCount(): number {
+    return Math.max(0, this.reviewers.length - 3);
+  }
+
+  getInitials(name: string): string {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  }
+
+  onAssignClick(event: MouseEvent) {
+    event.stopPropagation();
+    this.assignClick.emit({ pageId: this.page().id, event });
+  }
 
   imageSrc = signal<SafeUrl | null>(null);
   imageError = signal(false);

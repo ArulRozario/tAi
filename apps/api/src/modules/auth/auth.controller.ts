@@ -1,17 +1,23 @@
-import { 
-  Controller, 
-  Post, 
-  Get, 
-  Body, 
-  HttpCode, 
-  HttpStatus, 
-  UseGuards 
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  ParseUUIDPipe
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { Public } from './public.decorator';
+import { UpdateProfileDto, ChangePasswordDto, GetSessionsDto } from './dto';
 
 export class LoginDto {
   @IsEmail({}, { message: 'Please provide a valid email address' })
@@ -98,5 +104,37 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async me(@CurrentUser() user: any) {
     return this.authService.me(user.id);
+  }
+
+  @Patch('me')
+  @HttpCode(HttpStatus.OK)
+  async updateProfile(@CurrentUser() user: any, @Body() updateProfileDto: UpdateProfileDto) {
+    return this.authService.updateProfile(user.id, updateProfileDto);
+  }
+
+  @Post('me/change-password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(@CurrentUser() user: any, @Body() changePasswordDto: ChangePasswordDto) {
+    return this.authService.changePassword(user.id, changePasswordDto.currentPassword, changePasswordDto.newPassword);
+  }
+
+  @Get('me/sessions')
+  @HttpCode(HttpStatus.OK)
+  async getSessions(
+    @CurrentUser() user: any,
+    @Query() query: GetSessionsDto,
+    @Query('refreshToken') refreshToken?: string
+  ) {
+    return this.authService.getSessions(user.id, refreshToken, query);
+  }
+
+  @Delete('me/sessions/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async revokeSession(
+    @CurrentUser() user: any,
+    @Param('id', ParseUUIDPipe) sessionId: string,
+    @Query('refreshToken') refreshToken?: string
+  ) {
+    await this.authService.revokeSession(user.id, refreshToken, sessionId);
   }
 }

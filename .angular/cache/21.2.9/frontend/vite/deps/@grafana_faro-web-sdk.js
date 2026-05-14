@@ -1,7 +1,7 @@
 import {
   __commonJS,
   __toESM
-} from "./chunk-46DXP6YY.js";
+} from "./chunk-KWSTWQNB.js";
 
 // node_modules/.pnpm/ua-parser-js@1.0.41/node_modules/ua-parser-js/src/ua-parser.js
 var require_ua_parser = __commonJS({

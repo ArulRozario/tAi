@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { CardModule } from 'primeng/card';
 import { TagModule } from 'primeng/tag';
 import { StyleGuide } from '../projects/style-guide.service';
@@ -7,7 +7,7 @@ import { StyleGuide } from '../projects/style-guide.service';
 @Component({
   selector: 'app-style-guide-card',
   standalone: true,
-  imports: [CommonModule, CardModule, TagModule, DatePipe],
+  imports: [CommonModule, CardModule, TagModule],
   templateUrl: './style-guide-card.component.html',
   styleUrl: './style-guide-card.component.scss'
 })

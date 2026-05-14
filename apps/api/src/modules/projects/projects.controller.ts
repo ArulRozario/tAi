@@ -59,10 +59,13 @@ export class ProjectsController {
   findAll(
     @Query('page') page = '1',
     @Query('limit') limit = '20',
+    @Query('assignedToMe') assignedToMe?: string,
+    @CurrentUser() user?: { id: string },
   ) {
     return this.projectsService.findAll(
       parseInt(page, 10),
       parseInt(limit, 10),
+      assignedToMe === 'true' && user ? user.id : undefined,
     );
   }
 

@@ -219,6 +219,7 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
               projectName: project.name,
               styleGuideName: project.styleGuide?.name,
               status: page.status,
+              submittedAt: (page as any).submittedAt ?? null,
               sourceLang: project.sourceLang,
               targetLang: project.targetLang,
               assignedTo: 'You',
@@ -501,9 +502,26 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
         this.messageService.add({ severity: 'success', summary: 'Approved', detail: 'Page approved.' });
         this.skipPage();
       },
-      error: (err) => {
+      error: () => {
         this.isCompleting.set(false);
         this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to approve page.' });
+      },
+    });
+  }
+
+  submitForReview() {
+    const pageId = this.pageData()?.id;
+    if (!pageId) return;
+    this.isCompleting.set(true);
+    this.apiService.submitPageForReview(pageId).subscribe({
+      next: (page) => {
+        this.isCompleting.set(false);
+        this.pageData.update(p => p ? { ...p, submittedAt: (page as any).submittedAt } : p);
+        this.messageService.add({ severity: 'success', summary: 'Submitted', detail: 'Page submitted for master review.' });
+      },
+      error: () => {
+        this.isCompleting.set(false);
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to submit page.' });
       },
     });
   }

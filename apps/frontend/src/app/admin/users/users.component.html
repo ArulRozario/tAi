@@ -1,0 +1,274 @@
+<p-toast></p-toast>
+<p-confirmDialog></p-confirmDialog>
+
+<!-- Page Header -->
+<div class="page-header-row">
+  <div class="title-meta">
+    <h1 class="page-title">Team</h1>
+    <p class="page-subtitle">{{ memberSummary() }}</p>
+  </div>
+  <p-button label="Add member" icon="pi pi-user-plus" (click)="openInviteDialog()" />
+</div>
+
+<!-- Table Card -->
+<div class="table-card">
+  <div class="filters-bar">
+    <p-iconField iconPosition="left" class="search-box-wrapper">
+      <p-inputIcon class="pi pi-search"></p-inputIcon>
+      <input
+        type="text"
+        pInputText
+        placeholder="Search members…"
+        (input)="onSearch($event)"
+        [value]="filters().search"
+      />
+    </p-iconField>
+
+    <div class="filter-selects">
+      <p-select
+        [options]="roleOptions"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="All Roles"
+        (onChange)="onRoleFilter($event)"
+      />
+      <p-select
+        [options]="statusOptions"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="All Status"
+        (onChange)="onStatusFilter($event)"
+      />
+    </div>
+  </div>
+
+  <p-table [value]="users()" [loading]="loading()" [rowHover]="true" styleClass="members-table">
+    <ng-template pTemplate="header">
+      <tr>
+        <th>NAME</th>
+        <th>EMAIL</th>
+        <th>ROLE</th>
+        <th>ASSIGNED</th>
+        <th>STATUS</th>
+        <th style="width: 80px"></th>
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="body" let-user>
+      <tr>
+        <td>
+          <div class="user-name-cell">
+            <p-avatar [label]="getInitials(user.name)" shape="circle" styleClass="member-avatar" />
+            <span class="member-name">{{ user.name }}</span>
+          </div>
+        </td>
+        <td>
+          <span class="member-email">{{ user.email }}</span>
+        </td>
+        <td>
+          <span class="role-pill" [ngClass]="getRolePillClass(user.role)">{{ getRoleLabel(user.role) }}</span>
+        </td>
+        <td>
+          <span class="num-val">{{ user.role === 'MASTER' ? 'All' : (user.sessionCount || 0) }}</span>
+        </td>
+        <td>
+          <div class="status-cell">
+            @if (user.isActive) {
+              <span class="status-dot active"></span>
+              <span class="status-text">Active</span>
+            } @else {
+              <span class="status-text muted">Inactive</span>
+            }
+          </div>
+        </td>
+        <td>
+          <div class="row-actions">
+            <button class="icon-btn" (click)="viewUser(user)" pTooltip="Edit" tooltipPosition="top">
+              <i class="pi pi-pencil"></i>
+            </button>
+            <button class="icon-btn" (click)="showActions($event, user)" pTooltip="More" tooltipPosition="top">
+              <i class="pi pi-ellipsis-v"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td colspan="6">
+          <div class="empty-state">
+            <i class="pi pi-users"></i>
+            <span>No members found</span>
+          </div>
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+
+  @if (hasMore()) {
+    <div class="load-more-row">
+      <p-button
+        label="Load more"
+        severity="secondary"
+        [text]="true"
+        (click)="loadMore()"
+        [loading]="loadingMore()"
+      />
+    </div>
+  }
+</div>
+
+<!-- Actions Menu -->
+<p-menu #menu [model]="menuItems()" [popup]="true" />
+
+<!-- Add Member Dialog -->
+<p-dialog
+  header="Add member"
+  [(visible)]="isInviteDialogOpen"
+  [modal]="true"
+  [style]="{ width: '440px' }"
+  [closable]="true"
+  (onHide)="closeInviteDialog()"
+>
+  <div class="invite-form">
+    <div class="form-field">
+      <label>Name</label>
+      <input pInputText [(ngModel)]="inviteForm().name" placeholder="Full name" class="w-full" />
+    </div>
+    <div class="form-field">
+      <label>Email</label>
+      <input pInputText type="email" [(ngModel)]="inviteForm().email" placeholder="email@org.com" class="w-full" />
+    </div>
+    <div class="form-field">
+      <label>Role</label>
+      <div class="role-radios">
+        <label
+          class="radio-option"
+          [class.selected]="inviteForm().role === 'REVIEWER'"
+          (click)="setInviteRole('REVIEWER')"
+        >
+          <span class="radio-dot" [class.active]="inviteForm().role === 'REVIEWER'"></span>
+          Reviewer
+        </label>
+        <label
+          class="radio-option"
+          [class.selected]="inviteForm().role === 'MASTER'"
+          (click)="setInviteRole('MASTER')"
+        >
+          <span class="radio-dot" [class.active]="inviteForm().role === 'MASTER'"></span>
+          Master reviewer
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <ng-template pTemplate="footer">
+    <p-button label="Cancel" severity="secondary" [text]="true" (click)="closeInviteDialog()" />
+    <p-button label="Send invite" icon="pi pi-send" (click)="createUser()" />
+  </ng-template>
+</p-dialog>
+
+<!-- Member Detail Drawer -->
+<p-drawer
+  [(visible)]="isPanelOpen"
+  position="right"
+  [style]="{ width: '420px' }"
+  (onHide)="closePanel()"
+>
+  <ng-template pTemplate="header">
+    <span class="drawer-title">Member details</span>
+  </ng-template>
+
+  @if (selectedUser()) {
+    <div class="user-detail-panel">
+      <div class="avatar-section">
+        <p-avatar
+          [label]="getInitials(selectedUser()!.name)"
+          shape="circle"
+          size="xlarge"
+          styleClass="detail-avatar"
+        />
+        <div class="user-info">
+          <h2>{{ selectedUser()!.name }}</h2>
+          <p>{{ selectedUser()!.email }}</p>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <label class="detail-label">Role</label>
+        <p-select
+          [options]="roleOptions.slice(1)"
+          optionLabel="label"
+          optionValue="value"
+          [(ngModel)]="selectedUser()!.role"
+          (onChange)="updateUserRole(selectedUser()!.id, $event.value)"
+          styleClass="w-full"
+        />
+      </div>
+
+      <div class="detail-section">
+        <label class="detail-label">Status</label>
+        <div class="status-cell">
+          @if (selectedUser()!.isActive) {
+            <span class="status-dot active"></span>
+            <span class="status-text">Active</span>
+          } @else {
+            <span class="status-text muted">Inactive</span>
+          }
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <label class="detail-label">Active sessions ({{ selectedUser()!.sessionCount }})</label>
+        <div class="sessions-list">
+          @for (session of selectedUser()!.activeSessions; track session.id) {
+            <div class="session-item">
+              <span class="status-dot active"></span>
+              <span class="session-info">Created {{ formatDate(session.createdAt) }}</span>
+            </div>
+          }
+          @if (selectedUser()!.activeSessions.length === 0) {
+            <span class="no-sessions">No active sessions</span>
+          }
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <label class="detail-label">Member since</label>
+        <span class="detail-value">{{ formatDate(selectedUser()!.createdAt) }}</span>
+      </div>
+
+      <div class="panel-actions">
+        @if (selectedUser()!.isActive) {
+          <p-button
+            label="Deactivate"
+            icon="pi pi-ban"
+            severity="danger"
+            [text]="true"
+            (click)="deactivate(selectedUser()!)"
+          />
+        } @else {
+          <p-button
+            label="Reactivate"
+            icon="pi pi-check"
+            severity="success"
+            [text]="true"
+            (click)="reactivate(selectedUser()!)"
+          />
+        }
+        <p-button
+          label="Reset password"
+          icon="pi pi-key"
+          severity="warn"
+          [text]="true"
+          (click)="resetPassword(selectedUser()!)"
+        />
+      </div>
+    </div>
+  } @else if (loadingUserDetail()) {
+    <div class="loading-state">
+      <p-progressSpinner />
+    </div>
+  }
+</p-drawer>

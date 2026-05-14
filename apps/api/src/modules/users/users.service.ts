@@ -1,8 +1,9 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  ConflictException, 
-  Logger 
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  Logger
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword } from '../auth/password.util';
@@ -16,31 +17,141 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Retrieves all users registered in the system, excluding password hashes.
-   * Ordered newest first.
+   * Retrieves users with pagination, search, and filtering.
    */
-  async findAll() {
-    return this.prisma.user.findMany({
-      select: { 
-        id: true, 
-        email: true, 
-        name: true, 
-        role: true, 
-        isActive: true, 
-        createdAt: true 
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(query: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    role?: Role;
+    isActive?: boolean;
+    sortBy?: 'name' | 'email' | 'createdAt';
+    sortOrder?: 'asc' | 'desc';
+  }) {
+    const page = query.page || 1;
+    const limit = Math.min(query.limit || 20, 100);
+    const skip = (page - 1) * limit;
+    const sortBy = query.sortBy || 'createdAt';
+    const sortOrder = query.sortOrder || 'desc';
+
+    const where: any = {};
+
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { email: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (query.role) {
+      where.role = query.role;
+    }
+
+    if (query.isActive !== undefined) {
+      where.isActive = query.isActive;
+    }
+
+    const orderBy: any = { [sortBy]: sortOrder };
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          _count: {
+            select: { refreshTokens: { where: { expiresAt: { gt: new Date() } } } },
+          },
+          refreshTokens: {
+            where: { expiresAt: { gt: new Date() } },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { createdAt: true },
+          },
+        },
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    const userResponses = users.map((user) => ({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isActive: user.isActive,
+      sessionCount: user._count.refreshTokens,
+      lastActiveAt: user.refreshTokens[0]?.createdAt || null,
+      createdAt: user.createdAt,
+    }));
+
+    return {
+      users: userResponses,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   /**
-   * Invites a new user to the system. Generates a temporary credentials set,
-   * hashes and stores it, and triggers a mock email notification.
+   * Retrieves a single user by ID with active sessions.
    */
-  async invite(name: string, email: string, role: Role) {
+  async findOne(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        refreshTokens: {
+          where: { expiresAt: { gt: new Date() } },
+          select: {
+            id: true,
+            createdAt: true,
+            expiresAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID '${id}' not found.`);
+    }
+
+    return {
+      ...user,
+      sessionCount: user.refreshTokens.length,
+    };
+  }
+
+  /**
+   * Creates a new user with a temporary password that must be changed on first login.
+   * Returns the temporary password so it can be shared with the user.
+   */
+  async create(name: string, email: string, role: Role): Promise<{
+    id: string;
+    email: string;
+    name: string;
+    role: Role;
+    isActive: boolean;
+    mustChangePassword: boolean;
+    createdAt: Date;
+    temporaryPassword: string;
+  }> {
     const normalizedEmail = email.toLowerCase().trim();
 
-    // 1. Ensure email uniqueness
     const existingUser = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
     });
@@ -49,11 +160,9 @@ export class UsersService {
       throw new ConflictException(`Email '${email}' is already registered in the system.`);
     }
 
-    // 2. Generate cryptographically strong random temporary password (12 characters)
-    const tempPassword = randomBytes(6).toString('hex');
+    const tempPassword = randomBytes(8).toString('base64url');
     const passwordHash = hashPassword(tempPassword);
 
-    // 3. Persist the new user (default to active)
     const newUser = await this.prisma.user.create({
       data: {
         name,
@@ -61,6 +170,7 @@ export class UsersService {
         role,
         passwordHash,
         isActive: true,
+        mustChangePassword: true,
       },
       select: {
         id: true,
@@ -68,13 +178,17 @@ export class UsersService {
         name: true,
         role: true,
         isActive: true,
+        mustChangePassword: true,
         createdAt: true,
-      }
+      },
     });
 
-    this.logger.log(`User invited: ${newUser.email} (${newUser.role}) — temporary credentials issued`);
+    this.logger.log(`User created: ${newUser.email} (${newUser.role}) — temporary password issued`);
 
-    return newUser;
+    return {
+      ...newUser,
+      temporaryPassword: tempPassword,
+    };
   }
 
   /**
@@ -109,25 +223,22 @@ export class UsersService {
   /**
    * Administratively resets a user's password to a fresh temporary password.
    * Purges all active database login sessions for immediate safety.
+   * Sets mustChangePassword to true so user must change on next login.
    */
   async resetPassword(id: string): Promise<void> {
-    // 1. Ensure user exists
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new NotFoundException(`User with ID '${id}' not found.`);
     }
 
-    // 2. Generate and hash a new temporary password
     const tempPassword = randomBytes(6).toString('hex');
     const passwordHash = hashPassword(tempPassword);
 
-    // 3. Update password in the database
     await this.prisma.user.update({
       where: { id },
-      data: { passwordHash },
+      data: { passwordHash, mustChangePassword: true },
     });
 
-    // 4. Purge all active Refresh Tokens (force complete logout on all devices)
     const revokedSessions = await this.prisma.refreshToken.deleteMany({
       where: { userId: id },
     });
@@ -135,7 +246,71 @@ export class UsersService {
     this.logger.log(
       `Administratively reset password for user '${user.email}'. Revoked ${revokedSessions.count} active login session(s).`
     );
+  }
 
-    this.logger.log(`Password reset issued for user '${user.email}'. Temporary credentials delivered out-of-band.`);
+  /**
+   * Deactivates a user, preventing login and revoking all sessions.
+   */
+  async deactivate(id: string, currentUserId: string) {
+    if (id === currentUserId) {
+      throw new BadRequestException('Cannot deactivate yourself');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with ID '${id}' not found.`);
+    }
+
+    if (!user.isActive) {
+      throw new BadRequestException('User is already deactivated');
+    }
+
+    await this.prisma.refreshToken.deleteMany({ where: { userId: id } });
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data: { isActive: false },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        updatedAt: true,
+      },
+    });
+
+    this.logger.log(`User deactivated: ${user.email}`);
+    return updatedUser;
+  }
+
+  /**
+   * Reactivates a deactivated user.
+   */
+  async reactivate(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      throw new NotFoundException(`User with ID '${id}' not found.`);
+    }
+
+    if (user.isActive) {
+      throw new BadRequestException('User is already active');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id },
+      data: { isActive: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        updatedAt: true,
+      },
+    });
+
+    this.logger.log(`User reactivated: ${user.email}`);
+    return updatedUser;
   }
 }

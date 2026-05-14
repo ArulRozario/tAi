@@ -1,68 +1,58 @@
 import {
-  InputIcon
-} from "./chunk-YCOE7TSH.js";
+  Scroller
+} from "./chunk-JG7YBF6M.js";
 import {
   Overlay
-} from "./chunk-HRNDTIDB.js";
+} from "./chunk-U4HC6YLP.js";
 import {
-  Scroller
-} from "./chunk-PJQNME7O.js";
-import "./chunk-LT3B4FKO.js";
+  InputText
+} from "./chunk-46XO6JVL.js";
 import {
-  Tooltip
-} from "./chunk-QL5QB4DI.js";
+  Checkbox
+} from "./chunk-6COLMUNF.js";
 import {
-  ObjectUtils
-} from "./chunk-E243FPZG.js";
+  BaseEditableHolder
+} from "./chunk-HH2Q4YTA.js";
+import "./chunk-Q23NCOK6.js";
+import "./chunk-I3C34LFA.js";
+import {
+  Fluid
+} from "./chunk-TKPW4HR7.js";
 import {
   AutoFocus
-} from "./chunk-GAS3RXEU.js";
+} from "./chunk-2IN5UXYL.js";
 import {
-  DomHandler,
-  unblockBodyScroll
-} from "./chunk-PYYULY3E.js";
+  IconField
+} from "./chunk-KI3N6AH3.js";
+import {
+  InputIcon
+} from "./chunk-WBCO4XQT.js";
+import {
+  Tooltip
+} from "./chunk-SAC3T5ND.js";
+import {
+  ObjectUtils
+} from "./chunk-6ONAYYXI.js";
 import {
   ChevronDownIcon,
   SearchIcon,
   TimesCircleIcon,
   TimesIcon
-} from "./chunk-ILKOQHO4.js";
+} from "./chunk-PPIMPCR5.js";
 import {
-  Checkbox
-} from "./chunk-UTGU6RBZ.js";
-import {
-  BaseEditableHolder
-} from "./chunk-JUFGRIRL.js";
+  DomHandler,
+  unblockBodyScroll
+} from "./chunk-5E4TIMQ3.js";
 import {
   CheckIcon
-} from "./chunk-EK6MJUIH.js";
-import {
-  IconField
-} from "./chunk-ZJ3XQNUH.js";
-import {
-  InputText
-} from "./chunk-X76ZTFUZ.js";
-import {
-  Fluid
-} from "./chunk-IVVXXEEZ.js";
-import "./chunk-DXZ3JML4.js";
-import {
-  FormsModule,
-  NG_VALUE_ACCESSOR,
-  NgControlStatus,
-  NgModel
-} from "./chunk-FOE23LWJ.js";
+} from "./chunk-R3ASG4FZ.js";
 import {
   BaseComponent,
   PARENT_INSTANCE
-} from "./chunk-5Q3QJLUY.js";
-import {
-  Bind,
-  BindModule
-} from "./chunk-FDDOVCH6.js";
+} from "./chunk-EEUMEGIZ.js";
 import {
   BaseStyle
-} from "./chunk-5LSILY4Y.js";
+} from "./chunk-6TZC7T2Y.js";
 import {
   FilterService,
   Footer,
@@ -71,7 +61,11 @@ import {
   PrimeTemplate,
   SharedModule,
   TranslationKeys
-} from "./chunk-DFX2PQFP.js";
+} from "./chunk-QGSIXMK2.js";
+import {
+  Bind,
+  BindModule
+} from "./chunk-HKSBR2QA.js";
 import {
   C2 as C,
   J,
@@ -88,14 +82,20 @@ import {
   z
 } from "./chunk-N457OPXR.js";
 import {
+  FormsModule,
+  NG_VALUE_ACCESSOR,
+  NgControlStatus,
+  NgModel
+} from "./chunk-2T3QUAE7.js";
+import {
   CommonModule,
   NgClass,
   NgForOf,
   NgIf,
   NgStyle,
   NgTemplateOutlet
-} from "./chunk-7WBDEVG2.js";
-import "./chunk-MIJCVNFH.js";
+} from "./chunk-42UEGY5K.js";
+import "./chunk-FFSGIWCW.js";
 import {
   ChangeDetectionStrategy,
   Component,
@@ -168,14 +168,14 @@ import {
   ɵɵtwoWayListener,
   ɵɵtwoWayProperty,
   ɵɵviewQuery
-} from "./chunk-IDZCX6FW.js";
+} from "./chunk-EXX4CQJK.js";
 import "./chunk-FX47LQWG.js";
 import "./chunk-BGJDQHGH.js";
 import "./chunk-KHPDHDQC.js";
 import {
   __spreadProps,
   __spreadValues
-} from "./chunk-46DXP6YY.js";
+} from "./chunk-KWSTWQNB.js";
 
 // node_modules/.pnpm/@primeuix+styles@2.0.3/node_modules/@primeuix/styles/dist/chip/index.mjs
 var style = "\n    .p-chip {\n        display: inline-flex;\n        align-items: center;\n        background: dt('chip.background');\n        color: dt('chip.color');\n        border-radius: dt('chip.border.radius');\n        padding-block: dt('chip.padding.y');\n        padding-inline: dt('chip.padding.x');\n        gap: dt('chip.gap');\n    }\n\n    .p-chip-icon {\n        color: dt('chip.icon.color');\n        font-size: dt('chip.icon.size');\n        width: dt('chip.icon.size');\n        height: dt('chip.icon.size');\n    }\n\n    .p-chip-image {\n        border-radius: 50%;\n        width: dt('chip.image.width');\n        height: dt('chip.image.height');\n        margin-inline-start: calc(-1 * dt('chip.padding.y'));\n    }\n\n    .p-chip:has(.p-chip-remove-icon) {\n        padding-inline-end: dt('chip.padding.y');\n    }\n\n    .p-chip:has(.p-chip-image) {\n        padding-block-start: calc(dt('chip.padding.y') / 2);\n        padding-block-end: calc(dt('chip.padding.y') / 2);\n    }\n\n    .p-chip-remove-icon {\n        cursor: pointer;\n        font-size: dt('chip.remove.icon.size');\n        width: dt('chip.remove.icon.size');\n        height: dt('chip.remove.icon.size');\n        color: dt('chip.remove.icon.color');\n        border-radius: 50%;\n        transition:\n            outline-color dt('chip.transition.duration'),\n            box-shadow dt('chip.transition.duration');\n        outline-color: transparent;\n    }\n\n    .p-chip-remove-icon:focus-visible {\n        box-shadow: dt('chip.remove.icon.focus.ring.shadow');\n        outline: dt('chip.remove.icon.focus.ring.width') dt('chip.remove.icon.focus.ring.style') dt('chip.remove.icon.focus.ring.color');\n        outline-offset: dt('chip.remove.icon.focus.ring.offset');\n    }\n";

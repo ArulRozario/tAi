@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { comparePassword, hashPassword } from './password.util';
@@ -48,15 +48,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Determine refresh token TTL based on rememberMe flag
     const ttlDays = rememberMe ? 30 : 7;
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + ttlDays);
 
-    // Create secure random 40-byte hex refresh token
     const refreshTokenString = randomBytes(40).toString('hex');
 
-    // Persist refresh token in database
     await this.prisma.refreshToken.create({
       data: {
         token: refreshTokenString,
@@ -65,7 +62,6 @@ export class AuthService {
       },
     });
 
-    // Sign Access Token with 15 minutes expiration time
     const payload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
 
@@ -78,6 +74,7 @@ export class AuthService {
         name: user.name,
         role: user.role,
         isActive: user.isActive,
+        mustChangePassword: user.mustChangePassword,
       },
     };
   }
@@ -208,13 +205,155 @@ export class AuthService {
     if (!user || !user.isActive) {
       throw new UnauthorizedException('User not found or inactive');
     }
-    
+
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
       isActive: user.isActive,
+      mustChangePassword: user.mustChangePassword,
     };
+  }
+
+  /**
+   * Update user's profile (name and/or email).
+   */
+  async updateProfile(userId: string, data: { name?: string; email?: string }) {
+    if (!data.name && !data.email) {
+      throw new BadRequestException('At least one field (name or email) must be provided');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (data.email && data.email !== user.email) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: data.email.toLowerCase() },
+      });
+      if (existingUser) {
+        throw new ConflictException(`Email '${data.email}' is already in use`);
+      }
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.email && { email: data.email.toLowerCase() }),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    this.logger.log(`Profile updated for user: ${updatedUser.email}`);
+    return updatedUser;
+  }
+
+  /**
+   * Change user's password. Revokes all existing sessions for security.
+   * If mustChangePassword is true, skips current password verification.
+   */
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.mustChangePassword) {
+      const isValid = comparePassword(currentPassword, user.passwordHash);
+      if (!isValid) {
+        throw new UnauthorizedException('Current password is incorrect');
+      }
+    }
+
+    const isSamePassword = comparePassword(newPassword, user.passwordHash);
+    if (isSamePassword) {
+      throw new BadRequestException('New password must be different from current password');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: hashPassword(newPassword), mustChangePassword: false },
+    });
+
+    await this.prisma.refreshToken.deleteMany({ where: { userId } });
+
+    this.logger.log(`Password changed for user: ${user.email}. All sessions revoked.`);
+    return { message: 'Password changed successfully' };
+  }
+
+  /**
+   * Get user's active sessions with pagination.
+   */
+  async getSessions(userId: string, currentRefreshToken: string | undefined, query: { page?: number; limit?: number }) {
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const skip = (page - 1) * limit;
+    const now = new Date();
+
+    const whereClause = {
+      userId,
+      expiresAt: { gt: now },
+    };
+
+    const [sessions, total] = await Promise.all([
+      this.prisma.refreshToken.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          createdAt: true,
+          expiresAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.refreshToken.count({ where: whereClause }),
+    ]);
+
+    const sessionResponses = sessions.map((session) => ({
+      id: session.id,
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt,
+      isCurrent: currentRefreshToken ? session.id === currentRefreshToken : false,
+    }));
+
+    return {
+      sessions: sessionResponses,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Revoke a specific session.
+   */
+  async revokeSession(userId: string, currentRefreshToken: string | undefined, sessionId: string) {
+    const session = await this.prisma.refreshToken.findFirst({
+      where: { id: sessionId, userId },
+      select: { id: true, token: true },
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    if (currentRefreshToken && session.token === currentRefreshToken) {
+      throw new BadRequestException('Cannot revoke current session. Use logout instead.');
+    }
+
+    await this.prisma.refreshToken.delete({ where: { id: sessionId } });
+    this.logger.log(`Session revoked for user ${userId}: ${sessionId}`);
   }
 }

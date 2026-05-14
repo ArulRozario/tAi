@@ -1,15 +1,24 @@
 import { Component, signal, inject, OnInit, OnDestroy } from '@angular/core';
+import { Observable } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { SplitButtonModule } from 'primeng/splitbutton';
+import { DialogModule } from 'primeng/dialog';
+import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
+import { AvatarModule } from 'primeng/avatar';
+import { AvatarGroupModule } from 'primeng/avatargroup';
 import { MenuItem, MessageService } from 'primeng/api';
 import { PageThumbnailComponent } from '../../shared/components/page-thumbnail/page-thumbnail.component';
 import { ModelPickerComponent } from '../../shared/components/model-picker/model-picker.component';
 import { CardModule } from 'primeng/card';
+import { DividerModule } from 'primeng/divider';
 import { ProgressBarModule } from 'primeng/progressbar';
-import { ProjectService, Project, Page } from '../projects.service';
+import { ProjectService, Project, Page, PageReviewer } from '../projects.service';
+import { ApiService, User } from '../../core/services/api.service';
+import { AuthService } from '../../auth/auth.service';
 
 const ACTIVE_STATUSES = new Set(['PENDING', 'RENDERING', 'TRANSLATING', 'REVIEWING']);
 
@@ -19,6 +28,8 @@ const ACTIVE_STATUSES = new Set(['PENDING', 'RENDERING', 'TRANSLATING', 'REVIEWI
   imports: [
     CommonModule, RouterModule, FormsModule,
     ButtonModule, SplitButtonModule, ProgressBarModule, CardModule,
+    DialogModule, SelectModule, MultiSelectModule, DividerModule,
+    AvatarModule, AvatarGroupModule,
     PageThumbnailComponent, ModelPickerComponent,
   ],
   templateUrl: './project-detail.component.html',
@@ -28,6 +39,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private projectService = inject(ProjectService);
+  private apiService = inject(ApiService);
+  private authService = inject(AuthService);
   private messageService = inject(MessageService);
 
   project = signal<Project | null>(null);
@@ -36,6 +49,23 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   selectedModel = signal('');
   translationState = signal<'idle' | 'running' | 'paused'>('idle');
   isReviewing = signal(false);
+
+  // Reviewer assignment
+  isMasterOrAdmin = signal(false);
+  allReviewers = signal<User[]>([]);
+  selectionMode = signal(false);
+  selectedPageIds = signal<Set<string>>(new Set());
+
+  // Single-page assignment popover
+  assignTargetPage = signal<Page | null>(null);
+  showAssignDialog = signal(false);
+  assignSelectedReviewerIds: string[] = [];
+
+  // Bulk actions dialog
+  showBulkDialog = signal(false);
+  bulkAction = signal<'assign' | 'unassign' | 'reassign'>('assign');
+  bulkSelectedReviewerIds: string[] = [];
+  bulkSingleReviewerId = '';
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -47,6 +77,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   get pages(): Page[] { return this.project()?.pages ?? []; }
   get hasPages(): boolean { return this.pages.length > 0; }
+  get selectedCount(): number { return this.selectedPageIds().size; }
 
   get canTranslate(): boolean {
     return this.translationState() === 'idle' &&
@@ -61,11 +92,20 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     return this.pages.filter(p => !['PENDING', 'RENDERING', 'READY', 'TRANSLATION_ERROR'].includes(p.status)).length;
   }
 
+  get reviewerOptions(): { label: string; value: string }[] {
+    return this.allReviewers().map(u => ({ label: u.name, value: u.id }));
+  }
+
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');
+    const user = this.authService.getCurrentUser();
+    this.isMasterOrAdmin.set(user?.role === 'MASTER' || user?.role === 'ADMIN');
     if (id) {
       this.projectId.set(id);
       this.loadProject();
+      if (this.isMasterOrAdmin()) {
+        this.loadReviewers();
+      }
     }
   }
 
@@ -84,6 +124,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         this.schedulePoll(p);
       },
       error: (err) => this.loadError.set(err?.error?.message || 'Failed to load project.'),
+    });
+  }
+
+  private loadReviewers() {
+    this.apiService.getUsers().subscribe({
+      next: (users) => this.allReviewers.set(users.filter(u => u.role === 'REVIEWER' || u.role === 'MASTER')),
+      error: () => {},
     });
   }
 
@@ -106,6 +153,119 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ── Selection mode ────────────────────────────────────────────────────────
+
+  toggleSelectionMode() {
+    this.selectionMode.update(v => !v);
+    if (!this.selectionMode()) {
+      this.selectedPageIds.set(new Set());
+    }
+  }
+
+  togglePageSelection(pageId: string) {
+    if (!this.selectionMode()) return;
+    const set = new Set(this.selectedPageIds());
+    if (set.has(pageId)) set.delete(pageId);
+    else set.add(pageId);
+    this.selectedPageIds.set(set);
+  }
+
+  selectAll() {
+    this.selectedPageIds.set(new Set(this.pages.map(p => p.id)));
+  }
+
+  clearSelection() {
+    this.selectedPageIds.set(new Set());
+  }
+
+  isPageSelected(pageId: string): boolean {
+    return this.selectedPageIds().has(pageId);
+  }
+
+  onPageClick(pageId: string) {
+    if (this.selectionMode()) {
+      this.togglePageSelection(pageId);
+    } else {
+      this.navigateToWorkbench(pageId);
+    }
+  }
+
+  onAssignClick(event: { pageId: string; event: MouseEvent }) {
+    const page = this.pages.find(p => p.id === event.pageId);
+    if (!page) return;
+    this.assignTargetPage.set(page);
+    this.assignSelectedReviewerIds = page.reviewers?.map(r => r.userId) ?? [];
+    this.showAssignDialog.set(true);
+  }
+
+  // ── Single page assignment ─────────────────────────────────────────────────
+
+  saveAssignment() {
+    const page = this.assignTargetPage();
+    if (!page) return;
+    this.projectService.assignReviewersToPage(page.id, this.assignSelectedReviewerIds).subscribe({
+      next: () => {
+        this.showAssignDialog.set(false);
+        this.messageService.add({ severity: 'success', summary: 'Saved', detail: 'Reviewers updated.', life: 2000 });
+        this.loadProject();
+      },
+      error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to update reviewers.' }),
+    });
+  }
+
+  removeReviewerFromPage(pageId: string, userId: string) {
+    this.projectService.removeReviewerFromPage(pageId, userId).subscribe({
+      next: () => {
+        this.messageService.add({ severity: 'success', summary: 'Removed', life: 1500 });
+        this.loadProject();
+      },
+      error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove reviewer.' }),
+    });
+  }
+
+  // ── Bulk actions ───────────────────────────────────────────────────────────
+
+  openBulkAction(action: 'assign' | 'unassign' | 'reassign') {
+    this.bulkAction.set(action);
+    this.bulkSelectedReviewerIds = [];
+    this.bulkSingleReviewerId = '';
+    this.showBulkDialog.set(true);
+  }
+
+  executeBulkAction() {
+    const pageIds = Array.from(this.selectedPageIds());
+    if (!pageIds.length) return;
+
+    const action = this.bulkAction();
+
+    if (action === 'assign' || action === 'unassign') {
+      if (!this.bulkSingleReviewerId) return;
+      const obs$: Observable<unknown> = action === 'assign'
+        ? this.projectService.bulkAssign(pageIds, this.bulkSingleReviewerId)
+        : this.projectService.bulkUnassign(pageIds, this.bulkSingleReviewerId);
+      obs$.subscribe({
+        next: () => {
+          this.showBulkDialog.set(false);
+          this.messageService.add({ severity: 'success', summary: 'Done', detail: `${action === 'assign' ? 'Assigned' : 'Unassigned'} reviewer on ${pageIds.length} pages.`, life: 2000 });
+          this.loadProject();
+        },
+        error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Bulk action failed.' }),
+      });
+    } else {
+      if (!this.bulkSelectedReviewerIds.length) return;
+      this.projectService.bulkReassign(pageIds, this.bulkSelectedReviewerIds).subscribe({
+        next: () => {
+          this.showBulkDialog.set(false);
+          this.messageService.add({ severity: 'success', summary: 'Done', detail: `Reassigned ${pageIds.length} pages.`, life: 2000 });
+          this.loadProject();
+        },
+        error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Bulk reassign failed.' }),
+      });
+    }
+  }
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
+
   startTranslation() {
     const id = this.projectId();
     if (!id) return;
@@ -116,7 +276,6 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
           return;
         }
         this.translationState.set('running');
-        // Force immediate poll to pick up TRANSLATING pages
         this.clearPoll();
         this.pollTimer = setTimeout(() => this.loadProject(), 500);
       },
@@ -195,7 +354,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
         window.URL.revokeObjectURL(url);
         this.messageService.add({ severity: 'success', summary: 'Export complete', detail: `Exported as ${format.toUpperCase()}.` });
       },
-      error: () => this.messageService.add({ severity: 'error', summary: 'Export failed', detail: `Failed to export as ${format.toUpperCase()}.` }),
+      error: () => this.messageService.add({ severity: 'error', summary: 'Export failed', detail: `Failed to export.` }),
     });
   }
 
@@ -211,6 +370,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       },
       error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete project.' }),
     });
+  }
+
+  getInitials(name: string): string {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   }
 
   ngOnDestroy() {

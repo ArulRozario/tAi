@@ -87,11 +87,17 @@ export class ProjectsService {
   /**
    * Retrieves all projects, ordered newest first.
    */
-  async findAll(page = 1, limit = 20) {
+  async findAll(page = 1, limit = 20, assignedToUserId?: string) {
     const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (assignedToUserId) {
+      where.pages = { some: { reviewers: { some: { userId: assignedToUserId } } } };
+    }
 
     const [projects, total] = await Promise.all([
       this.prisma.project.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -107,7 +113,7 @@ export class ProjectsService {
           },
         },
       }),
-      this.prisma.project.count(),
+      this.prisma.project.count({ where }),
     ]);
 
     return {
@@ -141,6 +147,16 @@ export class ProjectsService {
             pageNumber: true,
             status: true,
             quality: true,
+            submittedAt: true,
+            reviewers: {
+              select: {
+                id: true,
+                userId: true,
+                isPrimary: true,
+                assignedAt: true,
+                user: { select: { id: true, name: true, email: true, role: true } },
+              },
+            },
           },
         },
         _count: {
