@@ -56,7 +56,7 @@ export class ReviewAgent {
     const targetLang = project.targetLang;
     const styleGuide = project.styleGuide.currentVersion?.content || 'Standard theological formal register.';
 
-    // 2. Fetch top 50 glossary terms for this genre
+    // 2. Fetch top 50 glossary terms for this style guide
     const glossaryTerms = await this.prisma.glossaryTerm.findMany({
       where: { styleGuideId: project.styleGuideId },
       take: 50,

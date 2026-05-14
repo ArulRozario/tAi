@@ -81,12 +81,12 @@
 }
 
 // ─── StyleGuide Pill ─────────────────────────────────────────────
-.genre-row {
+.style-guide-row {
   display: flex;
   align-items: center;
   gap: 10px;
 
-  .genre-label {
+  .style-guide-label {
     font-size: 12px;
     color: var(--text-disabled);
     font-weight: 600;
@@ -94,7 +94,7 @@
     letter-spacing: 0.04em;
   }
 
-  .genre-select-custom {
+  .style-guide-select-custom {
     ::ng-deep .p-select {
       height: 32px;
       background: var(--bg-sidebar);
@@ -124,19 +124,19 @@
     }
   }
 
-  .genre-pill-inner, .genre-option-item {
+  .style-guide-pill-inner, .style-guide-option-item {
     display: flex;
     align-items: center;
     gap: 8px;
 
-    .genre-dot {
+    .style-guide-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
       flex-shrink: 0;
     }
 
-    .genre-name {
+    .style-guide-name {
       font-weight: 600;
       white-space: nowrap;
       overflow: hidden;

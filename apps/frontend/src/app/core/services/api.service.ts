@@ -11,37 +11,6 @@ export interface User {
   createdAt: string;
 }
 
-export interface Genre {
-  id: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  color?: string;
-  projectCount?: number;
-  lastUpdatedBy?: User;
-  currentVersion?: GenreVersion;
-  createdAt?: string;
-  updatedAt?: string;
-  createdBy?: User;
-  _count?: { projects: number };
-}
-
-export interface GenreVersion {
-  id: string;
-  genreId: string;
-  version: string;
-  content: string;
-  note?: string;
-  createdAt: string;
-  createdBy?: User;
-}
-
-export interface VersionDiff {
-  fromVersion: string;
-  toVersion: string;
-  diff: string;
-}
-
 export interface Project {
   id: string;
   name: string;
@@ -49,8 +18,7 @@ export interface Project {
   sourceLang: string;
   targetLang: string;
   status: string;
-  genreId: string;
-  genre?: Genre;
+  styleGuideId: string;
   owner?: User;
   pageCount?: number;
   completedCount?: number;
@@ -167,7 +135,7 @@ export interface ProjectStats {
 
 export interface GlossaryTerm {
   id: string;
-  genreId: string;
+  styleGuideId: string;
   sourceTerm: string;
   targetTerm: string;
   context?: string;
@@ -259,7 +227,7 @@ export class ApiService {
     return this.http.get<Project>(`${this.base}/projects/${id}`);
   }
 
-  createProject(data: { name: string; description?: string; genreId: string; sourceFileId?: string; sourceLang: string; targetLang: string }): Observable<Project> {
+  createProject(data: { name: string; description?: string; styleGuideId: string; sourceFileId?: string; sourceLang: string; targetLang: string }): Observable<Project> {
     return this.http.post<Project>(`${this.base}/projects`, data);
   }
 
@@ -355,61 +323,21 @@ export class ApiService {
     return this.http.post<Page>(`${this.base}/pages/${pageId}/reassign`, { reviewerIds: userIds });
   }
 
-  // ── Genres ────────────────────────────────────────────────────────────────
-
-  getGenres(q?: string, limit = 50): Observable<Genre[]> {
-    let params = new HttpParams().set('limit', limit);
-    if (q) params = params.set('q', q);
-    return this.http.get<Genre[]>(`${this.base}/genres`, { params });
-  }
-
-  getGenre(id: string): Observable<Genre> {
-    return this.http.get<Genre>(`${this.base}/genres/${id}`);
-  }
-
-  createGenre(data: { name: string; key: string; description?: string; icon?: string; color?: string }): Observable<Genre> {
-    return this.http.post<Genre>(`${this.base}/genres`, data);
-  }
-
-  patchGenre(id: string, data: Partial<Genre & { segmentUnit: string }>): Observable<Genre> {
-    return this.http.patch<Genre>(`${this.base}/genres/${id}`, data);
-  }
-
-  restoreGenreVersion(genreId: string, versionId: string): Observable<GenreVersion> {
-    return this.http.post<GenreVersion>(`${this.base}/genres/${genreId}/restore/${versionId}`, {});
-  }
-
-  getGenreVersions(id: string): Observable<GenreVersion[]> {
-    return this.http.get<GenreVersion[]>(`${this.base}/genres/${id}/versions`);
-  }
-
-  createGenreVersion(id: string, content: string, note?: string): Observable<GenreVersion> {
-    return this.http.post<GenreVersion>(`${this.base}/genres/${id}/versions`, { content, note });
-  }
-
-  getVersionDiff(genreId: string, versionId: string): Observable<VersionDiff> {
-    return this.http.get<VersionDiff>(`${this.base}/genres/${genreId}/versions/${versionId}/diff`);
-  }
-
-  testGenre(id: string, sampleText: string): Observable<{ translation: string; tokensUsed: number }> {
-    return this.http.post<{ translation: string; tokensUsed: number }>(`${this.base}/genres/${id}/test`, { sampleText });
-  }
-
   // ── Glossary ──────────────────────────────────────────────────────────────
 
-  lookupGlossary(term: string, genreId: string): Observable<GlossaryTerm[]> {
+  lookupGlossary(term: string, styleGuideId: string): Observable<GlossaryTerm[]> {
     return this.http.get<GlossaryTerm[]>(`${this.base}/glossary/lookup`, {
-      params: new HttpParams().set('term', term).set('genreId', genreId),
+      params: new HttpParams().set('term', term).set('styleGuideId', styleGuideId),
     });
   }
 
-  getGlossary(genreId: string, limit = 100, offset = 0): Observable<{ data: GlossaryTerm[]; total: number }> {
+  getGlossary(styleGuideId: string, limit = 100, offset = 0): Observable<{ data: GlossaryTerm[]; total: number }> {
     return this.http.get<{ data: GlossaryTerm[]; total: number }>(`${this.base}/glossary`, {
-      params: new HttpParams().set('genreId', genreId).set('limit', limit).set('offset', offset),
+      params: new HttpParams().set('styleGuideId', styleGuideId).set('limit', limit).set('offset', offset),
     });
   }
 
-  createGlossaryTerm(data: { genreId: string; sourceTerm: string; targetTerm: string; context?: string; notes?: string }): Observable<GlossaryTerm> {
+  createGlossaryTerm(data: { styleGuideId: string; sourceTerm: string; targetTerm: string; context?: string; notes?: string }): Observable<GlossaryTerm> {
     return this.http.post<GlossaryTerm>(`${this.base}/glossary`, data);
   }
 
@@ -421,10 +349,10 @@ export class ApiService {
     return this.http.delete<void>(`${this.base}/glossary/${id}`);
   }
 
-  bulkImportGlossary(genreId: string, file: File): Observable<{ imported: number }> {
+  bulkImportGlossary(styleGuideId: string, file: File): Observable<{ imported: number }> {
     const fd = new FormData();
     fd.append('file', file);
-    fd.append('genreId', genreId);
+    fd.append('styleGuideId', styleGuideId);
     return this.http.post<{ imported: number }>(`${this.base}/glossary/bulk`, fd);
   }
 

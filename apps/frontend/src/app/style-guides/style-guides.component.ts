@@ -31,7 +31,7 @@ import { StyleGuideCardComponent } from './style-guide-card.component';
 })
 export class StyleGuidesComponent implements OnInit {
   styleGuides = signal<StyleGuide[]>([]);
-  breadcrumbItems: MenuItem[] = [{ label: 'tAI', routerLink: '/' }, { label: 'Genres' }];
+  breadcrumbItems: MenuItem[] = [{ label: 'tAI', routerLink: '/' }, { label: 'Style Guides' }];
   searchQuery = signal('');
 
   constructor(
@@ -59,7 +59,7 @@ export class StyleGuidesComponent implements OnInit {
     this.router.navigate(['/style-guides', id]);
   }
 
-  navigateToCreateGenre() {
+  navigateToCreate() {
     this.router.navigate(['/style-guides/create']);
   }
 }

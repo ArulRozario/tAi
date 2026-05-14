@@ -15,14 +15,14 @@ async function main() {
   await prisma.chatMessage.deleteMany({});
   await prisma.chatSession.deleteMany({});
   await prisma.error.deleteMany({});
-  await prisma.sentence.deleteMany({});
+  await prisma.pageEdit.deleteMany({});
   await prisma.pageReviewer.deleteMany({});
   await prisma.page.deleteMany({});
   await prisma.chapter.deleteMany({});
   await prisma.job.deleteMany({});
   await prisma.project.deleteMany({});
-  await prisma.genreVersion.deleteMany({});
-  await prisma.genre.deleteMany({});
+  await prisma.styleGuideVersion.deleteMany({});
+  await prisma.styleGuide.deleteMany({});
   await prisma.refreshToken.deleteMany({});
   await prisma.user.deleteMany({});
 
@@ -57,8 +57,8 @@ async function main() {
 
   console.log('Users seeded successfully!');
 
-  // 3. Seeding Bible Genre
-  console.log('Seeding "Tamil Bible (Parisutha Vedagamam)" Genre...');
+  // 3. Seeding Bible Style Guide
+  console.log('Seeding "Tamil Bible (Parisutha Vedagamam)" Style Guide...');
   
   const pdfTemplate = {
     pageSize: 'A5',
@@ -77,7 +77,7 @@ async function main() {
     chapterDropCap: false
   };
 
-  const genre = await prisma.genre.create({
+  const styleGuide = await prisma.styleGuide.create({
     data: {
       name: 'Tamil Bible (Parisutha Vedagamam)',
       description: 'Authoritative register and style guide for translating Christian theological and scripture texts into the traditional Protestant Tamil Bible style.',
@@ -191,9 +191,9 @@ English: Grace and peace to you from God our Father and the Lord Jesus Christ.
 Tamil: நம்முடைய பிதாவாகிய தேவனாலும் கர்த்தராகிய இயேசுகிறிஸ்துவினாலும் உங்களுக்கு கிருபையும் சமாதானமும் உண்டாவதாக.
 `;
 
-  const genreVersion = await prisma.genreVersion.create({
+  const styleGuideVersion = await prisma.styleGuideVersion.create({
     data: {
-      genreId: genre.id,
+      styleGuideId: styleGuide.id,
       version: '1.0',
       content: styleGuideContent,
       note: 'Initial import of the Protestant Tamil Bible translation standard rules and guidelines.',
@@ -201,16 +201,15 @@ Tamil: நம்முடைய பிதாவாகிய தேவனால�
     }
   });
 
-  // Cycle link updated
-  await prisma.genre.update({
-    where: { id: genre.id },
-    data: { currentVersionId: genreVersion.id }
+  await prisma.styleGuide.update({
+    where: { id: styleGuide.id },
+    data: { currentVersionId: styleGuideVersion.id }
   });
 
-  console.log('Genre and initial GenreVersion seeded successfully!');
+  console.log('Style guide and initial StyleGuideVersion seeded successfully!');
 
   // 4. Seeding Glossary Terms (50 items)
-  console.log('Seeding glossary terms linked to Bible genre...');
+  console.log('Seeding glossary terms linked to Bible style guide...');
   
   const glossaryTerms = [
     { sourceTerm: 'God', targetTerm: 'தேவன்', context: 'theological — never கடவுள்' },
@@ -267,7 +266,7 @@ Tamil: நம்முடைய பிதாவாகிய தேவனால�
   for (const term of glossaryTerms) {
     await prisma.glossaryTerm.create({
       data: {
-        genreId: genre.id,
+        styleGuideId: styleGuide.id,
         sourceTerm: term.sourceTerm,
         targetTerm: term.targetTerm,
         context: term.context,

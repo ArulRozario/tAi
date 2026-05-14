@@ -57,7 +57,7 @@ export class StyleGuideService {
     return this.http.get<StyleGuide>(`${this.apiUrl}/${id}`);
   }
 
-  getGenreVersions(id: string): Observable<StyleGuideVersion[]> {
+  getStyleGuideVersions(id: string): Observable<StyleGuideVersion[]> {
     return this.http.get<StyleGuideVersion[]>(`${this.apiUrl}/${id}/versions`);
   }
 

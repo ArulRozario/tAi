@@ -3,7 +3,7 @@
   <div class="styleGuides-content">
     <div class="content-header">
       <div class="title-section">
-        <h1 class="page-title">Genres</h1>
+        <h1 class="page-title">Style Guides</h1>
         <p class="page-subtitle">Translation contexts that drive agent behavior · {{ styleGuides().length }} defined</p>
       </div>
       <div class="action-section">
@@ -12,12 +12,12 @@
           <input 
             type="text" 
             pInputText 
-            placeholder="Search styleGuides" 
+            placeholder="Search style guides"
             [(ngModel)]="searchQuery" 
             (input)="onSearch()"
           />
         </p-iconField>
-        <p-button label="New styleGuide" icon="pi pi-plus" (click)="navigateToCreateGenre()"></p-button>
+        <p-button label="New Style Guide" icon="pi pi-plus" (click)="navigateToCreate()"></p-button>
       </div>
     </div>
 

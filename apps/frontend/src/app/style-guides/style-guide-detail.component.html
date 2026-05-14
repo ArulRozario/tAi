@@ -24,9 +24,9 @@
         <p-select [options]="versions" [(ngModel)]="selectedVersion" styleClass="tai-dropdown"></p-select>
         <p-button label="History" icon="pi pi-history" severity="secondary" [outlined]="true" size="small"></p-button>
         <p-button label="Test" icon="pi pi-play" severity="secondary" [outlined]="true" size="small"></p-button>
-        <p-button label="Save" icon="pi pi-check" severity="danger" [loading]="isSaving()" [disabled]="isSaving()" loadingIcon="pi pi-spinner pi-spin" (onClick)="saveGenre()"></p-button>
+        <p-button label="Save" icon="pi pi-check" severity="danger" [loading]="isSaving()" [disabled]="isSaving()" loadingIcon="pi pi-spinner pi-spin" (onClick)="saveStyleGuide()"></p-button>
       } @else {
-        <p-button label="Create" icon="pi pi-check" severity="danger" [loading]="isSaving()" [disabled]="isSaving()" loadingIcon="pi pi-spinner pi-spin" (onClick)="saveGenre()"></p-button>
+        <p-button label="Create" icon="pi pi-check" severity="danger" [loading]="isSaving()" [disabled]="isSaving()" loadingIcon="pi pi-spinner pi-spin" (onClick)="saveStyleGuide()"></p-button>
       }
     </div>
   </header>

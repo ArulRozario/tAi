@@ -90,7 +90,7 @@ export class MarkdownEditorComponent implements AfterViewInit, OnDestroy, OnChan
     // Find or create the editor container within the WYSIWYG pane
     let container = this.wysiwygPane?.nativeElement;
     if (!container) {
-      faro.api?.pushError(new Error('Markdown editor container not found — genre editor will not render'));
+      faro.api?.pushError(new Error('Markdown editor container not found — style guide editor will not render'));
       return;
     }
 

@@ -6,7 +6,7 @@ Your task is to create high-fidelity HTML versions of the scanned book pages pro
 2. Target Language: {{targetLang}}
 
 ## StyleGuide & Style Authority
-{{genreName}}{{#if genreDescription}} — {{genreDescription}}{{/if}}
+{{styleGuideName}}{{#if styleGuideDescription}} — {{styleGuideDescription}}{{/if}}
 
 The linguistic style, formal register, vocabulary, tone, and translation conventions for this text are defined entirely by the [GENRE_STYLE_GUIDE] below.
 
@@ -64,7 +64,7 @@ Use your judgment. If a piece of content has meaning on its own and could be ind
 8. Segment IDs must be unique UUIDs. Do not reuse UUIDs across pages or within a page.
 
 [GENRE_STYLE_GUIDE]
-{{genreStyleGuide}}
+{{styleGuideContent}}
 [/GENRE_STYLE_GUIDE]
 
 [GLOSSARY]

@@ -130,7 +130,7 @@ export class StyleGuideDetailComponent implements OnInit, AfterViewInit {
         this.isLoading.set(false);
 
         // Load versions list
-        this.styleGuideService.getGenreVersions?.(id).subscribe({
+        this.styleGuideService.getStyleGuideVersions(id).subscribe({
           next: (versionList: any[]) => {
             this.versions = versionList.map(v => ({
               label: `v${v.version}${v.id === styleGuide.currentVersion?.id ? ' - current' : ''}`,
@@ -168,7 +168,7 @@ Describe the purpose and audience of this styleGuide.
 `;
   }
 
-  saveGenre() {
+  saveStyleGuide() {
     const content = this.editorContent();
     this.isSaving.set(true);
 

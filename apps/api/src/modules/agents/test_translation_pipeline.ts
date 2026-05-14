@@ -27,11 +27,11 @@ async function run() {
   }
 
   // 2. Fetch required StyleGuide ID and Admin User ID
-  const genre = await prisma.styleGuide.findFirst({
+  const styleGuide = await prisma.styleGuide.findFirst({
     where: { name: 'Tamil Bible (Parisutha Vedagamam)' },
   });
-  if (!genre) {
-    throw new Error('Tamil Bible (Parisutha Vedagamam) genre not found. Please seed first.');
+  if (!styleGuide) {
+    throw new Error('Tamil Bible (Parisutha Vedagamam) style guide not found. Please seed first.');
   }
 
   const admin = await prisma.user.findFirst({
@@ -49,7 +49,7 @@ async function run() {
       description: 'High-fidelity visual/textual Tamil translation test of the Westminster Shorter Catechism',
       sourceLang: 'en',
       targetLang: 'ta',
-      styleGuideId: genre.id,
+      styleGuideId: styleGuide.id,
       ownerId: admin.id,
       status: ProjectStatus.DRAFT,
     },

@@ -145,14 +145,14 @@ export class TranslationAgent {
         ? `When a sentence bleeds from Page ${page.pageNumber} to Page ${nextPageInBatch.pageNumber}: REMOVE the incomplete segment from Page ${page.pageNumber} and PREPEND its text to the first body segment of Page ${nextPageInBatch.pageNumber} to form the complete sentence.`
         : `When a sentence bleeds from Page ${page.pageNumber} to the next page: REMOVE the incomplete segment from Page ${page.pageNumber} and flag it in 'borrowedTextFromNextPage'.`;
 
-      const genreDescription = project.styleGuide?.description || '';
+      const styleGuideDescription = project.styleGuide?.description || '';
 
       const systemPrompt = this.promptTemplate
         .replace(/\{\{sourceLang\}\}/g, sourceLang)
         .replace(/\{\{targetLang\}\}/g, targetLang)
-        .replace(/\{\{genreName\}\}/g, styleGuideName)
-        .replace(/\{\{#if genreDescription\}\}([\s\S]*?)\{\{\/if\}\}/g, genreDescription ? '$1' : '')
-        .replace(/\{\{genreStyleGuide\}\}/g, styleGuideContent)
+        .replace(/\{\{styleGuideName\}\}/g, styleGuideName)
+        .replace(/\{\{#if styleGuideDescription\}\}([\s\S]*?)\{\{\/if\}\}/g, styleGuideDescription ? '$1' : '')
+        .replace(/\{\{styleGuideContent\}\}/g, styleGuideContent)
         .replace(/\{\{glossaryBlock\}\}/g, glossaryBlock || 'No glossary terms defined.')
         .replace(/\{\{pageCount\}\}/g, String(batchSize))
         .replace(/\{\{batchSizeMinusOne\}\}/g, String(batchSize - 1))

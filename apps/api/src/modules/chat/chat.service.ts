@@ -268,11 +268,10 @@ export class ChatService {
       },
     });
 
-    // 6. Support draft version updates for BUILD mode GENRE context
     if (session.context === ChatContext.STYLE_GUIDE && mode === ChatMode.BUILD) {
       return {
         ...savedMessage,
-        genreVersionDraft: responseText,
+        styleGuideVersionDraft: responseText,
       };
     }
 
@@ -380,9 +379,8 @@ export class ChatService {
           },
         });
 
-        // Emit final BUILD draft for GENRE contexts
         if (session.context === ChatContext.STYLE_GUIDE && mode === ChatMode.BUILD) {
-          subject.next({ data: JSON.stringify({ genreVersionDraft: accumulatedResponse }) });
+          subject.next({ data: JSON.stringify({ styleGuideVersionDraft: accumulatedResponse }) });
         }
 
         // Send terminating [DONE] event

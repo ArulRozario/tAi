@@ -37,7 +37,7 @@
   align-items: flex-start;
   margin-bottom: 8px;
 
-  .genre-icon {
+  .style-guide-icon {
     width: 32px;
     height: 32px;
     border-radius: 8px;
@@ -54,7 +54,7 @@
   flex-direction: column;
   gap: 8px;
 
-  .genre-title {
+  .style-guide-title {
     font-size: 15px;
     font-weight: 700;
     color: var(--text-main);
@@ -62,7 +62,7 @@
     line-height: 1.4;
   }
 
-  .genre-desc {
+  .style-guide-desc {
     font-size: 13px;
     color: var(--text-muted);
     margin: 0;
