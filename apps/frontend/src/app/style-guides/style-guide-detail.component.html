@@ -1,0 +1,80 @@
+<div class="style-guide-detail-page">
+  <!-- Toolbar -->
+  <header class="styleGuide-toolbar">
+    <div class="toolbar-left">
+      <p-button icon="pi pi-arrow-left" label="Back" [text]="true" routerLink="/style-guides" styleClass="back-btn" />
+      <div class="context-info">
+        <span>Style Guides</span>
+        <span class="sep">·</span>
+        @if (isNew()) {
+          <input type="text" pInputText [ngModel]="styleGuideName()" (ngModelChange)="styleGuideName.set($event)" class="styleGuide-name-input" placeholder="Enter style guide name...">
+        } @else {
+          <span><strong>{{ styleGuideName() }}</strong></span>
+        }
+      </div>
+    </div>
+
+    <div class="toolbar-center">
+      <!-- Could add breadcrumb or status here if needed -->
+    </div>
+
+    <div class="toolbar-right">
+      <p-select [options]="segmentUnits" [(ngModel)]="selectedSegmentUnit" styleClass="tai-dropdown"></p-select>
+      @if (!isNew()) {
+        <p-select [options]="versions" [(ngModel)]="selectedVersion" styleClass="tai-dropdown"></p-select>
+        <p-button label="History" icon="pi pi-history" severity="secondary" [outlined]="true" size="small"></p-button>
+        <p-button label="Test" icon="pi pi-play" severity="secondary" [outlined]="true" size="small"></p-button>
+        <p-button label="Save" icon="pi pi-check" severity="danger" [loading]="isSaving()" [disabled]="isSaving()" loadingIcon="pi pi-spinner pi-spin" (onClick)="saveGenre()"></p-button>
+      } @else {
+        <p-button label="Create" icon="pi pi-check" severity="danger" [loading]="isSaving()" [disabled]="isSaving()" loadingIcon="pi pi-spinner pi-spin" (onClick)="saveGenre()"></p-button>
+      }
+    </div>
+  </header>
+
+  <!-- Workspace -->
+  <div class="styleGuide-workspace">
+    <!-- Editor Column -->
+    <div class="editor-column" [class.collapsed]="assistantWidth() > 0 && workspaceWidth() - assistantWidth() < 1">
+      <div class="editor-container">
+        <app-markdown-editor
+          [markdown]="editorContent()"
+          (markdownChange)="editorContent.set($event)"
+          placeholder="Define your style guide here...">
+        </app-markdown-editor>
+      </div>
+    </div>
+
+    <!-- Resizer -->
+    @if (assistantWidth() > 0 && assistantWidth() < workspaceWidth()) {
+      <div class="column-resizer" (mousedown)="onResizeStart($event)">
+        <div class="resizer-handle"></div>
+      </div>
+    }
+
+    <!-- Assistant Column -->
+    <div class="assistant-column" [class.collapsed]="assistantWidth() < 1" [style.width.px]="assistantWidth()">
+      <app-ai-chat
+        #aiChat
+        title="Style Guide Assistant"
+        greeting="Hi — I'm here to help you draft and refine this style guide definition. I'll show you a diff of any changes I suggest. Click Accept to apply them."
+        [showPlanMode]="true"
+        [showDiff]="true"
+        [currentContent]="editorContent()"
+        userInitials="RK"
+        placeholder="Ask about this style guide...">
+      </app-ai-chat>
+    </div>
+
+    <!-- Expand buttons (positioned in workspace, not inside collapsed columns) -->
+    @if (assistantWidth() > workspaceWidth() - 1) {
+      <button class="workspace-expand-btn expand-editor" (click)="expandEditor()" title="Show editor">
+        <i class="pi pi-chevron-right"></i>
+      </button>
+    }
+    @if (assistantWidth() < 1) {
+      <button class="workspace-expand-btn expand-assistant" (click)="expandAssistant()" title="Show assistant">
+        <i class="pi pi-chevron-left"></i>
+      </button>
+    }
+  </div>
+</div>

@@ -1,0 +1,64 @@
+<aside class="sidebar" [class.collapsed]="layout.sidebarCollapsed()">
+  <div class="sidebar-header">
+    <div class="brand" *ngIf="!layout.sidebarCollapsed()">
+      tAI<span class="brand-dot">.</span>
+    </div>
+    <button class="collapse-toggle" (click)="layout.toggleSidebar()">
+      <i class="pi" [class.pi-angle-left]="!layout.sidebarCollapsed()" [class.pi-angle-right]="layout.sidebarCollapsed()"></i>
+    </button>
+  </div>
+
+  <!-- Dynamic Navigation Menu via PrimeNG p-menu with custom item templates -->
+  <nav class="nav-menu">
+    <p-menu [model]="sidebarMenuItems" styleClass="custom-sidebar-menu" [ngClass]="{'menu-collapsed': layout.sidebarCollapsed()}">
+      <ng-template pTemplate="submenuheader" let-item>
+        <span *ngIf="!layout.sidebarCollapsed()">{{ item.label }}</span>
+      </ng-template>
+      <ng-template pTemplate="item" let-item>
+        <a
+          class="menu-item"
+          [class.active]="item.routerLink && isActive(item.routerLink)"
+          [routerLink]="item.routerLink ?? null"
+          [pTooltip]="layout.sidebarCollapsed() ? item.label : ''"
+          tooltipPosition="right"
+          (click)="item.command ? item.command() : null"
+        >
+          <i [class]="item.icon + ' icon'"></i>
+          <span *ngIf="!layout.sidebarCollapsed()">{{ item.label }}</span>
+          @if (item.badge && !layout.sidebarCollapsed()) {
+            <span class="badge-count">{{ item.badge }}</span>
+          }
+        </a>
+      </ng-template>
+    </p-menu>
+  </nav>
+
+  <!-- Sidebar Footer -->
+  <div class="sidebar-footer">
+    <div class="footer-actions">
+      <!-- PrimeNG Text Button for Theme Toggle -->
+      <p-button 
+        [icon]="theme.isDarkMode() ? 'pi pi-sun' : 'pi pi-moon'" 
+        [text]="true" 
+        severity="secondary" 
+        (click)="theme.toggleTheme()"
+        [pTooltip]="layout.sidebarCollapsed() ? (theme.isDarkMode() ? 'Light Mode' : 'Dark Mode') : ''"
+        tooltipPosition="right"
+        styleClass="action-btn">
+      </p-button>
+      
+      <button class="bell-btn" [pTooltip]="layout.sidebarCollapsed() ? 'Notifications' : ''" tooltipPosition="right">
+        <i class="pi pi-bell"></i>
+      </button>
+    </div>
+    
+    <!-- User profile card with PrimeNG circular avatar -->
+    <div class="profile-card" [pTooltip]="layout.sidebarCollapsed() ? (user?.name || 'User') : ''" tooltipPosition="right">
+      <p-avatar [label]="userInitials" shape="circle" styleClass="profile-avatar"></p-avatar>
+      <div class="profile-info" *ngIf="!layout.sidebarCollapsed()">
+        <div class="profile-name">{{ user?.name || 'Loading...' }}</div>
+        <div class="profile-role">{{ user?.role || '' }}</div>
+      </div>
+    </div>
+  </div>
+</aside>

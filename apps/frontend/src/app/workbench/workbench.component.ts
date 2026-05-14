@@ -1,7 +1,7 @@
 import { Component, signal, computed, ViewChild, ElementRef, AfterViewInit, effect, HostListener, inject, OnInit } from '@angular/core';
 import { faro } from '@grafana/faro-web-sdk';
 import { CommonModule } from '@angular/common';
-import { RouterModule, ActivatedRoute } from '@angular/router';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 import { ButtonModule } from 'primeng/button';
@@ -9,7 +9,13 @@ import { TagModule } from 'primeng/tag';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { AvatarModule } from 'primeng/avatar';
+import { AvatarGroupModule } from 'primeng/avatargroup';
 import { SelectModule } from 'primeng/select';
+import { MultiSelectModule } from 'primeng/multiselect';
+import { InputTextModule } from 'primeng/inputtext';
+import { TextareaModule } from 'primeng/textarea';
+import { DialogModule } from 'primeng/dialog';
+import { MenuModule } from 'primeng/menu';
 import { MessageService, MenuItem } from 'primeng/api';
 import { AiChatComponent } from '../shared/components/ai-chat/ai-chat.component';
 import { AiChatService } from '../shared/components/ai-chat/ai-chat.service';
@@ -19,30 +25,12 @@ import { ModelPickerComponent } from '../shared/components/model-picker/model-pi
 import { CardModule } from 'primeng/card';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import * as Diff from 'diff';
-import { ProjectService, Project, Page } from '../projects/projects.service';
-import { mockPages } from './mock-pages';
-
-export interface WorkbenchPage {
-  id: string;
-  projectId: string;
-  chapterNum: number;
-  pageNum: number;
-  projectName: string;
-  styleGuideName?: string;
-  status: string;
-  assignedTo: string;
-  lastAiRun: string;
-  metrics: {
-    overall: number;
-    accuracy: number;
-    style: number;
-    terms: number;
-  };
-  aiFeedback: string;
-  segments: never[];
-  sourceHtml: SafeHtml;
-  targetHtml: SafeHtml;
-}
+import { ProjectService, Project, Page, PageReviewer } from '../projects/projects.service';
+import { ApiService, User } from '../core/services/api.service';
+import { AuthService } from '../auth/auth.service';
+import { WorkbenchStateService, WorkbenchPage } from './services/workbench-state.service';
+import { PageContentRendererComponent } from './components/page-content-renderer/page-content-renderer.component';
+import { InlineSegmentEditorComponent } from './components/inline-segment-editor/inline-segment-editor.component';
 
 @Component({
   selector: 'app-workbench',
@@ -56,11 +44,19 @@ export interface WorkbenchPage {
     ProgressBarModule,
     TooltipModule,
     AvatarModule,
+    AvatarGroupModule,
     SelectModule,
+    MultiSelectModule,
+    InputTextModule,
+    TextareaModule,
+    DialogModule,
+    MenuModule,
     AiChatComponent,
     CardModule,
     PageThumbnailSidebarComponent,
     ModelPickerComponent,
+    PageContentRendererComponent,
+    InlineSegmentEditorComponent,
   ],
   providers: [
     UnifiedChatService,
@@ -71,69 +67,71 @@ export interface WorkbenchPage {
 })
 export class WorkbenchComponent implements OnInit, AfterViewInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private projectService = inject(ProjectService);
+  private apiService = inject(ApiService);
+  private authService = inject(AuthService);
   private sanitizer = inject(DomSanitizer);
   private messageService = inject(MessageService);
   private chatService = inject(AiChatService);
   private unifiedChat = inject(UnifiedChatService);
+  public state = inject(WorkbenchStateService);
 
-  @ViewChild('targetScroll') targetScroll!: ElementRef;
-  @ViewChild('sourceScroll') sourceScroll!: ElementRef;
   @ViewChild('aiChat') aiChat!: AiChatComponent;
-
-  zoomLevel = signal<number>(100);
-  viewMode = signal<'side-by-side' | 'overlay'>('side-by-side');
-  sourceViewMode = signal<'html' | 'image'>('html');
-  activeSegmentId = signal<string | null>(null);
-  editingSegmentId = signal<string | null>(null);
-  rightPanelCollapsed = signal<boolean>(true);
-  leftPanelCollapsed = signal<boolean>(false);
-
-  activeSegmentTop = signal<number>(0);
-  activeSegmentLeft = signal<number>(0);
 
   private isSyncing = false;
   private isAutoScrolling = false;
-  private lastHoveredSegId: string | null = null;
-  private saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   edits = signal<{ segmentId: string; editedText: string }[]>([]);
-  isSaving = signal(false);
   baseTargetHtml = signal<string>('');
   pageErrors = signal<{ segmentId: string; severity: string; message: string }[]>([]);
 
+  // ─── Page Data (Managed in component as it's local to the page load) ───
   pageData = signal<WorkbenchPage | null>(null);
   loading = signal(true);
 
-  /** URL to the source page image via the dedicated backend endpoint */
+  sourceHtml = computed(() => this.pageData()?.sourceHtml ?? null);
+  targetHtml = computed(() => this.pageData()?.targetHtml ?? null);
+
   sourceImageUrl = computed(() => {
     const p = this.pageData();
     if (!p) return null;
     return this.projectService.withToken(`/api/v1/projects/${p.projectId}/pages/${p.pageNum}/image`);
   });
 
-  /** True when the source image fails to load */
   imageLoadError = signal(false);
-
-  // ─── Navigation & Actions ──────────────────────────────────
-  prevPageId = signal<string | null>(null);
-  nextPageId = signal<string | null>(null);
   isRetranslating = signal(false);
   isReplacingImage = signal(false);
   isReviewing = signal(false);
+  isCompleting = signal(false);
   selectedModel = signal<string>('');
 
-  // ─── AI Chat Segment State ────────────────────────────────
-  private getActiveSegmentText(): { sourceText: string; currentTranslation: string } | null {
-    const segmentId = this.activeSegmentId();
-    if (!segmentId) return null;
-    const sourceEl = document.querySelector(`.source-col [id="${segmentId}"]`);
-    const targetEl = document.querySelector(`.target-col [id="${segmentId}"]`);
-    return {
-      sourceText: sourceEl?.textContent?.trim() || '',
-      currentTranslation: targetEl?.textContent?.trim() || '',
-    };
-  }
+  isQueueMode = signal(false);
+  isMasterOrAdmin = computed(() => this.authService.hasAnyRole(['MASTER', 'ADMIN']));
+
+  overflowMenuItems: MenuItem[] = [
+    {
+      label: 'Request changes',
+      icon: 'pi pi-undo',
+      command: () => { this.showRequestChangesDialog = true; },
+    },
+    {
+      label: 'Escalate',
+      icon: 'pi pi-exclamation-triangle',
+      command: () => { this.showEscalateDialog = true; },
+    },
+  ];
+
+  showRequestChangesDialog = false;
+  showEscalateDialog = false;
+  showAddReviewerDialog = false;
+  showReassignDialog = false;
+  requestChangesNote = '';
+  escalateReason = '';
+
+  allUsers = signal<User[]>([]);
+  selectedNewReviewerUserId = '';
+  selectedReassignUserIds: string[] = [];
 
   pageStatusOptions: MenuItem[] = [
     { label: 'Pending', value: 'PENDING' },
@@ -143,18 +141,14 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     { label: 'Human Review', value: 'HUMAN_REVIEW' },
     { label: 'Approved', value: 'APPROVED' },
     { label: 'Rejected', value: 'REJECTED' },
-    { label: 'Error', value: 'ERROR' },
+    { label: 'Render Error', value: 'RENDER_ERROR' },
+    { label: 'Translation Error', value: 'TRANSLATION_ERROR' },
   ];
 
   constructor() {
-    effect(() => {
-      this.activeSegmentId(); // track
-      setTimeout(() => this.updateActiveStyles(), 0);
-    });
-
     this.chatService.contentAccepted$.subscribe((content) => {
       const pageId = this.pageData()?.id;
-      const segmentId = this.activeSegmentId();
+      const segmentId = this.state.activeSegmentId();
       if (pageId && segmentId) {
         this.projectService.savePageEdit(pageId, segmentId, content).subscribe({
           next: () => {
@@ -171,7 +165,8 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   }
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
+    this.isQueueMode.set(this.route.snapshot.data['mode'] === 'queue');
+    const id = this.route.snapshot.paramMap.get('pageId');
     if (id) {
       this.loadPageData(id);
     }
@@ -186,8 +181,8 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
       next: (page) => {
         this.projectService.getProject(page.projectId).subscribe({
           next: (project) => {
-            const baseSourceHtml = this.ensureSegments(page.originalHtml || '');
-            const baseTargetHtml = this.ensureSegments(page.translatedHtml || '');
+            const baseSourceHtml = page.originalHtml || '';
+            const baseTargetHtml = page.translatedHtml || '';
             this.baseTargetHtml.set(baseTargetHtml);
 
             this.pageData.set({
@@ -198,6 +193,8 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
               projectName: project.name,
               styleGuideName: project.styleGuide?.name,
               status: page.status,
+              sourceLang: project.sourceLang,
+              targetLang: project.targetLang,
               assignedTo: 'You',
               lastAiRun: 'Recently',
               metrics: {
@@ -208,17 +205,13 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
               },
               aiFeedback: 'Processing complete. Visual translation generated.',
               segments: [],
+              reviewers: page.reviewers || [],
               sourceHtml: this.sanitizer.bypassSecurityTrustHtml(baseSourceHtml),
               targetHtml: this.sanitizer.bypassSecurityTrustHtml(baseTargetHtml),
             });
 
-            // Load edits and compile
             this.loadEdits(pageId, baseTargetHtml);
-
-            // Load errors for this page
             this.loadPageErrors(pageId);
-
-            // Set model picker to project's saved model
             this.selectedModel.set(project.translationModel || '');
             this.loading.set(false);
             this.loadSiblings(page.id);
@@ -253,8 +246,7 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   loadPageErrors(pageId: string) {
     this.projectService.getPageErrors(pageId).subscribe({
       next: (errors) => {
-        this.pageErrors.set(errors);
-        this.applyErrorStyles();
+        this.state.pageErrors.set(errors);
       },
       error: (err) => faro.api?.pushError(new Error('Failed to load page errors'), { context: { pageId, error: String(err) } }),
     });
@@ -285,50 +277,43 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     return doc.body.innerHTML;
   }
 
-  /** Load prev/next sibling page IDs for navigation */
   loadSiblings(pageId: string) {
     this.projectService.getPageSiblings(pageId).subscribe({
       next: (siblings) => {
-        this.prevPageId.set(siblings.prevPageId);
-        this.nextPageId.set(siblings.nextPageId);
+        this.state.prevPageId.set(siblings.prevPageId);
+        this.state.nextPageId.set(siblings.nextPageId);
       },
       error: (err) => faro.api?.pushError(new Error('Failed to load page siblings'), { context: { pageId, error: String(err) } }),
     });
   }
 
-  /** Navigate to the previous page */
   goToPrevPage() {
-    const id = this.prevPageId();
+    const id = this.state.prevPageId();
     if (id) {
       this.loadPageData(id);
     }
   }
 
-  /** Navigate to the next page */
   goToNextPage() {
-    const id = this.nextPageId();
+    const id = this.state.nextPageId();
     if (id) {
       this.loadPageData(id);
     }
   }
 
-  /** Navigate to a page selected from the thumbnail sidebar */
   onSidebarPageSelect(pageId: string) {
     this.loadPageData(pageId);
   }
 
-  /** Trigger file input for image replacement */
   triggerImageReplace(input: HTMLInputElement) {
     input.click();
   }
 
-  /** Handle image file selection and upload */
   onImageReplaceSelected(event: Event, pageId: string) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
 
-    // Validate: must be an image
     if (!file.type.startsWith('image/')) {
       this.messageService.add({ severity: 'error', summary: 'Invalid file', detail: 'Please select an image file.' });
       return;
@@ -339,7 +324,6 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
       next: () => {
         this.isReplacingImage.set(false);
         this.messageService.add({ severity: 'success', summary: 'Image replaced', detail: 'Page image updated. You can now retranslate the page.' });
-        // Refresh the image by busting cache
         this.imageLoadError.set(false);
         this.pageData.update(p => p ? { ...p } : p);
       },
@@ -353,7 +337,6 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     input.value = '';
   }
 
-  /** Retranslate the current page using the selected model */
   retranslatePage() {
     const pageId = this.pageData()?.id;
     if (!pageId) return;
@@ -374,7 +357,6 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     });
   }
 
-  /** Run AI review on the current page */
   startReview() {
     const pageId = this.pageData()?.id;
     if (!pageId) return;
@@ -398,7 +380,6 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     });
   }
 
-  /** Change the status of the current page */
   onStatusChange(status: string) {
     const pageId = this.pageData()?.id;
     if (!pageId || !status) return;
@@ -419,255 +400,6 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     });
   }
 
-  /**
-   * Temporary helper to wrap lines in segments if they are not already wrapped.
-   * In a real extraction, this is done by the backend.
-   */
-  private ensureSegments(html: string): string {
-    if (html.includes('class="segment"')) return html;
-
-    // Simple wrap by line/break for demo if not segmented
-    const lines = html.split('<br>');
-    return lines.map((line) => `<span id="${this.generateUuid()}" class="segment">${line}</span>`).join('<br>');
-  }
-
-  private generateUuid(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
-  }
-
-  ngAfterViewInit() {
-    // No longer need manual listener attachment
-  }
-
-  reviewerNotes = 'Reviewing visual translation consistency...';
-
-  pagesList = [
-    { id: '1', num: 1, status: 'in-review' },
-  ];
-
-  setZoom(delta: number) {
-    this.zoomLevel.update(z => Math.max(50, Math.min(200, z + delta)));
-  }
-
-  setActiveSegment(id: string) {
-    this.activeSegmentId.set(id);
-  }
-
-  toggleRightPanel() {
-    this.rightPanelCollapsed.update(v => !v);
-  }
-
-  onScroll(event: Event, source: 'source' | 'target') {
-    if (this.isSyncing || this.isAutoScrolling) return;
-
-    this.isSyncing = true;
-    const scrolledEl = event.target as HTMLElement;
-    const targetEl = source === 'source' 
-      ? this.targetScroll.nativeElement 
-      : this.sourceScroll.nativeElement;
-
-    if (scrolledEl && targetEl) {
-      const scrollPercentage = scrolledEl.scrollTop / (scrolledEl.scrollHeight - scrolledEl.clientHeight);
-      targetEl.scrollTop = scrollPercentage * (targetEl.scrollHeight - targetEl.clientHeight);
-    }
-    
-    setTimeout(() => this.isSyncing = false, 50);
-  }
-
-  onSegmentMouseMove(event: MouseEvent) {
-    const target = event.target as HTMLElement;
-    const segmentEl = target.closest('.segment');
-    const segId = segmentEl?.getAttribute('id');
-
-    if (segId !== this.lastHoveredSegId) {
-      document.querySelectorAll('.segment.hovered').forEach(el => {
-        el.classList.remove('hovered');
-      });
-
-      if (segId) {
-        const selector = `[id="${segId}"]`;
-        document.querySelectorAll(selector).forEach(el => {
-          el.classList.add('hovered');
-        });
-      }
-      this.lastHoveredSegId = segId as string;
-    }
-  }
-
-  onSegmentMouseLeave() {
-    this.lastHoveredSegId = null;
-    document.querySelectorAll('.segment.hovered').forEach(el => {
-      el.classList.remove('hovered');
-    });
-  }
-
-  handleSegmentClick(event: MouseEvent) {
-    const target = event.target as HTMLElement;
-    const segmentEl = target.closest('.segment');
-    if (!segmentEl) return;
-
-    const segId = segmentEl.getAttribute('id');
-    if (!segId) return;
-
-    this.setActiveSegment(segId);
-
-    this.isAutoScrolling = true;
-    const selector = `[id="${segId}"]`;
-    document.querySelectorAll(selector).forEach((el) => {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-    setTimeout(() => (this.isAutoScrolling = false), 800);
-  }
-
-  approvedSegmentIds = signal<Set<string>>(new Set());
-
-  @HostListener('document:keydown', ['$event'])
-  handleKeyboardEvent(event: KeyboardEvent) {
-    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-      const activeId = this.activeSegmentId();
-      if (activeId !== null) {
-        event.preventDefault();
-        const editingId = this.editingSegmentId();
-        if (editingId === activeId) {
-          const segmentEl = document.querySelector(`.target-col [id="${editingId}"]`) as HTMLElement;
-          if (segmentEl) segmentEl.blur();
-        }
-        setTimeout(() => this.approveSegment(activeId), 10);
-      }
-    }
-  }
-
-  approveSegment(id: string) {
-    this.approvedSegmentIds.update((set) => {
-      const next = new Set(set);
-      next.add(id);
-      return next;
-    });
-    this.updateActiveStyles();
-    this.advanceToNextSegment(id);
-  }
-
-  advanceToNextSegment(currentId: string) {
-    const targetCol = document.querySelector('.target-col');
-    if (!targetCol) return;
-    const segments = Array.from(targetCol.querySelectorAll('.segment'));
-    const idx = segments.findIndex((el) => el.getAttribute('id') === currentId);
-    const nextEl = segments[idx + 1];
-    if (nextEl) {
-      const nextId = nextEl.getAttribute('id')!;
-      this.setActiveSegment(nextId);
-      this.isAutoScrolling = true;
-      document.querySelectorAll(`[id="${nextId}"]`).forEach((el) => {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
-      setTimeout(() => (this.isAutoScrolling = false), 800);
-    }
-  }
-
-  triggerEdit(segmentId: string) {
-    const segmentEl = document.querySelector(`.target-col [id="${segmentId}"]`) as HTMLElement;
-    if (segmentEl) {
-      this.editingSegmentId.set(segmentId);
-      this.enterEditMode(segmentEl, segmentId);
-      this.setActiveSegment(segmentId);
-    }
-  }
-
-  handleSegmentDoubleClick(event: MouseEvent) {
-    const target = event.target as HTMLElement;
-    const segmentEl = target.closest('.segment') as HTMLElement;
-
-    if (!segmentEl || !target.closest('.target-col')) return;
-
-    const segId = segmentEl.getAttribute('id');
-    if (!segId) return;
-
-    this.editingSegmentId.set(segId);
-    this.enterEditMode(segmentEl, segId);
-    this.setActiveSegment(segId);
-
-    this.isAutoScrolling = true;
-    const selector = `[id="${segId}"]`;
-    document.querySelectorAll(selector).forEach((el) => {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-    setTimeout(() => (this.isAutoScrolling = false), 800);
-  }
-
-  private enterEditMode(segmentEl: HTMLElement, segmentId: string) {
-    segmentEl.contentEditable = 'true';
-    segmentEl.focus();
-
-    const range = document.createRange();
-    const sel = window.getSelection();
-    range.selectNodeContents(segmentEl);
-    range.collapse(false);
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-
-    const saveEdit = () => {
-      const newValue = segmentEl.innerText;
-      this.editingSegmentId.set(null);
-      segmentEl.contentEditable = 'false';
-      segmentEl.onblur = null;
-      segmentEl.onkeydown = null;
-
-      // Debounced auto-save to API
-      if (this.saveDebounceTimer) {
-        clearTimeout(this.saveDebounceTimer);
-      }
-      this.isSaving.set(true);
-      this.saveDebounceTimer = setTimeout(() => {
-        const pageId = this.pageData()?.id;
-        if (!pageId) return;
-        this.projectService.savePageEdit(pageId, segmentId, newValue).subscribe({
-          next: () => {
-            this.isSaving.set(false);
-            this.messageService.add({ severity: 'success', summary: 'Saved', detail: 'Edit saved.', life: 1500 });
-            // Reload edits and recompile
-            const baseHtml = this.pageData()?.targetHtml ? undefined : '';
-            this.loadEdits(pageId);
-          },
-          error: (err) => {
-            this.isSaving.set(false);
-            const detail = err?.error?.message || 'Failed to save edit.';
-            this.messageService.add({ severity: 'error', summary: 'Error', detail });
-          },
-        });
-      }, 500);
-    };
-
-    segmentEl.onblur = saveEdit;
-    segmentEl.onkeydown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        segmentEl.blur();
-      }
-      if (e.key === 'Escape') {
-        segmentEl.blur();
-      }
-    };
-  }
-
-  resetSegmentEdit(segmentId: string) {
-    const pageId = this.pageData()?.id;
-    if (!pageId) return;
-    this.projectService.resetPageEdit(pageId, segmentId).subscribe({
-      next: () => {
-        this.messageService.add({ severity: 'success', summary: 'Reset', detail: 'Segment edit reset.', life: 1500 });
-        this.loadEdits(pageId);
-      },
-      error: (err) => {
-        const detail = err?.error?.message || 'Failed to reset edit.';
-        this.messageService.add({ severity: 'error', summary: 'Error', detail });
-      },
-    });
-  }
-
   resetAllEdits() {
     const pageId = this.pageData()?.id;
     if (!pageId) return;
@@ -676,119 +408,165 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
         this.messageService.add({ severity: 'success', summary: 'Reset', detail: 'All edits reset.', life: 1500 });
         this.loadEdits(pageId);
       },
-      error: (err) => {
-        const detail = err?.error?.message || 'Failed to reset edits.';
-        this.messageService.add({ severity: 'error', summary: 'Error', detail });
+      error: (err: any) => {
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: err?.error?.message || 'Failed to reset all edits.' });
       },
     });
   }
 
-  /** Open the AI chat panel for segment retranslation */
-  openAiRetranslate() {
-    const pageId = this.pageData()?.id;
-    const segmentId = this.activeSegmentId();
-    if (pageId && segmentId) {
-      this.unifiedChat.configure({
-        context: 'segment',
-        entityId: pageId,
-        segmentId,
-      });
-    }
+  ngAfterViewInit() {}
 
-    this.rightPanelCollapsed.set(false);
-    const seg = this.getActiveSegmentText();
-    const styleGuide = this.pageData()?.styleGuideName;
-    if (seg && this.aiChat) {
-      const greeting = `Segment retranslation mode${styleGuide ? ` — *${styleGuide}*` : ''}.\n\n**Source:** ${seg.sourceText}\n\n**Current:** ${seg.currentTranslation || '[none]'}\n\nType your instructions (e.g., "make it more formal", "fix grammar") and I'll retranslate this segment.`;
-      this.aiChat.reset(greeting);
-    }
+  setZoom(delta: number) {
+    this.state.zoomLevel.update(z => Math.max(50, Math.min(200, z + delta)));
   }
 
-  private updateActiveStyles() {
-    const activeId = this.activeSegmentId();
-    const approved = this.approvedSegmentIds();
-    const edits = this.edits();
-    const editedIds = new Set(edits.map((e) => e.segmentId));
-    const errors = this.pageErrors();
-    const errorIds = new Set(errors.map((e) => e.segmentId));
+  toggleRightPanel() {
+    this.state.rightPanelCollapsed.update(v => !v);
+  }
 
-    document.querySelectorAll('.segment.active').forEach((el) => {
-      el.classList.remove('active');
-    });
+  onScroll(event: any, source: 'source' | 'target') {
+    if (this.isSyncing) return;
 
-    document.querySelectorAll('.segment.approved').forEach((el) => {
-      el.classList.remove('approved');
-    });
+    this.isSyncing = true;
+    const scrollPercentage = event.detail.scrollPercentage;
+    
+    window.dispatchEvent(new CustomEvent('workbench-sync-scroll', { 
+      detail: { source, scrollPercentage } 
+    }));
+    
+    setTimeout(() => this.isSyncing = false, 50);
+  }
 
-    document.querySelectorAll('.segment.edited').forEach((el) => {
-      el.classList.remove('edited');
-    });
-
-    document.querySelectorAll('.segment.has-error').forEach((el) => {
-      el.classList.remove('has-error');
-    });
-
-    document.querySelectorAll('.segment .error-badge').forEach((el) => el.remove());
-
-    approved.forEach((id) => {
-      document.querySelectorAll(`[id="${id}"]`).forEach((el) => {
-        el.classList.add('approved');
-      });
-    });
-
-    editedIds.forEach((id) => {
-      document.querySelectorAll(`[id="${id}"]`).forEach((el) => {
-        el.classList.add('edited');
-      });
-    });
-
-    errorIds.forEach((id) => {
-      document.querySelectorAll(`[id="${id}"]`).forEach((el) => {
-        el.classList.add('has-error');
-        const badge = document.createElement('span');
-        badge.className = 'error-badge';
-        badge.setAttribute('title', errors.find(e => e.segmentId === id)?.message || 'Error');
-        badge.textContent = errors.find(e => e.segmentId === id)?.severity === 'CRITICAL' ? '!' : '?';
-        el.appendChild(badge);
-      });
-    });
-
-    if (activeId === null) return;
-
-    document.querySelectorAll(`[id="${activeId}"]`).forEach((el) => {
-      el.classList.add('active');
-
-      const targetCol = el.closest('.target-col');
-      if (targetCol) {
-        const scrollContent = targetCol.querySelector('.scroll-content');
-        if (scrollContent) {
-          const elRect = el.getBoundingClientRect();
-          const scrollRect = scrollContent.getBoundingClientRect();
-          const top = elRect.top - scrollRect.top + scrollContent.scrollTop - 14;
-          const left = elRect.right - scrollRect.left + scrollContent.scrollLeft - 14;
-
-          this.activeSegmentTop.set(top);
-          this.activeSegmentLeft.set(left);
-        }
+  goBack() {
+    if (this.isQueueMode()) {
+      this.router.navigate(['/queue']);
+    } else {
+      const projectId = this.pageData()?.projectId;
+      if (projectId) {
+        this.router.navigate(['/projects', projectId]);
       }
+    }
+  }
+
+  skipPage() {
+    const pageId = this.pageData()?.id;
+    if (!pageId) return;
+    this.apiService.getNextInQueue(pageId).subscribe({
+      next: (res) => {
+        if (res.nextPageId) {
+          this.router.navigate(['/review', res.nextPageId]);
+          this.loadPageData(res.nextPageId);
+          this.isQueueMode.set(true);
+        } else {
+          this.messageService.add({ severity: 'info', summary: 'Queue empty', detail: 'No more pages in the review queue.' });
+          this.router.navigate(['/queue']);
+        }
+      },
+      error: (err) => {
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to get next page.' });
+      },
     });
   }
 
-  private applyErrorStyles() {
-    document.querySelectorAll('.segment.has-error').forEach((el) => {
-      el.classList.remove('has-error');
+  completePage() {
+    const pageId = this.pageData()?.id;
+    if (!pageId) return;
+    this.isCompleting.set(true);
+    this.apiService.approvePage(pageId).subscribe({
+      next: () => {
+        this.isCompleting.set(false);
+        this.messageService.add({ severity: 'success', summary: 'Approved', detail: 'Page approved.' });
+        this.skipPage();
+      },
+      error: (err) => {
+        this.isCompleting.set(false);
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to approve page.' });
+      },
     });
-    document.querySelectorAll('.segment .error-badge').forEach((el) => el.remove());
-    const errors = this.pageErrors();
-    errors.forEach(({ segmentId, severity, message }) => {
-      document.querySelectorAll(`[id="${segmentId}"]`).forEach((el) => {
-        el.classList.add('has-error');
-        const badge = document.createElement('span');
-        badge.className = 'error-badge';
-        badge.setAttribute('title', message);
-        badge.textContent = severity === 'CRITICAL' ? '!' : '?';
-        el.appendChild(badge);
+  }
+
+  submitRequestChanges() {
+    const pageId = this.pageData()?.id;
+    if (!pageId || !this.requestChangesNote.trim()) return;
+    this.apiService.requestChanges(pageId, this.requestChangesNote).subscribe({
+      next: () => {
+        this.showRequestChangesDialog = false;
+        this.requestChangesNote = '';
+        this.messageService.add({ severity: 'success', summary: 'Changes requested', detail: 'Page returned for retranslation.' });
+        this.skipPage();
+      },
+      error: (err) => {
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to request changes.' });
+      },
+    });
+  }
+
+  submitEscalate() {
+    const pageId = this.pageData()?.id;
+    if (!pageId || !this.escalateReason.trim()) return;
+    this.apiService.escalatePage(pageId, this.escalateReason).subscribe({
+      next: () => {
+        this.showEscalateDialog = false;
+        this.escalateReason = '';
+        this.messageService.add({ severity: 'success', summary: 'Escalated', detail: 'Page has been escalated.' });
+        this.skipPage();
+      },
+      error: (err) => {
+        this.showEscalateDialog = false;
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to escalate page.' });
+      },
+    });
+  }
+
+  openAddReviewer() {
+    if (!this.allUsers().length) {
+      this.apiService.getUsers().subscribe({
+        next: (users) => this.allUsers.set(users),
+        error: () => {},
       });
+    }
+    this.selectedNewReviewerUserId = '';
+    this.showAddReviewerDialog = true;
+  }
+
+  submitAddReviewer() {
+    const pageId = this.pageData()?.id;
+    if (!pageId || !this.selectedNewReviewerUserId) return;
+    this.apiService.addReviewer(pageId, this.selectedNewReviewerUserId).subscribe({
+      next: (page) => {
+        this.showAddReviewerDialog = false;
+        this.pageData.update(p => p ? { ...p, reviewers: (page as any).reviewers || p.reviewers } : p);
+        this.messageService.add({ severity: 'success', summary: 'Reviewer added', life: 1500 });
+      },
+      error: (err) => {
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to add reviewer.' });
+      },
+    });
+  }
+
+  openReassign() {
+    if (!this.allUsers().length) {
+      this.apiService.getUsers().subscribe({
+        next: (users) => this.allUsers.set(users),
+        error: () => {},
+      });
+    }
+    this.selectedReassignUserIds = this.pageData()?.reviewers?.map(r => r.userId) || [];
+    this.showReassignDialog = true;
+  }
+
+  submitReassign() {
+    const pageId = this.pageData()?.id;
+    if (!pageId || !this.selectedReassignUserIds.length) return;
+    this.apiService.reassignReviewers(pageId, this.selectedReassignUserIds).subscribe({
+      next: (page) => {
+        this.showReassignDialog = false;
+        this.pageData.update(p => p ? { ...p, reviewers: (page as any).reviewers || p.reviewers } : p);
+        this.messageService.add({ severity: 'success', summary: 'Reviewers updated', life: 1500 });
+      },
+      error: (err) => {
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to reassign reviewers.' });
+      },
     });
   }
 }

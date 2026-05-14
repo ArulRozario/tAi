@@ -1,441 +1,189 @@
-import { Component, signal, computed, inject, OnInit } from '@angular/core';
-import { faro } from '@grafana/faro-web-sdk';
+import { Component, signal, inject, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-
 import { ButtonModule } from 'primeng/button';
-import { TagModule } from 'primeng/tag';
-import { AvatarModule } from 'primeng/avatar';
-import { ProgressBarModule } from 'primeng/progressbar';
 import { SplitButtonModule } from 'primeng/splitbutton';
-import { TooltipModule } from 'primeng/tooltip';
-import { SelectModule } from 'primeng/select';
 import { MenuItem, MessageService } from 'primeng/api';
-import { QualityGaugeComponent } from '../../shared/components/quality-gauge/quality-gauge.component';
 import { PageThumbnailComponent } from '../../shared/components/page-thumbnail/page-thumbnail.component';
 import { ModelPickerComponent } from '../../shared/components/model-picker/model-picker.component';
 import { CardModule } from 'primeng/card';
-import { ProjectService, Project, Chapter, ProjectStats, Page } from '../projects.service';
+import { ProgressBarModule } from 'primeng/progressbar';
+import { ProjectService, Project, Page } from '../projects.service';
 
-interface ExtractionProgress {
-  currentPage: number;
-  totalPages: number;
-  status: 'extracting' | 'complete' | 'error';
-  pageId?: string;
-}
+const ACTIVE_STATUSES = new Set(['PENDING', 'RENDERING', 'TRANSLATING', 'REVIEWING']);
 
 @Component({
   selector: 'app-project-detail',
   standalone: true,
   imports: [
-    CommonModule,
-    RouterModule,
-    ButtonModule,
-    TagModule,
-    AvatarModule,
-    ProgressBarModule,
-    SplitButtonModule,
-    TooltipModule,
-    SelectModule,
-    FormsModule,
-    QualityGaugeComponent,
-    PageThumbnailComponent,
-    ModelPickerComponent,
-    CardModule,
+    CommonModule, RouterModule, FormsModule,
+    ButtonModule, SplitButtonModule, ProgressBarModule, CardModule,
+    PageThumbnailComponent, ModelPickerComponent,
   ],
   templateUrl: './project-detail.component.html',
   styleUrl: './project-detail.component.scss',
 })
-export class ProjectDetailComponent implements OnInit {
+export class ProjectDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private projectService = inject(ProjectService);
   private messageService = inject(MessageService);
 
-  projectId = signal<string | null>(null);
   project = signal<Project | null>(null);
-  chapters = signal<Chapter[]>([]);
-  stats = signal<ProjectStats | null>(null);
-  loading = signal(true);
-
-  // ─── Extraction State ──────────────────────────────────────
-  isExtracting = signal(false);
-  extractionProgress = signal<ExtractionProgress | null>(null);
-  extractionError = signal<string | null>(null);
-
-  // ─── Model Picker State ────────────────────────────────────
-  selectedModel = signal<string>('');
-
-  exportItems: MenuItem[] = [
-    {
-      label: 'Export as DOCX',
-      icon: 'pi pi-file-word',
-      command: () => this.exportProject('docx'),
-    },
-    {
-      label: 'Export as Text',
-      icon: 'pi pi-file',
-      command: () => this.exportProject('text'),
-    },
-    {
-      label: 'Export as HTML',
-      icon: 'pi pi-code',
-      command: () => this.exportProject('html'),
-    },
-  ];
-
-  genreOptions = signal<{ label: string; value: string }[]>([]);
-  selectedGenre = signal<string>('');
-
-  selectedChapterId = signal<string | null>(null);
-
-  selectedChapter = computed(() => {
-    const chapters = this.chapters();
-    if (chapters.length === 0) return null;
-    return chapters.find(c => c.id === this.selectedChapterId()) ?? chapters[0];
-  });
-
-  isTranslating = signal(false);
+  loadError = signal<string | null>(null);
+  projectId = signal<string | null>(null);
+  selectedModel = signal('');
+  translationState = signal<'idle' | 'running' | 'paused'>('idle');
   isReviewing = signal(false);
 
-  chapterPages = computed(() => {
-    const ch = this.selectedChapter();
-    if (!ch) return [];
-    const proj = this.project();
-    if (!proj || !proj.pages) return [];
-    return proj.pages.filter(p => p.chapterId === ch.id);
-  });
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Fallback for pages without chapters
-  orphanPages = computed(() => {
-    const proj = this.project();
-    if (!proj || !proj.pages) return [];
-    return proj.pages.filter(p => !p.chapterId);
-  });
+  exportItems: MenuItem[] = [
+    { label: 'Export as DOCX', icon: 'pi pi-file-word', command: () => this.exportProject('docx') },
+    { label: 'Export as Text', icon: 'pi pi-file', command: () => this.exportProject('text') },
+    { label: 'Export as HTML', icon: 'pi pi-code', command: () => this.exportProject('html') },
+  ];
+
+  get pages(): Page[] { return this.project()?.pages ?? []; }
+  get hasPages(): boolean { return this.pages.length > 0; }
+
+  get canTranslate(): boolean {
+    return this.translationState() === 'idle' &&
+      this.pages.some(p => p.status === 'READY' || p.status === 'TRANSLATION_ERROR');
+  }
+
+  get translationDone(): number {
+    return this.pages.filter(p => ['TRANSLATED', 'HUMAN_REVIEW', 'APPROVED'].includes(p.status)).length;
+  }
+
+  get translationTotal(): number {
+    return this.pages.filter(p => !['PENDING', 'RENDERING', 'READY', 'TRANSLATION_ERROR'].includes(p.status)).length;
+  }
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.projectId.set(id);
-      this.loadData();
+      this.loadProject();
     }
   }
 
-  loadData() {
+  loadProject() {
     const id = this.projectId()!;
-    this.loading.set(true);
-    this.extractionError.set(null);
-
     this.projectService.getProject(id).subscribe({
       next: (p) => {
         this.project.set(p);
-        if (p.styleGuide) {
-          this.genreOptions.set([{ label: p.styleGuide.name, value: p.styleGuide.id }]);
-          this.selectedGenre.set(p.styleGuide.id);
+        this.loadError.set(null);
+        const isTranslating = p.pages?.some(pg => pg.status === 'TRANSLATING') ?? false;
+        if (isTranslating && this.translationState() === 'idle') {
+          this.translationState.set('running');
+        } else if (!isTranslating && this.translationState() === 'running') {
+          this.translationState.set('idle');
         }
-
-        // Set the model picker to the project's saved model
-        // model selection is per-operation, not persisted to project
-
-        // Auto-trigger extraction if project has a source file but no pages yet
-        const hasNoPages = !p.pages || p.pages.length === 0;
-        const hasSourceFile = !!p.sourceFileId;
-        if (hasNoPages && hasSourceFile && !this.isExtracting()) {
-          this.startExtraction();
-        }
+        this.schedulePoll(p);
       },
-      error: (err) => faro.api?.pushError(new Error('Failed to load project detail'), { context: { projectId: this.projectId() ?? '', error: String(err) } })
-    });
-
-    this.projectService.getChapters(id).subscribe({
-      next: (ch) => {
-        this.chapters.set(ch);
-        if (ch.length > 0) {
-          this.selectedChapterId.set(ch[0].id);
-        }
-      },
-      error: (err) => faro.api?.pushError(new Error('Failed to load chapters'), { context: { projectId: this.projectId() ?? '', error: String(err) } })
-    });
-
-    this.projectService.getStats(id).subscribe({
-      next: (s) => {
-        this.stats.set(s);
-        this.loading.set(false);
-      },
-      error: (err) => {
-        faro.api?.pushError(new Error('Failed to load project stats'), { context: { projectId: this.projectId() ?? '', error: String(err) } });
-        this.loading.set(false);
-      }
+      error: (err) => this.loadError.set(err?.error?.message || 'Failed to load project.'),
     });
   }
 
-  /**
-   * Starts the extraction SSE stream. Renders PDF pages to images and creates
-   * PENDING Page records. Progress is streamed in real-time.
-   */
-  startExtraction() {
-    const id = this.projectId();
-    if (!id) return;
-
-    this.isExtracting.set(true);
-    this.extractionProgress.set({ currentPage: 0, totalPages: 0, status: 'extracting' });
-    this.extractionError.set(null);
-
-    const eventSource = new EventSource(this.projectService.withToken(`/api/v1/projects/${id}/extract`));
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      // Extraction complete
-      if (data.message === 'Extraction complete.') {
-        this.isExtracting.set(false);
-        this.extractionProgress.set({
-          currentPage: data.totalPages,
-          totalPages: data.totalPages,
-          status: 'complete',
-        });
-        eventSource.close();
-        this.loadData(); // Refresh to show page cards
-        return;
-      }
-
-      // Extraction failed
-      if (data.message === 'Extraction failed.') {
-        this.isExtracting.set(false);
-        this.extractionError.set(data.error || 'Unknown extraction error');
-        this.extractionProgress.set({
-          currentPage: 0,
-          totalPages: 0,
-          status: 'error',
-        });
-        eventSource.close();
-        return;
-      }
-
-      // Progress update
-      if (data.status === 'extracting') {
-        this.extractionProgress.set(data as ExtractionProgress);
-      }
-    };
-
-    eventSource.onerror = (err) => {
-      faro.api?.pushError(new Error('Extraction stream interrupted'), { context: { projectId: this.project()?.id ?? '' } });
-      this.isExtracting.set(false);
-      this.extractionError.set('Connection lost during extraction');
-      eventSource.close();
-    };
+  private schedulePoll(p: Project) {
+    this.clearPoll();
+    if (this.shouldPoll(p)) {
+      this.pollTimer = setTimeout(() => this.loadProject(), 2000);
+    }
   }
 
-  get approvedPercent(): number {
-    const s = this.stats();
-    return s && s.totalPages > 0 ? Math.round((s.approved / s.totalPages) * 100) : 0;
-  }
-  get inReviewPercent(): number {
-    const s = this.stats();
-    return s && s.totalPages > 0 ? Math.round((s.inReview / s.totalPages) * 100) : 0;
-  }
-  get pendingPercent(): number {
-    const s = this.stats();
-    return s && s.totalPages > 0 ? Math.round((s.pending / s.totalPages) * 100) : 0;
+  private shouldPoll(p: Project): boolean {
+    if (p.status === 'PROCESSING') return true;
+    return p.pages?.some(pg => ACTIVE_STATUSES.has(pg.status)) ?? false;
   }
 
-  get extractionPercent(): number {
-    const p = this.extractionProgress();
-    if (!p || p.totalPages === 0) return 0;
-    return Math.round((p.currentPage / p.totalPages) * 100);
-  }
-
-  getChapterProgress(ch: Chapter): number {
-    return 0;
-  }
-
-  getChapterTagSeverity(status: string): 'success' | 'warn' | 'secondary' {
-    const s = status.toLowerCase();
-    if (s === 'done' || s === 'completed') return 'success';
-    if (s === 'in-progress' || s === 'processing') return 'warn';
-    return 'secondary';
-  }
-
-  getChapterTagLabel(status: string): string {
-    const s = status.toLowerCase();
-    if (s === 'done' || s === 'completed') return 'Done';
-    if (s === 'in-progress' || s === 'processing') return 'In progress';
-    return 'Queued';
-  }
-
-  selectChapter(id: string): void {
-    this.selectedChapterId.set(id);
-  }
-
-  navigateToWorkbench(pageId: string): void {
-    this.router.navigate(['/workbench', pageId]);
+  private clearPoll() {
+    if (this.pollTimer) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 
   startTranslation() {
     const id = this.projectId();
     if (!id) return;
-
-    this.isTranslating.set(true);
-    const model = this.selectedModel();
-    const baseUrl = `/api/v1/projects/${id}/translate${model ? `?model=${encodeURIComponent(model)}` : ''}`;
-    const eventSource = new EventSource(this.projectService.withToken(baseUrl));
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      // Ignore heartbeats — they just keep the SSE connection alive
-      if (data.type === 'heartbeat') {
-        return;
-      }
-
-      // Initial status / total pages info
-      if (data.type === 'status') {
-        console.log(`[Translation] ${data.message}`);
-        return;
-      }
-
-      // Batch started
-      if (data.type === 'batch-start') {
-        console.log(`[Translation] Batch ${data.batch}/${data.totalBatches} started — pages ${data.pageNumbers?.join(', ')}`);
-        return;
-      }
-
-      // Page update (translated or error)
-      if (data.type === 'page-update' && data.pageNumber && data.status) {
-        this.updatePageStatus(data.pageNumber, data.status);
-        return;
-      }
-
-      // Translation fully completed
-      if (data.type === 'completed' || data.message === 'Translation completed.') {
-        this.isTranslating.set(false);
-        eventSource.close();
-        this.loadData();
-        return;
-      }
-
-      // Quota exceeded — stop immediately so user can switch models
-      if (data.type === 'quota-exceeded') {
-        this.isTranslating.set(false);
-        eventSource.close();
-        this.loadData(); // refresh to show ERROR on current batch
-        this.messageService.add({
-          severity: 'warn',
-          summary: 'Quota exceeded',
-          detail: 'The selected model has reached its API quota. Please choose a different model and try again.',
-          sticky: true,
-        });
-        return;
-      }
-
-      // Fatal error from the backend
-      if (data.type === 'fatal-error') {
-        faro.api?.pushError(new Error(`Translation fatal error: ${data.error}`), { context: { projectId: this.project()?.id ?? '' } });
-        this.isTranslating.set(false);
-        eventSource.close();
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Translation failed',
-          detail: data.error || 'An unexpected error occurred during translation.',
-        });
-        return;
-      }
-
-      // Legacy fallback for old-style messages
-      if (data.message === 'No pages need translation.') {
-        this.isTranslating.set(false);
-        eventSource.close();
-        this.messageService.add({
-          severity: 'info',
-          summary: 'Nothing to translate',
-          detail: 'All pages are already translated or in review.',
-        });
-        return;
-      }
-    };
-
-    eventSource.onerror = (err) => {
-      faro.api?.pushError(new Error('Translation stream interrupted'), { context: { projectId: this.project()?.id ?? '' } });
-      this.isTranslating.set(false);
-      eventSource.close();
-      this.messageService.add({
-        severity: 'error',
-        summary: 'Connection lost',
-        detail: 'The translation stream was interrupted. Please try again.',
-      });
-    };
+    this.projectService.startTranslation(id, this.selectedModel() || undefined).subscribe({
+      next: (res) => {
+        if (res.jobCount === 0) {
+          this.messageService.add({ severity: 'info', summary: 'Nothing to translate', detail: 'No pages are ready for translation.' });
+          return;
+        }
+        this.translationState.set('running');
+        // Force immediate poll to pick up TRANSLATING pages
+        this.clearPoll();
+        this.pollTimer = setTimeout(() => this.loadProject(), 500);
+      },
+      error: (err) => this.messageService.add({ severity: 'error', summary: 'Error', detail: err?.error?.message || 'Failed to start translation.' }),
+    });
   }
 
-  private updatePageStatus(pageNumber: number, status: string) {
-    this.project.update(p => {
-      if (!p || !p.pages) return p;
-      const updatedPages = p.pages.map(page =>
-        page.pageNumber === pageNumber ? { ...page, status } : page
-      );
-      return { ...p, pages: updatedPages };
+  pauseTranslation() {
+    const id = this.projectId();
+    if (!id) return;
+    this.projectService.pauseProject(id).subscribe({
+      next: () => this.translationState.set('paused'),
+      error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to pause.' }),
+    });
+  }
+
+  resumeTranslation() {
+    const id = this.projectId();
+    if (!id) return;
+    this.projectService.resumeProject(id).subscribe({
+      next: () => {
+        this.translationState.set('running');
+        this.clearPoll();
+        this.pollTimer = setTimeout(() => this.loadProject(), 500);
+      },
+      error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to resume.' }),
+    });
+  }
+
+  stopTranslation() {
+    const id = this.projectId();
+    if (!id) return;
+    this.projectService.cancelProjectJobs(id).subscribe({
+      next: () => {
+        this.translationState.set('idle');
+        this.loadProject();
+      },
+      error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to stop.' }),
     });
   }
 
   startReview() {
     const id = this.projectId();
     if (!id) return;
-
     this.isReviewing.set(true);
     this.projectService.reviewProject(id, this.selectedModel() || undefined).subscribe({
-      next: (res: any) => {
+      next: () => {
         this.isReviewing.set(false);
-        this.messageService.add({
-          severity: 'success',
-          summary: 'AI Review queued',
-          detail: res.message || 'Review job has been queued. Pages will be reviewed in batches.',
-        });
-        // Poll for job completion
-        this.pollReviewJob(res.jobId);
+        this.messageService.add({ severity: 'success', summary: 'Review queued', detail: 'AI review has been queued.' });
+        if (this.project()) this.schedulePoll(this.project()!);
       },
       error: (err) => {
         this.isReviewing.set(false);
-        const detail = err?.error?.message || 'Failed to queue AI review.';
-        this.messageService.add({ severity: 'error', summary: 'Error', detail });
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: err?.error?.message || 'Failed to queue review.' });
       },
     });
   }
 
-  private pollReviewJob(jobId: string) {
-    const poll = () => {
-      this.projectService.getJob(jobId).subscribe({
-        next: (job: any) => {
-          if (job.status === 'DONE') {
-            this.messageService.add({
-              severity: 'success',
-              summary: 'Review complete',
-              detail: 'AI review has finished. Refresh to see updated error counts.',
-            });
-            this.loadData();
-          } else if (job.status === 'FAILED') {
-            this.messageService.add({
-              severity: 'error',
-              summary: 'Review failed',
-              detail: job.errorMessage || 'AI review job failed.',
-            });
-          } else {
-            setTimeout(poll, 3000);
-          }
-        },
-        error: () => {
-          // Stop polling on error
-        },
-      });
-    };
-    setTimeout(poll, 3000);
+  navigateToWorkbench(pageId: string) {
+    this.router.navigate(['/workbench', pageId]);
   }
 
-  exportProject(format: 'pdf' | 'docx' | 'html' | 'text') {
+  exportProject(format: string) {
     const id = this.projectId();
     if (!id) return;
-
     const name = this.project()?.name || 'export';
-    this.projectService.exportProject(id, format).subscribe({
+    this.projectService.exportProject(id, format as any).subscribe({
       next: (blob) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -445,48 +193,27 @@ export class ProjectDetailComponent implements OnInit {
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Export complete',
-          detail: `Project exported as ${format.toUpperCase()}.`,
-        });
+        this.messageService.add({ severity: 'success', summary: 'Export complete', detail: `Exported as ${format.toUpperCase()}.` });
       },
-      error: (err) => {
-        const detail = err?.error?.message || `Failed to export as ${format.toUpperCase()}.`;
-        this.messageService.add({ severity: 'error', summary: 'Export failed', detail });
-      },
+      error: () => this.messageService.add({ severity: 'error', summary: 'Export failed', detail: `Failed to export as ${format.toUpperCase()}.` }),
     });
   }
 
   onDeleteProject() {
     const id = this.projectId();
     if (!id) return;
-
     const name = this.project()?.name || 'this project';
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${name}"?\n\nThis will permanently remove:\n• All pages and translations\n• All chapters\n• All uploaded files\n• All review data\n\nThis action cannot be undone.`
-    );
-
-    if (!confirmed) return;
-
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     this.projectService.deleteProject(id).subscribe({
       next: () => {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Project deleted',
-          detail: `"${name}" has been permanently removed.`,
-        });
+        this.messageService.add({ severity: 'success', summary: 'Deleted', detail: `"${name}" has been removed.` });
         this.router.navigate(['/projects']);
       },
-      error: (err) => {
-        const detail = err?.error?.message || 'Failed to delete project.';
-        this.messageService.add({ severity: 'error', summary: 'Error', detail });
-      },
+      error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete project.' }),
     });
   }
 
-  get initials(): string {
-    return this.project()?.owner?.name?.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'RK';
+  ngOnDestroy() {
+    this.clearPoll();
   }
 }

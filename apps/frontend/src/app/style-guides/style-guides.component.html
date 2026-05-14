@@ -1,0 +1,30 @@
+<div class="styleGuides-page">
+
+  <div class="styleGuides-content">
+    <div class="content-header">
+      <div class="title-section">
+        <h1 class="page-title">Genres</h1>
+        <p class="page-subtitle">Translation contexts that drive agent behavior · {{ styleGuides().length }} defined</p>
+      </div>
+      <div class="action-section">
+        <p-iconField iconPosition="left">
+          <p-inputIcon styleClass="pi pi-search"></p-inputIcon>
+          <input 
+            type="text" 
+            pInputText 
+            placeholder="Search styleGuides" 
+            [(ngModel)]="searchQuery" 
+            (input)="onSearch()"
+          />
+        </p-iconField>
+        <p-button label="New styleGuide" icon="pi pi-plus" (click)="navigateToCreateGenre()"></p-button>
+      </div>
+    </div>
+
+    <div class="styleGuides-grid">
+      @for (styleGuide of styleGuides(); track styleGuide.id) {
+        <app-style-guide-card [styleGuide]="styleGuide" (click)="navigateToStyleGuide(styleGuide.id)"></app-style-guide-card>
+      }
+    </div>
+  </div>
+</div>

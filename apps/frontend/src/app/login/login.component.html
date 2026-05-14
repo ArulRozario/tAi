@@ -1,0 +1,78 @@
+<div class="login-container">
+  <div class="background-grid"></div>
+  <div class="radial-glow"></div>
+
+  <div class="login-card-wrapper">
+    <div class="logo-section">
+      <div class="logo">
+        <span class="logo-t">t</span><span class="logo-ai">AI</span>
+      </div>
+      <div class="logo-subtitle">TRANSLATION INTELLIGENCE</div>
+    </div>
+
+    <p-card styleClass="tai-login-card">
+      <div class="login-header">
+        <h1>Sign in</h1>
+        <p>Welcome back. Pick up where you left off.</p>
+      </div>
+
+      <form (ngSubmit)="onLogin()" class="login-form">
+        <div class="form-field">
+          <label for="email">Email</label>
+          <input 
+            type="text" 
+            pInputText 
+            id="email" 
+            name="email"
+            [(ngModel)]="email" 
+            placeholder="ravi@tai.ws" 
+            class="w-full"
+          />
+        </div>
+
+        <div class="form-field">
+          <label for="password">Password</label>
+          <p-password
+            id="password"
+            name="password"
+            [(ngModel)]="password"
+            [toggleMask]="true"
+            [feedback]="false"
+            placeholder="••••••••"
+            [style]="{ width: '100%' }"
+            [inputStyle]="{ width: '100%' }"
+          ></p-password>
+        </div>
+
+        <div class="form-actions">
+          <div class="remember-me">
+            <p-checkbox 
+              name="rememberMe" 
+              [(ngModel)]="rememberMe" 
+              [binary]="true" 
+              label="Remember me"
+              id="rememberMe"
+            ></p-checkbox>
+          </div>
+          <a href="#" class="forgot-password">Forgot password?</a>
+        </div>
+
+        <p-button 
+          type="submit" 
+          [label]="loading() ? 'Signing in...' : 'Sign In'" 
+          [loading]="loading()"
+          [disabled]="loading() || !email() || !password()"
+          styleClass="w-full tai-login-btn"
+        ></p-button>
+      </form>
+
+      <div class="login-footer">
+        <span>Tamil</span>
+        <span class="dot">•</span>
+        <span>English</span>
+        <span class="dot">•</span>
+        <span class="brand-link">Thiruviviliam</span>
+      </div>
+    </p-card>
+  </div>
+</div>

@@ -1,13 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../dist/out-tsc",
+    "outDir": "../../dist/apps/api",
     "module": "commonjs",
     "types": ["node"],
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "target": "es2021",
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "emitDeclarationOnly": false
   },
   "include": ["src/**/*.ts"]
 }

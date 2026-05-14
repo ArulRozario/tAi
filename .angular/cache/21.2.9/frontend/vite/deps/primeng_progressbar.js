@@ -1,31 +1,36 @@
 import {
   BaseComponent,
-  Bind,
   PARENT_INSTANCE
-} from "./chunk-RDGPVRJM.js";
+} from "./chunk-5Q3QJLUY.js";
+import {
+  Bind
+} from "./chunk-FDDOVCH6.js";
 import {
   BaseStyle
-} from "./chunk-YMFEJ3C6.js";
+} from "./chunk-5LSILY4Y.js";
 import {
   PrimeTemplate,
   SharedModule
-} from "./chunk-6X4SBNEN.js";
+} from "./chunk-DFX2PQFP.js";
+import "./chunk-N457OPXR.js";
 import {
   CommonModule,
   NgIf,
   NgTemplateOutlet
-} from "./chunk-SO6KPK33.js";
-import "./chunk-4FSBW6TR.js";
+} from "./chunk-7WBDEVG2.js";
+import "./chunk-MIJCVNFH.js";
 import {
   ChangeDetectionStrategy,
   Component,
   ContentChild,
   ContentChildren,
   Injectable,
+  InjectionToken,
   Input,
   NgModule,
   ViewEncapsulation,
   booleanAttribute,
+  inject,
   numberAttribute,
   setClassMetadata,
   ɵɵHostDirectivesFeature,
@@ -36,6 +41,8 @@ import {
   ɵɵclassMap,
   ɵɵcontentQuery,
   ɵɵdefineComponent,
+  ɵɵdefineInjectable,
+  ɵɵdefineInjector,
   ɵɵdefineNgModule,
   ɵɵelement,
   ɵɵelementContainer,
@@ -51,17 +58,11 @@ import {
   ɵɵtemplate,
   ɵɵtext,
   ɵɵtextInterpolate2
-} from "./chunk-MEPECJH5.js";
-import {
-  InjectionToken,
-  inject,
-  ɵɵdefineInjectable,
-  ɵɵdefineInjector
-} from "./chunk-BDTBJ5A5.js";
-import "./chunk-BGJDQHGH.js";
+} from "./chunk-IDZCX6FW.js";
 import "./chunk-FX47LQWG.js";
+import "./chunk-BGJDQHGH.js";
 import "./chunk-KHPDHDQC.js";
-import "./chunk-GOMI4DH3.js";
+import "./chunk-46DXP6YY.js";
 
 // node_modules/.pnpm/@primeuix+styles@2.0.3/node_modules/@primeuix/styles/dist/progressbar/index.mjs
 var style = "\n    .p-progressbar {\n        display: block;\n        position: relative;\n        overflow: hidden;\n        height: dt('progressbar.height');\n        background: dt('progressbar.background');\n        border-radius: dt('progressbar.border.radius');\n    }\n\n    .p-progressbar-value {\n        margin: 0;\n        background: dt('progressbar.value.background');\n    }\n\n    .p-progressbar-label {\n        color: dt('progressbar.label.color');\n        font-size: dt('progressbar.label.font.size');\n        font-weight: dt('progressbar.label.font.weight');\n    }\n\n    .p-progressbar-determinate .p-progressbar-value {\n        height: 100%;\n        width: 0%;\n        position: absolute;\n        display: none;\n        display: flex;\n        align-items: center;\n        justify-content: center;\n        overflow: hidden;\n        transition: width 1s ease-in-out;\n    }\n\n    .p-progressbar-determinate .p-progressbar-label {\n        display: inline-flex;\n    }\n\n    .p-progressbar-indeterminate .p-progressbar-value::before {\n        content: '';\n        position: absolute;\n        background: inherit;\n        inset-block-start: 0;\n        inset-inline-start: 0;\n        inset-block-end: 0;\n        will-change: inset-inline-start, inset-inline-end;\n        animation: p-progressbar-indeterminate-anim 2.1s cubic-bezier(0.65, 0.815, 0.735, 0.395) infinite;\n    }\n\n    .p-progressbar-indeterminate .p-progressbar-value::after {\n        content: '';\n        position: absolute;\n        background: inherit;\n        inset-block-start: 0;\n        inset-inline-start: 0;\n        inset-block-end: 0;\n        will-change: inset-inline-start, inset-inline-end;\n        animation: p-progressbar-indeterminate-anim-short 2.1s cubic-bezier(0.165, 0.84, 0.44, 1) infinite;\n        animation-delay: 1.15s;\n    }\n\n    @keyframes p-progressbar-indeterminate-anim {\n        0% {\n            inset-inline-start: -35%;\n            inset-inline-end: 100%;\n        }\n        60% {\n            inset-inline-start: 100%;\n            inset-inline-end: -90%;\n        }\n        100% {\n            inset-inline-start: 100%;\n            inset-inline-end: -90%;\n        }\n    }\n    @-webkit-keyframes p-progressbar-indeterminate-anim {\n        0% {\n            inset-inline-start: -35%;\n            inset-inline-end: 100%;\n        }\n        60% {\n            inset-inline-start: 100%;\n            inset-inline-end: -90%;\n        }\n        100% {\n            inset-inline-start: 100%;\n            inset-inline-end: -90%;\n        }\n    }\n\n    @keyframes p-progressbar-indeterminate-anim-short {\n        0% {\n            inset-inline-start: -200%;\n            inset-inline-end: 100%;\n        }\n        60% {\n            inset-inline-start: 107%;\n            inset-inline-end: -8%;\n        }\n        100% {\n            inset-inline-start: 107%;\n            inset-inline-end: -8%;\n        }\n    }\n    @-webkit-keyframes p-progressbar-indeterminate-anim-short {\n        0% {\n            inset-inline-start: -200%;\n            inset-inline-end: 100%;\n        }\n        60% {\n            inset-inline-start: 107%;\n            inset-inline-end: -8%;\n        }\n        100% {\n            inset-inline-start: 107%;\n            inset-inline-end: -8%;\n        }\n    }\n";

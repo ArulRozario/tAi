@@ -1,0 +1,123 @@
+<p-dialog 
+  [(visible)]="visible" 
+  [modal]="true" 
+  [draggable]="false" 
+  [resizable]="false"
+  styleClass="create-project-dialog"
+  header="Create new project"
+  [style]="{width: '540px'}"
+  (onHide)="hide()">
+  
+  <form [formGroup]="projectForm" (ngSubmit)="onSubmit()" class="modal-form">
+    
+    <div class="field">
+      <label for="name">Project name</label>
+      <input 
+        id="name" 
+        type="text" 
+        pInputText 
+        formControlName="name" 
+        placeholder="e.g. The Cost of Discipleship"
+        class="w-full" />
+    </div>
+
+    <div class="form-row">
+      <div class="field flex-1">
+        <label for="sourceLang">Source language</label>
+        <p-select 
+          id="sourceLang"
+          [options]="languages" 
+          formControlName="sourceLang" 
+          optionLabel="label" 
+          optionValue="value"
+          class="w-full">
+        </p-select>
+      </div>
+      <div class="field flex-1">
+        <label for="targetLang">Target language</label>
+        <p-select 
+          id="targetLang"
+          [options]="languages" 
+          formControlName="targetLang" 
+          optionLabel="label" 
+          optionValue="value"
+          class="w-full">
+        </p-select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="styleGuide">StyleGuide</label>
+      <p-select 
+        id="styleGuide"
+        [options]="styleGuides()" 
+        formControlName="styleGuideId" 
+        optionLabel="name" 
+        optionValue="id"
+        placeholder="Select a styleGuide..."
+        class="w-full">
+      </p-select>
+    </div>
+
+    <div class="upload-section">
+      <!-- Hidden native file input — programmatic clicks work reliably -->
+      <input
+        id="project-file-input"
+        type="file"
+        accept="application/pdf"
+        (change)="onFileInputChange($event)"
+        style="display: none"
+      />
+
+      <div
+        class="drop-zone"
+        [class.drop-active]="isDragOver()"
+        [class.drop-error]="fileError()"
+        (click)="onDropZoneClick()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+      >
+        <div class="drop-content">
+          @if (selectedFile) {
+            <i class="pi pi-file-pdf upload-icon file-selected"></i>
+            <span class="file-name">{{ selectedFile.name }}</span>
+            <span class="file-size">{{ (selectedFile.size / 1024 / 1024).toFixed(2) }} MB</span>
+            <button
+              type="button"
+              class="clear-file-btn"
+              (click)="clearFile($event)"
+            >
+              <i class="pi pi-times"></i> Remove
+            </button>
+          } @else {
+            <i class="pi pi-upload upload-icon"></i>
+            <span class="drop-text">
+              {{ isDragOver() ? 'Drop PDF here' : 'Drop PDF here' }}
+            </span>
+            <span class="drop-subtext">or</span>
+            <button type="button" class="browse-btn" (click)="onDropZoneClick(); $event.stopPropagation()">
+              Browse files
+            </button>
+          }
+        </div>
+      </div>
+
+      @if (fileError()) {
+        <p class="upload-error">{{ fileError() }}</p>
+      } @else {
+        <p class="upload-hint">PDF only — up to 200 MB</p>
+      }
+    </div>
+
+    <div class="modal-footer">
+      <p-button 
+        label="Create project" 
+        [loading]="loading()" 
+        type="submit"
+        styleClass="w-full create-btn">
+      </p-button>
+    </div>
+
+  </form>
+</p-dialog>

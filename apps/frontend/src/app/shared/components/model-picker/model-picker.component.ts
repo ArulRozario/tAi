@@ -1,8 +1,9 @@
 import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, signal } from '@angular/core';
 import { faro } from '@grafana/faro-web-sdk';
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
+import { SelectModule } from 'primeng/select';
 import { ProjectService } from '../../../projects/projects.service';
 
 export interface ModelOption {
@@ -15,113 +16,32 @@ export interface ModelOption {
 @Component({
   selector: 'tai-model-picker',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatePipe],
+  imports: [CommonModule, FormsModule, SelectModule],
   template: `
-    <div class="model-picker">
-      <label class="picker-label" *ngIf="label">{{ label }}</label>
-      <select
-        class="picker-select"
-        [ngModel]="selectedModel()"
-        (ngModelChange)="onSelect($event)"
-        [disabled]="disabled || healthyModels().length === 0"
-      >
-        <option value="" *ngIf="showDefault">Default (auto)</option>
-        <option
-          *ngFor="let m of healthyModels()"
-          [value]="m.name"
-          [title]="m.name"
-        >
-          {{ m.label }}
-        </option>
-      </select>
-
-      <div class="model-statuses" *ngIf="showStatus && allModels().length > 0">
-        <div
-          *ngFor="let m of allModels()"
-          class="status-badge"
-          [class.healthy]="m.status === 'healthy'"
-          [class.exhausted]="m.status === 'exhausted'"
-          [title]="m.status === 'exhausted' ? 'Retry at ' + (m.retryAt | date:'short') : 'Healthy'"
-        >
-          <span class="dot"></span>
-          <span class="name">{{ m.label }}</span>
-        </div>
-      </div>
-
-      <div class="picker-hint" *ngIf="disabled">Loading models…</div>
-      <div class="picker-hint error" *ngIf="loadError()">{{ loadError() }}</div>
-    </div>
+    <p-select
+      [options]="selectOptions()"
+      [ngModel]="selectedModel()"
+      (ngModelChange)="onSelect($event)"
+      optionLabel="label"
+      optionValue="value"
+      [disabled]="disabled"
+      placeholder="Default (auto)"
+      styleClass="model-picker-select"
+      size="small"
+    />
   `,
   styles: [`
-    .model-picker {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .picker-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-    .picker-select {
-      padding: 6px 10px;
-      border-radius: 6px;
-      border: 1px solid var(--border-color);
-      background: var(--surface-1);
-      color: var(--text-main);
-      font-size: 0.85rem;
-      cursor: pointer;
-      min-width: 180px;
-    }
-    .picker-select:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-    .model-statuses {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 2px;
-    }
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 0.7rem;
-      background: var(--surface-2);
-      border: 1px solid var(--border-color);
-      color: var(--text-muted);
-    }
-    .status-badge.healthy .dot {
-      background: var(--accent-success);
-    }
-    .status-badge.exhausted .dot {
-      background: var(--accent-danger);
-    }
-    .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-    .picker-hint {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-    .picker-hint.error {
-      color: var(--accent-danger);
+    :host { display: inline-block; }
+    :host ::ng-deep .model-picker-select {
+      min-width: 160px;
     }
   `]
 })
 export class ModelPickerComponent implements OnInit, OnDestroy {
-  @Input() label = 'AI Model';
+  @Input() label = '';
   @Input() disabled = false;
   @Input() showDefault = true;
-  @Input() showStatus = true;
+  @Input() showStatus = false;
   @Input() initialModel = '';
   @Output() modelChange = new EventEmitter<string>();
 
@@ -129,6 +49,11 @@ export class ModelPickerComponent implements OnInit, OnDestroy {
   healthyModels = signal<ModelOption[]>([]);
   selectedModel = signal<string>('');
   loadError = signal<string>('');
+
+  selectOptions = () => {
+    const opts = this.healthyModels().map(m => ({ label: m.label, value: m.name }));
+    return this.showDefault ? [{ label: 'Default (auto)', value: '' }, ...opts] : opts;
+  };
 
   private destroy$ = new Subject<void>();
 

@@ -1,0 +1,167 @@
+.login-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-canvas);
+  overflow: hidden;
+  z-index: 1000;
+}
+
+.background-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(var(--border-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-color) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.radial-glow {
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 800px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(244, 63, 94, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.login-card-wrapper {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.logo-section {
+  text-align: center;
+  margin-bottom: 32px;
+
+  .logo {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    margin-bottom: 8px;
+
+    .logo-t {
+      color: var(--accent-primary);
+    }
+
+    .logo-ai {
+      color: var(--text-main);
+    }
+  }
+
+  .logo-subtitle {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-disabled);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+}
+
+.login-header {
+  margin-bottom: 32px;
+
+  h1 {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 0 0 8px 0;
+    letter-spacing: -0.02em;
+  }
+
+  p {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0;
+    font-weight: 500;
+  }
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+}
+
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 4px 0 12px 0;
+
+  .forgot-password {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-primary);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.login-footer {
+  margin-top: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-disabled);
+
+  .dot {
+    opacity: 0.5;
+  }
+
+  .brand-link {
+    color: var(--accent-primary);
+    opacity: 0.8;
+  }
+
+  span:not(.dot):not(.brand-link):hover {
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+}
+
+.w-full {
+  width: 100% !important;
+}
+
+/* Make form fields stretch so PrimeNG components fill the width */
+.form-field {
+  align-items: stretch;
+}

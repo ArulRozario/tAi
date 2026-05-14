@@ -36,11 +36,18 @@ export interface Project {
 }
 
 export interface ProjectStats {
-  totalPages: number;
-  approved: number;
-  inReview: number;
+  total: number;
   pending: number;
-  avgQuality: number;
+  extracting: number;
+  extracted: number;
+  translating: number;
+  translated: number;
+  reviewing: number;
+  humanReview: number;
+  approved: number;
+  rejected: number;
+  escalated: number;
+  error: number;
 }
 
 export interface Chapter {
@@ -52,6 +59,14 @@ export interface Chapter {
   pages?: Page[];
 }
 
+export interface PageReviewer {
+  id: string;
+  userId: string;
+  user: { id: string; name: string; email: string; role: string };
+  isPrimary: boolean;
+  assignedAt: string;
+}
+
 export interface Page {
   id: string;
   projectId: string;
@@ -61,6 +76,7 @@ export interface Page {
   quality?: number;
   originalHtml?: string;
   translatedHtml?: string;
+  reviewers?: PageReviewer[];
 }
 
 export interface PaginatedProjects {
@@ -90,9 +106,6 @@ export interface FileUploadResponse {
   url: string;
 }
 
-@Injectable({
-  providedIn: 'root',
-})
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
   private apiUrl = '/api/v1/projects';
@@ -242,6 +255,50 @@ export class ProjectService {
       prompt,
       modelOverride,
     });
+  }
+
+  /** Bulk translation status for the project list page */
+  getActiveTranslations(): Observable<Record<string, { isRunning: boolean; isPaused: boolean; done: number; total: number; percent: number }>> {
+    return this.http.get<any>(`${this.apiUrl}/translations/active`);
+  }
+
+  /** Enqueue TRANSLATE_BATCH jobs for all pending pages */
+  startTranslation(projectId: string, model?: string): Observable<{ jobCount: number; message: string }> {
+    return this.http.post<any>(`${this.apiUrl}/${projectId}/translate`, { model: model || null });
+  }
+
+  /** Snapshot of extraction pipeline state — frontend polls on 1.5s interval */
+  getExtractionProgress(projectId: string): Observable<{
+    phase: string;
+    pagesFound: number;
+    pagesRendered: number;
+    isActive: boolean;
+  }> {
+    return this.http.get<any>(`${this.apiUrl}/${projectId}/extract/progress`);
+  }
+
+  /** Poll translation job + page progress */
+  getTranslationProgress(projectId: string): Observable<{
+    active: { total: number; queued: number; running: number; paused: number; isRunning: boolean; isPaused: boolean; isActive: boolean };
+    progress: { total: number; done: number; percent: number };
+    pages: Page[];
+  }> {
+    return this.http.get<any>(`${this.apiUrl}/${projectId}/translate/progress`);
+  }
+
+  /** Pause all QUEUED translation jobs for the project */
+  pauseProject(projectId: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${projectId}/pause`, {});
+  }
+
+  /** Resume all PAUSED translation jobs for the project */
+  resumeProject(projectId: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${projectId}/resume`, {});
+  }
+
+  /** Cancel all active translation jobs for the project */
+  cancelProjectJobs(projectId: string): Observable<void> {
+    return this.http.post<void>(`${this.apiUrl}/${projectId}/cancel-jobs`, {});
   }
 
   /** Queue AI review for all translated pages in a project */

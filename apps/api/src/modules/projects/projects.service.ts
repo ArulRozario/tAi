@@ -19,28 +19,22 @@ export class ProjectsService {
     private readonly jobsService: JobsService,
   ) {}
 
-  /**
-   * Creates a new translation project.
-   * Links the project to an active genre and sets the creating user as owner.
-   */
   async create(ownerId: string, createProjectDto: CreateProjectDto) {
-    // 1. Verify target genre exists
-    const genre = await this.prisma.styleGuide.findUnique({
-      where: { id: createProjectDto.genreId },
+    const styleGuide = await this.prisma.styleGuide.findUnique({
+      where: { id: createProjectDto.styleGuideId },
     });
 
-    if (!genre) {
-      throw new NotFoundException(`StyleGuide with ID '${createProjectDto.genreId}' not found.`);
+    if (!styleGuide) {
+      throw new NotFoundException(`StyleGuide with ID '${createProjectDto.styleGuideId}' not found.`);
     }
 
-    // 2. Persist the project in DRAFT status
     const project = await this.prisma.project.create({
       data: {
         name: createProjectDto.name,
         description: createProjectDto.description,
         sourceLang: createProjectDto.sourceLang,
         targetLang: createProjectDto.targetLang,
-        styleGuideId: createProjectDto.genreId,
+        styleGuideId: createProjectDto.styleGuideId,
         ownerId,
         status: ProjectStatus.DRAFT,
         sourceFileId: createProjectDto.sourceFileId,
@@ -53,11 +47,11 @@ export class ProjectsService {
       }
     });
 
-    // 3. Atomically enqueue PROCESS_DOCUMENT job if sourceFileId is provided
+    // 3. Atomically enqueue SPLIT_DOCUMENT job if sourceFileId is provided
     if (createProjectDto.sourceFileId) {
       try {
         await this.jobsService.enqueue({
-          type: JobType.PROCESS_DOCUMENT,
+          type: JobType.SPLIT_DOCUMENT,
           projectId: project.id,
           payload: {
             projectId: project.id,
@@ -246,7 +240,7 @@ export class ProjectsService {
 
   /**
    * Retrieves all glossary cards/terms associated with a project.
-   * Dynamically resolves the terms via the project's linked Genre.
+   * Dynamically resolves the terms via the project's linked StyleGuide.
    */
   async findGlossaryTerms(projectId: string) {
     const project = await this.findOne(projectId); // Ensure project exists and retrieve metadata
@@ -274,28 +268,27 @@ export class ProjectsService {
       throw new NotFoundException(`Project with ID '${id}' not found.`);
     }
 
-    const stats = {
+    const counts: Record<string, number> = {};
+    for (const page of project.pages) {
+      counts[page.status] = (counts[page.status] ?? 0) + 1;
+    }
+
+    const g = (s: PageStatus) => counts[s] ?? 0;
+
+    return {
       total: project.pages.length,
-      pending: 0,
-      extracting: 0,
-      extracted: 0,
-      translating: 0,
-      translated: 0,
-      reviewing: 0,
-      humanReview: 0,
-      approved: 0,
-      rejected: 0,
-      error: 0,
+      pending: g(PageStatus.PENDING),
+      rendering: g(PageStatus.RENDERING),
+      ready: g(PageStatus.READY),
+      translating: g(PageStatus.TRANSLATING),
+      translated: g(PageStatus.TRANSLATED),
+      reviewing: g(PageStatus.REVIEWING),
+      humanReview: g(PageStatus.HUMAN_REVIEW),
+      approved: g(PageStatus.APPROVED),
+      rejected: g(PageStatus.REJECTED),
+      renderError: g(PageStatus.RENDER_ERROR),
+      translationError: g(PageStatus.TRANSLATION_ERROR),
     };
-
-    project.pages.forEach((page) => {
-      const status = page.status as keyof typeof stats;
-      if (status in stats) {
-        stats[status]++;
-      }
-    });
-
-    return stats;
   }
 
   /**
@@ -365,7 +358,7 @@ export class ProjectsService {
   /**
    * Enqueues a REVIEW_PAGE job for all translated pages in the project.
    */
-  async enqueueReview(projectId: string) {
+  async enqueueReview(projectId: string, modelOverride?: string) {
     await this.findOne(projectId);
 
     const pagesToReview = await this.prisma.page.findMany({
@@ -390,6 +383,7 @@ export class ProjectsService {
           projectId,
           pageIds: pagesToReview.map((p) => p.id),
           isBatchReview: true,
+          ...(modelOverride ? { modelOverride } : {}),
         },
       },
     });

@@ -22,8 +22,8 @@ export class CreateProjectDto {
   @MaxLength(10)
   targetLang!: string;
 
-  @IsUUID('4', { message: 'genreId must be a valid UUID' })
-  genreId!: string;
+  @IsUUID('4', { message: 'styleGuideId must be a valid UUID' })
+  styleGuideId!: string;
 
   @IsString()
   @IsOptional()

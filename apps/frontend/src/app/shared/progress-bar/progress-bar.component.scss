@@ -1,0 +1,46 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+/* Progress Bar */
+.progress-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.progress-bar-track {
+  flex: 1;
+  height: 6px;
+  background-color: var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+  max-width: 110px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+
+  &.red {
+    background-color: var(--accent-primary);
+  }
+
+  &.green {
+    background-color: var(--accent-success);
+  }
+}
+
+.progress-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-disabled);
+  min-width: 34px;
+
+  &.green-text {
+    color: var(--accent-success);
+  }
+}

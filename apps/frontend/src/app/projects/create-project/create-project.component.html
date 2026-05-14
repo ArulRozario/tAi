@@ -1,0 +1,44 @@
+<div class="flex justify-center py-8">
+  <p-card header="Create New Project" [style]="{ width: '600px' }">
+    <form [formGroup]="projectForm" (ngSubmit)="onSubmit()" class="flex flex-column gap-4">
+      
+      <div class="flex flex-column gap-2">
+        <label for="name" class="font-semibold">Project Name *</label>
+        <input pInputText id="name" formControlName="name" placeholder="Enter project name" />
+      </div>
+
+      <div class="flex flex-column gap-2">
+        <label for="description" class="font-semibold">Description</label>
+        <textarea pInputTextarea id="description" formControlName="description" rows="3" placeholder="Enter project description"></textarea>
+      </div>
+
+      <div class="grid">
+        <div class="col-6 flex flex-column gap-2">
+          <label for="sourceLang" class="font-semibold">Source Language *</label>
+          <input pInputText id="sourceLang" formControlName="sourceLang" placeholder="e.g. en" />
+        </div>
+        <div class="col-6 flex flex-column gap-2">
+          <label for="targetLang" class="font-semibold">Target Language *</label>
+          <input pInputText id="targetLang" formControlName="targetLang" placeholder="e.g. ta" />
+        </div>
+      </div>
+
+      <div class="flex flex-column gap-2">
+        <label for="styleGuide" class="font-semibold">StyleGuide *</label>
+        <p-select id="styleGuide" formControlName="styleGuideId" [options]="styleGuides" optionLabel="label" optionValue="value" placeholder="Select a styleGuide"></p-select>
+      </div>
+
+      <div class="flex flex-column gap-2">
+        <label for="sourceFileId" class="font-semibold">Source File ID (Optional)</label>
+        <input pInputText id="sourceFileId" formControlName="sourceFileId" placeholder="Enter file ID" />
+      </div>
+
+      <div class="flex justify-content-end gap-2 mt-4">
+        <p-button label="Cancel" severity="secondary" (onClick)="onCancel()" />
+        <p-button label="Create Project" type="submit" [disabled]="projectForm.invalid" />
+      </div>
+
+    </form>
+  </p-card>
+</div>
+<p-toast />

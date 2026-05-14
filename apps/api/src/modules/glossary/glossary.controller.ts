@@ -29,12 +29,12 @@ export class GlossaryController {
   @Get()
   @Roles('ADMIN', 'MASTER', 'REVIEWER')
   findMany(
-    @Query('genreId') genreId?: string,
+    @Query('styleGuideId') styleGuideId?: string,
     @Query('q') q?: string,
     @Query('limit') limit = '50'
   ) {
     return this.glossaryService.findMany({
-      genreId,
+      styleGuideId,
       q,
       limit: parseInt(limit, 10),
     });
@@ -45,7 +45,7 @@ export class GlossaryController {
   create(
     @Body()
     body: {
-      genreId: string;
+      styleGuideId: string;
       sourceTerm: string;
       targetTerm: string;
       context?: string;
@@ -78,12 +78,12 @@ export class GlossaryController {
     @Body() body: any,
     @UploadedFile() file?: any,
   ) {
-    const genreId = body.genreId;
+    const styleGuideId = body.styleGuideId;
     let terms = body.terms;
 
     if (file) {
-      if (!genreId) {
-        throw new BadRequestException('genreId is required for bulk CSV import');
+      if (!styleGuideId) {
+        throw new BadRequestException('styleGuideId is required for bulk CSV import');
       }
       const csvContent = file.buffer.toString('utf-8');
       const lines = csvContent.split(/\r?\n/);
@@ -103,11 +103,11 @@ export class GlossaryController {
       }
     }
 
-    if (!genreId || !terms || !Array.isArray(terms)) {
-      throw new BadRequestException('Invalid bulk import data. Please provide genreId and a list of terms or a CSV file.');
+    if (!styleGuideId || !terms || !Array.isArray(terms)) {
+      throw new BadRequestException('Invalid bulk import data. Please provide styleGuideId and a list of terms or a CSV file.');
     }
 
-    const res = await this.glossaryService.bulkCreate({ genreId, terms });
+    const res = await this.glossaryService.bulkCreate({ styleGuideId, terms });
     return {
       created: res.created,
       imported: res.created,

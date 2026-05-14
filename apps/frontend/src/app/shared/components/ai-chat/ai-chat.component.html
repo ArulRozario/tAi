@@ -1,0 +1,108 @@
+<div class="ai-chat-panel">
+  <!-- Header -->
+  <div class="panel-header">
+    <div class="header-title">
+      <i class="pi pi-sparkles"></i>
+      {{ title }}
+    </div>
+    <div class="header-actions">
+      @if (showPlanMode) {
+        <div class="plan-toggle">
+          <span class="plan-label">Plan mode</span>
+          <p-toggleswitch
+            [(ngModel)]="isPlanMode"
+            (ngModelChange)="onPlanModeChange()"
+            styleClass="ai-toggleswitch">
+          </p-toggleswitch>
+        </div>
+      }
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div class="chat-area">
+    @for (msg of messages(); track msg.id) {
+      @if (msg.role === 'assistant') {
+        <div class="chat-message assistant-message">
+          <div class="message-header">
+            <i class="pi pi-sparkles"></i>
+            Assistant
+            @if (showPlanMode && isPlanMode() && $first) {
+              <span class="plan-tag">PLAN</span>
+            }
+          </div>
+
+          @if (showDiff && msg.content && $index > 0 && !isTyping()) {
+            <!-- Show diff view for styleGuide assistant responses -->
+            <div class="message-content">
+              <div class="diff-header">Suggested changes:</div>
+              <div class="diff-content" [innerHTML]="getDiffHtml(currentContent, msg.content)"></div>
+            </div>
+          } @else {
+            <div class="message-content" [innerHTML]="renderMarkdown(msg.content || (isTyping() ? '...' : ''))"></div>
+          }
+
+          @if (msg.showActions && !isTyping()) {
+            <div class="message-actions">
+              <button class="action-btn accept-btn" (click)="acceptMessage(msg.id)">
+                <i class="pi pi-check"></i> Accept
+              </button>
+              <button class="action-btn retry-btn" (click)="retryMessage(msg.id)">
+                <i class="pi pi-refresh"></i> Retry
+              </button>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="chat-message user-message">
+          <div class="message-header">
+            <div class="avatar">{{ userInitials }}</div>
+            You
+          </div>
+          <div class="message-content">{{ msg.content }}</div>
+        </div>
+      }
+    }
+    @if (isTyping()) {
+      <div class="typing-indicator">
+        <span></span><span></span><span></span>
+      </div>
+    }
+  </div>
+
+  <!-- Input -->
+  <div class="chat-input-container">
+    <div class="chat-input-wrapper">
+      <textarea
+        class="chat-textarea"
+        rows="1"
+        [placeholder]="placeholder"
+        [ngModel]="newMessage()"
+        (ngModelChange)="newMessage.set($event)"
+        (input)="autoResize($event)"
+        (keydown)="onKeydown($event)">
+      </textarea>
+      <div class="input-actions">
+        <button class="icon-btn" aria-label="Attach context">
+          <i class="pi pi-paperclip"></i>
+        </button>
+        <button
+          class="send-btn"
+          aria-label="Send message"
+          [disabled]="!newMessage().trim() || isTyping()"
+          (click)="sendMessage()">
+          <i class="pi pi-send"></i>
+        </button>
+      </div>
+    </div>
+    <div class="input-footer-row">
+      <tai-model-picker
+        label="Model"
+        [showDefault]="false"
+        [showStatus]="false"
+        [disabled]="isTyping()"
+        (modelChange)="selectedModel.set($event)"
+      />
+    </div>
+  </div>
+</div>

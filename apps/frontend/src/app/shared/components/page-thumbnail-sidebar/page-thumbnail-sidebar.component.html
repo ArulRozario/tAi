@@ -1,0 +1,34 @@
+<div class="sidebar-wrapper" [class.collapsed]="collapsed()">
+  <div class="sidebar-header">
+    <span class="sidebar-title">Pages</span>
+    <button class="collapse-btn" (click)="toggleCollapse()" [title]="collapsed() ? 'Expand' : 'Collapse'">
+      <i class="pi" [class.pi-chevron-left]="!collapsed()" [class.pi-chevron-right]="collapsed()"></i>
+    </button>
+  </div>
+
+  @if (!collapsed()) {
+    <div class="sidebar-content">
+      @if (loading()) {
+        <div class="sidebar-loading">
+          <i class="pi pi-spinner pi-spin"></i>
+          <span>Loading pages...</span>
+        </div>
+      } @else if (pages().length === 0) {
+        <div class="sidebar-empty">
+          <span>No pages</span>
+        </div>
+      } @else {
+        <div class="thumbnails-list">
+          @for (page of pages(); track page.id) {
+            <app-page-thumbnail
+              [page]="page"
+              [projectId]="projectId()"
+              [active]="activePageId() === page.id"
+              (select)="onPageSelect($event)">
+            </app-page-thumbnail>
+          }
+        </div>
+      }
+    </div>
+  }
+</div>

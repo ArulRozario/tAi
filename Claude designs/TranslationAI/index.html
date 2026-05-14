@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>tAI — Interactive Style & Screen Mockup Viewer</title>
+  <!-- Compiled Styles -->
+  <link rel="stylesheet" href="compiled-styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/primeicons/primeicons.css">
+  
+  <style>
+    /* Custom font declarations */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+    
+    :root {
+      --bg: #09090b;
+      --surface-1: #18181b;
+      --surface-2: #27272a;
+      --border: #3f3f46;
+      --text-1: #fafafa;
+      --text-2: #a1a1aa;
+      --text-3: #52525b;
+      --accent: #8b5cf6;
+      --accent-soft: rgba(139, 92, 246, 0.15);
+      --success: #10b981;
+      --success-soft: rgba(16, 185, 129, 0.15);
+      --warning: #f59e0b;
+      --warning-soft: rgba(245, 158, 11, 0.15);
+      --error: #ef4444;
+      --error-soft: rgba(239, 68, 68, 0.15);
+      --font-sans: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    
+    body {
+      background-color: var(--bg);
+      color: var(--text-1);
+      font-family: var(--font-sans);
+    }
+    
+    /* Simple custom mock implementations of standard styles */
+    .btn--block {
+      width: 100%;
+      text-align: center;
+      justify-content: center;
+    }
+    
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .status-dot--approved { background-color: var(--success); }
+    .status-dot--review { background-color: var(--warning); }
+    .status-dot--pending { background-color: var(--text-3); }
+    .status-dot--changes { background-color: var(--error); }
+    .status-dot--processing { background-color: var(--accent); }
+    
+    /* Modal styles */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .modal-card {
+      background: var(--surface-1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 540px;
+      padding: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.4);
+    }
+    
+    /* Genre lists */
+    .genre-card {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .genre-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    
+    /* Navigation top bar styles */
+    .shell-navbar {
+      background-color: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+    .shell-nav-links {
+      display: flex;
+      gap: 16px;
+    }
+    .shell-nav-link {
+      color: var(--text-2);
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+    .shell-nav-link.is-active {
+      color: var(--text-1);
+      font-weight: 600;
+    }
+    .shell-nav-link:hover {
+      color: var(--text-1);
+    }
+    
+    /* Input elements styling in dark mode */
+    .input, .select, .textarea {
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text-1);
+      padding: 8px 12px;
+      border-radius: 6px;
+      width: 100%;
+      box-sizing: border-box;
+      outline: none;
+    }
+    .input:focus, .select:focus, .textarea:focus {
+      border-color: var(--accent);
+    }
+    
+    .genre-picker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      background: var(--surface-2);
+      font-size: 13px;
+    }
+    .genre-picker__dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+    }
+    
+    /* Custom page grid for project detail */
+    .page-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .page-grid__cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .page-grid__cell.s-approved { background: var(--success-soft); color: var(--success); border-color: rgba(16, 185, 129, 0.3); }
+    .page-grid__cell.s-review { background: var(--warning-soft); color: var(--warning); border-color: rgba(245, 158, 11, 0.3); }
+    .page-grid__cell.s-pending { background: var(--surface-2); color: var(--text-2); border-color: var(--border); }
+    .page-grid__cell.s-changes { background: var(--error-soft); color: var(--error); border-color: rgba(239, 68, 68, 0.3); }
+    .page-grid__cell.s-processing { background: var(--accent-soft); color: var(--accent); border-color: rgba(139, 92, 246, 0.3); }
+    
+    /* Simple code-editor highlighter mock */
+    .code-editor {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-2);
+    }
+    .code-editor .h { color: var(--accent); font-weight: 600; }
+    .code-editor .k { color: var(--warning); }
+    .code-editor .s { color: var(--success); }
+    
+    /* Admin config settings tabs */
+    .tabs {
+      display: flex;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .tab {
+      background: none;
+      border: none;
+      color: var(--text-3);
+      padding: 8px 4px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 14px;
+    }
+    .tab.is-active {
+      color: var(--accent);
+      border-bottom: 2px solid var(--accent);
+    }
+    
+    /* Genre Editor layout */
+    .genre-editor {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 48px);
+      overflow: hidden;
+    }
+    .genre-editor__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 48px;
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+    }
+    .genre-editor__title {
+      font-size: 14px;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      color: var(--text-1);
+      outline: none;
+    }
+    .genre-editor__tabs {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 36px;
+      background-color: var(--surface-1);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+    }
+    .view-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: none;
+      color: var(--text-2);
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .view-tab.is-active {
+      background: var(--surface-2);
+      color: var(--text-1);
+    }
+    .genre-editor__body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    .genre-editor__doc {
+      flex: 1;
+      display: flex;
+      min-width: 0;
+    }
+    .genre-editor__doc--split .md-editor { width: 50%; border-right: 1px solid var(--border); }
+    .genre-editor__doc--split .md-preview { width: 50%; }
+    .genre-editor__doc--edit .md-editor { width: 100%; }
+    .genre-editor__doc--preview .md-preview { width: 100%; }
+    
+    .md-editor {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .md-editor__toolbar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 36px;
+      border-bottom: 1px solid var(--border);
+      padding: 0 8px;
+      background-color: var(--surface-1);
+    }
+    .md-editor__area {
+      flex: 1;
+      background-color: var(--bg);
+      border: none;
+      resize: none;
+      padding: 16px;
+      font-family: var(--font-sans);
+      color: var(--text-1);
+    }
+    .md-preview {
+      overflow-y: auto;
+      padding: 24px;
+    }
+    .md-preview__inner {
+      max-width: 650px;
+      margin: 0 auto;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    
+    .genre-chat {
+      width: 320px;
+      border-left: 1px solid var(--border);
+      background-color: var(--surface-1);
+      display: flex;
+      flex-direction: column;
+    }
+    .genre-chat__head {
+      height: 48px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+    .genre-chat__brand {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .genre-chat__mode {
+      display: flex;
+      padding: 8px;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    .mode-pill {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px;
+      cursor: pointer;
+      color: var(--text-2);
+    }
+    .mode-pill.is-active {
+      background: var(--surface-2);
+      color: var(--text-1);
+      border-color: var(--accent);
+    }
+    .mode-pill__hint {
+      font-size: 10px;
+      color: var(--text-3);
+    }
+    .genre-chat__thread {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .chat-msg {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .chat-msg--assistant {
+      align-self: flex-start;
+    }
+    .chat-msg--user {
+      align-self: flex-end;
+      background-color: var(--surface-2);
+      border-radius: 8px;
+      padding: 8px 12px;
+      max-width: 85%;
+    }
+    .chat-msg__head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .chat-msg__avatar {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background-color: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .chat-msg__name {
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .chat-msg__mode {
+      font-size: 10px;
+      border-radius: 4px;
+      padding: 2px 6px;
+      background: var(--surface-2);
+    }
+    .chat-msg__body {
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .genre-chat__quick {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .quick-prompt {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 10px;
+      padding: 4px 8px;
+      cursor: pointer;
+      color: var(--text-2);
+    }
+    .quick-prompt:hover {
+      border-color: var(--accent);
+      color: var(--text-1);
+    }
+    .genre-chat__composer {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      background-color: var(--bg);
+    }
+    .composer-mode-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--text-2);
+      margin-bottom: 6px;
+    }
+    .composer-input {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--surface-1);
+      overflow: hidden;
+    }
+    .composer-input textarea {
+      background: transparent;
+      border: none;
+      resize: none;
+      padding: 8px;
+      color: var(--text-1);
+      font-size: 12px;
+      outline: none;
+    }
+    .composer-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 8px;
+      border-top: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    
+    /* Version history drawer */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+    }
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 360px;
+      background: var(--surface-1);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 101;
+    }
+    .drawer__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .drawer__body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .drawer__foot {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .version-row {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+    }
+    .version-row.is-selected {
+      border-color: var(--accent);
+      background-color: var(--surface-2);
+    }
+    .version-row__tag {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 11px;
+    }
+    
+    .genre-select-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .genre-select-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .genre-select-item.is-selected {
+      border-color: var(--accent);
+      background-color: var(--surface-2);
+    }
+    .genre-select-item__icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+    }
+    .dropzone.is-active {
+      border-color: var(--accent);
+      background-color: var(--surface-2);
+    }
+    
+    .input-group {
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background-color: var(--bg);
+      padding: 0 10px;
+    }
+    .input-group input {
+      background: transparent;
+      border: none;
+      color: var(--text-1);
+      padding: 8px 6px;
+      font-size: 13px;
+      outline: none;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React & Babel Standalone CDNs -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Wireframes Global mock tAIData -->
+  <script>
+    window.tAIData = {
+      WEEKLY_PAGES: [45, 65, 80, 55, 90, 75, 110, 85, 120, 100, 132, 95],
+      PROJECTS: [
+        { id: "p1", name: "The Pilgrim's Progress", chapters: 12, pages: 184, progress: 65, completed: 120, inReview: 35, pending: 29, quality: 82, status: "Active" },
+        { id: "p2", name: "The Imitation of Christ", chapters: 4, pages: 112, progress: 100, completed: 112, inReview: 0, pending: 0, quality: 91, status: "Complete" },
+        { id: "p3", name: "Mere Christianity", chapters: 11, pages: 232, progress: 15, completed: 35, inReview: 45, pending: 152, quality: 45, status: "Active" },
+        { id: "p4", name: "Confessions of St. Augustine", chapters: 13, pages: 310, progress: 0, completed: 0, inReview: 0, pending: 310, quality: 0, status: "New" }
+      ],
+      ACTIVITY: [
+        { initials: "SR", color: "#6ea8ff", user: "Selvi R.", action: "approved page", target: "P12 of Imitation of Christ", time: "2 min" },
+        { initials: "DA", color: "#4ecca3", user: "Daniel A.", action: "requested changes", target: "P45 of Pilgrim's Progress", time: "15 min" },
+        { initials: "MB", color: "#ffc107", user: "Mary B.", action: "escalated page", target: "P78 of Mere Christianity", time: "42 min" }
+      ],
+      TEAM: [
+        { id: "u1", initials: "SJ", color: "#e94560", name: "Suresh Johnson", email: "suresh@tai.ws", role: "Master", assigned: 12, status: "Active" },
+        { id: "u2", initials: "SR", color: "#6ea8ff", name: "Selvi Rajan", email: "selvi@tai.ws", role: "Reviewer", assigned: 45, status: "Active" },
+        { id: "u3", initials: "DA", color: "#4ecca3", name: "Daniel Amirtham", email: "daniel@tai.ws", role: "Reviewer", assigned: 30, status: "Active" },
+        { id: "u4", initials: "MB", color: "#ffc107", name: "Mary Beatrice", email: "mary@tai.ws", role: "Reviewer", assigned: 15, status: "Active" }
+      ],
+      QUEUE: [
+        { id: "q1", page: "P78", project: "Mere Christianity", chapter: 8, quality: 45, errors: 12, priority: "high", time: "12m waiting", status: "review" },
+        { id: "q2", page: "P45", project: "The Pilgrim's Progress", chapter: 3, quality: 65, errors: 5, priority: "medium", time: "1h waiting", status: "changes" },
+        { id: "q3", page: "P46", project: "The Pilgrim's Progress", chapter: 3, quality: 58, errors: 8, priority: "high", time: "2h waiting", status: "review" },
+        { id: "q4", page: "P12", project: "The Imitation of Christ", chapter: 1, quality: 92, errors: 1, priority: "low", time: "3h waiting", status: "review" },
+        { id: "q5", page: "P23", project: "Confessions of St. Augustine", chapter: 2, quality: 71, errors: 3, priority: "medium", time: "4h waiting", status: "review" }
+      ],
+      ESCALATED: [
+        { page: "P78", project: "Mere Christianity", chapter: 8, issue: "Theology", summary: "Dispute over translation of 'logos' as 'varththai' instead of 'vaaku' in chapter 1", by: "Mary B." },
+        { page: "P45", project: "The Pilgrim's Progress", chapter: 3, issue: "Register", summary: "Colloquial terminology used instead of classical Thiruviviliam honorifics", by: "Daniel A." }
+      ],
+      ERROR_BREAKDOWN: [
+        { type: "Terminology", color: "var(--error)", severity: "high", count: 18, example: "Translated 'logos' as 'varththai' (colloquial word) instead of 'vaaku' (classical Word)" },
+        { type: "Style / Register", color: "var(--warning)", severity: "medium", count: 10, example: "Uses informal plural endings for God instead of traditional Bible respectful suffixes" },
+        { type: "Accuracy / Translation Gaps", color: "var(--error)", severity: "high", count: 5, example: "Omitted phrase 'and the Word was with God' in verse reference translation" }
+      ],
+      GENRES: [
+        { id: "g1", name: "Tamil Protestant Bible (Thiruviviliam)", short: "Thiruviviliam", description: "Formal Protestant/Ecumenical scriptural Tamil dialect characterized by Sanskrit-derived theological markers.", segmentUnit: "Verse", version: "v3.2", projects: 3, color: "#8b5cf6", icon: "book", updated: "2026-05-04", updatedBy: "Suresh J." },
+        { id: "g2", name: "Classical Lutheran Hymnal (Classical)", short: "Classical", description: "A poetic, structured 19th-century liturgical Tamil containing high classical forms.", segmentUnit: "Paragraph", version: "v1.4", projects: 1, color: "#e94560", icon: "star", updated: "2026-04-12", updatedBy: "Selvi R." },
+        { id: "g3", name: "Modern Theological Prose", short: "Modern Prose", description: "Academic and conversational theology utilizing standard grammatical syntax with embedded English loan markers.", segmentUnit: "Paragraph", version: "v2.0", projects: 0, color: "#10b981", icon: "sparkles", updated: "2026-05-01", updatedBy: "Suresh J." }
+      ],
+      GENRE_VERSIONS: [
+        { v: "v3.2", current: true, date: "May 4, 2026", note: "Add precise Christology terminology markers and locks", author: "Suresh Johnson" },
+        { v: "v3.1", current: false, date: "Apr 20, 2026", note: "Refined honorific plural modifiers across Old Testament rules", author: "Suresh Johnson" },
+        { v: "v3.0", current: false, date: "Mar 11, 2026", note: "Initial seed for ecumenical Tamil Bible terminology matching", author: "Daniel Amirtham" }
+      ],
+      GENRE_CHAT_SEED: [
+        { role: "assistant", text: "Hello Suresh! I'm ready to help you refine the **Thiruviviliam** genre rules. We are currently editing version **v3.2**. Tell me what modifications we need today!" }
+      ],
+      MODELS: [
+        { agent: "Translation", model: "gemini-1.5-pro", provider: "OpenAI", endpoint: "https://api.openai.com/v1", note: "Default primary model" },
+        { agent: "Analysis", model: "claude-3-opus", provider: "Anthropic", endpoint: "https://api.anthropic.com/v1", note: "Used for high-density review parsing" }
+      ],
+      RULES: [
+        { id: "r1", agent: "Translation Agent", version: "v2.1", name: "Thiruviviliam Prose guidelines", updated: "3 days ago", active: true },
+        { id: "r2", agent: "Review Agent", version: "v1.8", name: "Theological error checks and registers", updated: "1 week ago", active: true },
+        { id: "r3", agent: "Glossary Seeding", version: "v3.2", name: "Tamil ecumenical terminologies", updated: "2 weeks ago", active: false }
+      ],
+      RULE_CONTENT: `# Thiruviviliam Translation Rules\n\n--- \nversion: v2.1\nlanguage: ta\n---\n\n## 1. Theological Honorifics\nAlways translate references to God, Christ, and the Holy Spirit using respectful plural endings:\n- He gave → அவர் அளித்தார் (not அளித்தான்)\n- God saw → தேவன் கண்டார்\n\n## 2. Terminology Locks\n- faith → விசுவாசம்\n- grace → கிருபை\n- Word (divine logos) → வாக்கு / வார்த்தை\n- salvation → இரட்சிப்பு`,
+      PASSAGE: {
+        segments: [
+          { id: "s1", status: "good", en: "For God so loved the world, that He gave His only begotten Son,", ta: "தேவன் உலகத்தின்மேல் அவ்வளவாய் அன்புகூர்ந்தார்; தம்முடைய ஒரே பேறான குமாரனை அளித்தார்,", selected: false },
+          { id: "s2", status: "good", en: "that whoever believes in Him should not perish, but have everlasting life.", ta: "அவரிடம் விசுவாசம் வைக்கிற எவனும் கெட்டுப்போகாமல் நித்திய ஜீவனை அடையும்படி,", selected: false },
+          { id: "s3", status: "error", en: "For God did not send His Son into the world to condemn the world,", ta: "தேவன் உலகத்தை ஆக்கினைக்குள்ளாகத் தீர்க்கும்படி தம்முடைய குமாரனை உலகத்தில் அனுப்பவில்லை,", selected: true },
+          { id: "s4", status: "good", en: "but that the world through Him might be saved.", ta: "உலகம் அவராலே இரட்சிக்கப்படுவதற்காகவே அவரை அனுப்பினார்.", selected: false }
+        ]
+      },
+      QUALITY: { overall: 45, accuracy: 52, fluency: 48, style: 38, terminology: 65 }
+    };
+  </script>
+
+  <!-- Global Shared Components Definition -->
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Btn Component Mapping
+    const Btn = ({ children, kind = "secondary", size = "md", icon, className = "", onClick, ...props }) => {
+      let baseClass = "p-button";
+      if (kind === "ghost") baseClass += " p-button-text";
+      if (kind === "primary") baseClass += " p-button-primary";
+      if (kind === "success") baseClass += " p-button-success";
+      if (kind === "danger") baseClass += " p-button-danger";
+      if (kind === "warning") baseClass += " p-button-warning";
+      
+      if (size === "sm") baseClass += " p-button-sm";
+      if (size === "lg") baseClass += " p-button-lg";
+      
+      let iconMarkup = null;
+      if (icon) {
+        let piName = icon;
+        if (icon === "plus") piName = "plus";
+        if (icon === "download") piName = "download";
+        if (icon === "edit") piName = "pencil";
+        if (icon === "more") piName = "ellipsis-v";
+        if (icon === "arrowLeft") piName = "arrow-left";
+        if (icon === "arrowRight") piName = "arrow-right";
+        if (icon === "chevronLeft") piName = "chevron-left";
+        if (icon === "chevronRight") piName = "chevron-right";
+        if (icon === "chevronDown") piName = "chevron-down";
+        if (icon === "columns") piName = "th-large";
+        if (icon === "layout") piName = "table";
+        if (icon === "sparkles") piName = "sparkles";
+        if (icon === "history") piName = "history";
+        if (icon === "play") piName = "play";
+        if (icon === "check") piName = "check";
+        if (icon === "filter") piName = "filter";
+        if (icon === "bolt") piName = "bolt";
+        if (icon === "terminal") piName = "code";
+        if (icon === "settings") piName = "cog";
+        if (icon === "send") piName = "send";
+        if (icon === "x") piName = "times";
+        if (icon === "refresh") piName = "refresh";
+        if (icon === "users") piName = "users";
+        if (icon === "flag") piName = "flag";
+        
+        iconMarkup = <i className={`pi pi-${piName} ${children ? 'mr-2' : ''}`} style={{ fontSize: size === 'sm' ? '11px' : '13px' }}></i>;
+      }
+
+      return (
+        <button className={`${baseClass} ${className} inline-flex items-center justify-center`} onClick={onClick} {...props}>
+          {iconMarkup}
+          {children}
+        </button>
+      );
+    };
+
+    // Icon Component
+    const Icon = ({ name, size = 14, style = {}, ...props }) => {
+      let piName = name;
+      if (name === "arrowUp") piName = "arrow-up";
+      if (name === "arrowDown") piName = "arrow-down";
+      if (name === "arrowLeft") piName = "arrow-left";
+      if (name === "arrowRight") piName = "arrow-right";
+      if (name === "plus") piName = "plus";
+      if (name === "download") piName = "download";
+      if (name === "pencil" || name === "edit") piName = "pencil";
+      if (name === "chevronDown") piName = "chevron-down";
+      if (name === "chevronLeft") piName = "chevron-left";
+      if (name === "chevronRight") piName = "chevron-right";
+      if (name === "columns") piName = "th-large";
+      if (name === "layout") piName = "table";
+      if (name === "sparkles") piName = "sparkles";
+      if (name === "history") piName = "history";
+      if (name === "check") piName = "check";
+      if (name === "search") piName = "search";
+      if (name === "upload") piName = "upload";
+      if (name === "settings") piName = "cog";
+      if (name === "star") piName = "star";
+      if (name === "book") piName = "book";
+      if (name === "note") piName = "envelope";
+      if (name === "send") piName = "send";
+      if (name === "x") piName = "times";
+      if (name === "refresh") piName = "refresh";
+      if (name === "users") piName = "users";
+      if (name === "flag") piName = "flag";
+      if (name === "diff") piName = "directions";
+      
+      return <i className={`pi pi-${piName}`} style={{ fontSize: `${size}px`, ...style }} {...props}></i>;
+    };
+
+    // Pill Component
+    const Pill = ({ children, kind = "default", dot = false, ...props }) => {
+      let baseClass = "p-tag";
+      if (kind === "success") baseClass += " p-tag-success";
+      if (kind === "error" || kind === "danger") baseClass += " p-tag-danger";
+      if (kind === "warning" || kind === "warn") baseClass += " p-tag-warning";
+      if (kind === "accent") baseClass += " bg-purple-950 text-purple-200 border-purple-500 border";
+      if (kind === "info") baseClass += " bg-blue-950 text-blue-200 border-blue-500 border";
+      
+      return (
+        <span className={`${baseClass} inline-flex items-center gap-1`} {...props}>
+          {dot && <span className="status-dot mr-1" style={{ width: 6, height: 6, backgroundColor: kind === "success" ? 'var(--success)' : kind === 'error' || kind === 'danger' ? 'var(--error)' : kind === 'warning' ? 'var(--warning)' : 'var(--text-1)' }}></span>}
+          {children}
+        </span>
+      );
+    };
+
+    // PriorityPill Component
+    const PriorityPill = ({ level }) => {
+      const lower = level ? level.toLowerCase() : "low";
+      if (lower === "high") return <Pill kind="error">High</Pill>;
+      if (lower === "medium") return <Pill kind="warning">Medium</Pill>;
+      return <Pill>Low</Pill>;
+    };
+
+    // StatusDot Component
+    const StatusDot = ({ status }) => {
+      let className = "status-dot--pending";
+      if (status === "approved" || status === "complete" || status === "Active") className = "status-dot--approved";
+      if (status === "review" || status === "In progress") className = "status-dot--review";
+      if (status === "changes" || status === "Escalated" || status === "error") className = "status-dot--changes";
+      if (status === "processing") className = "status-dot--processing";
+      return <span className={`status-dot ${className}`}></span>;
+    };
+
+    // StatusPill Component
+    const StatusPill = ({ status }) => {
+      let kind = "default";
+      if (status === "Approved" || status === "Complete" || status === "Active") kind = "success";
+      if (status === "review" || status === "In progress" || status === "Pending" || status === "review") kind = "warning";
+      if (status === "Changes" || status === "Escalated" || status === "changes" || status === "error") kind = "danger";
+      if (status === "processing" || status === "Processing") kind = "accent";
+      return <Pill kind={kind} dot>{status}</Pill>;
+    };
+
+    // Progress bar
+    const Progress = ({ value = 0, kind }) => {
+      let cls = "p-progressbar";
+      if (kind === "success") cls += " p-progressbar-success";
+      if (kind === "error" || kind === "danger") cls += " p-progressbar-danger";
+      if (kind === "warning" || kind === "warn") cls += " p-progressbar-warning";
+      return (
+        <div className={cls}>
+          <div className="p-progressbar-value" style={{ width: `${value}%` }}></div>
+        </div>
+      );
+    };
+
+    // Avatar
+    const Avatar = ({ initials, color = "var(--surface-2)" }) => {
+      return (
+        <div className="p-avatar inline-flex items-center justify-center rounded-full text-zinc-100 font-semibold" style={{ width: 24, height: 24, backgroundColor: color }}>
+          {initials}
+        </div>
+      );
+    };
+
+    // QualityRing
+    const QualityRing = ({ value = 0, size = 48 }) => {
+      const color = value < 60 ? "var(--error)" : value < 80 ? "var(--warning)" : "var(--success)";
+      return (
+        <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+            <path className="text-zinc-800" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            <path style={{ stroke: color }} strokeDasharray={`${value}, 100`} strokeWidth="3.2" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+          </svg>
+          <span className="absolute font-mono text-xs font-bold" style={{ color }}>{value}%</span>
+        </div>
+      );
+    };
+
+    // Modal Component
+    const Modal = ({ title, children, onClose, footer }) => {
+      return (
+        <div className="modal-backdrop" onClick={onClose}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-zinc-800">
+              <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
+              <Btn kind="ghost" size="sm" icon="x" onClick={onClose} />
+            </div>
+            <div className="mb-4 text-sm">{children}</div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">{footer}</div>
+          </div>
+        </div>
+      );
+    };
+
+    window.Btn = Btn;
+    window.Icon = Icon;
+    window.Pill = Pill;
+    window.PriorityPill = PriorityPill;
+    window.StatusDot = StatusDot;
+    window.StatusPill = StatusPill;
+    window.Progress = Progress;
+    window.Avatar = Avatar;
+    window.QualityRing = QualityRing;
+    window.Modal = Modal;
+  </script>
+
+  <!-- Screens Loader -->
+  <script type="text/babel" src="screens/auth.jsx"></script>
+  <script type="text/babel" src="screens/dashboard.jsx"></script>
+  <script type="text/babel" src="screens/projects.jsx"></script>
+  <script type="text/babel" src="screens/queue.jsx"></script>
+  <script type="text/babel" src="screens/review.jsx"></script>
+  <script type="text/babel" src="screens/workbench.jsx"></script>
+  <script type="text/babel" src="screens/genres.jsx"></script>
+  <script type="text/babel" src="screens/admin.jsx"></script>
+
+  <!-- Unified Main App Mounting -->
+  <script type="text/babel">
+    const App = () => {
+      const [screen, setScreen] = useState("auth");
+      const [screenData, setScreenData] = useState(null);
+
+      const handleNavigate = (target, data = null) => {
+        setScreen(target);
+        setScreenData(data);
+      };
+
+      const handleBack = () => {
+        if (screen === "projectDetail") {
+          handleNavigate("projects");
+        } else if (screen === "genreEditor") {
+          handleNavigate("genres");
+        } else if (screen === "review") {
+          handleNavigate("queue");
+        } else if (screen === "workbench") {
+          handleNavigate("projects");
+        } else {
+          handleNavigate("dashboard");
+        }
+      };
+
+      const showNavShell = screen !== "auth" && screen !== "workbench" && screen !== "genreEditor";
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Global Header Shell */}
+          {showNavShell && (
+            <header className="shell-navbar shrink-0">
+              <div className="flex items-center gap-6">
+                <div className="text-zinc-100 font-bold tracking-wider text-base cursor-pointer" onClick={() => handleNavigate("dashboard")}>
+                  <span className="text-purple-500 font-extrabold">t</span>AI
+                </div>
+                <div className="shell-nav-links">
+                  <button className={`shell-nav-link ${screen === 'dashboard' ? 'is-active' : ''}`} onClick={() => handleNavigate("dashboard")}>Dashboard</button>
+                  <button className={`shell-nav-link ${screen === 'projects' || screen === 'projectDetail' ? 'is-active' : ''}`} onClick={() => handleNavigate("projects")}>Projects</button>
+                  <button className={`shell-nav-link ${screen === 'queue' || screen === 'review' ? 'is-active' : ''}`} onClick={() => handleNavigate("queue")}>Queue</button>
+                  <button className={`shell-nav-link ${screen === 'genres' || screen === 'genreEditor' ? 'is-active' : ''}`} onClick={() => handleNavigate("genres")}>Genres</button>
+                  <button className={`shell-nav-link ${screen === 'admin' ? 'is-active' : ''}`} onClick={() => handleNavigate("admin")}>Admin Override</button>
+                  <button className={`shell-nav-link ${screen === 'team' ? 'is-active' : ''}`} onClick={() => handleNavigate("team")}>Team</button>
+                  <button className={`shell-nav-link ${screen === 'settings' ? 'is-active' : ''}`} onClick={() => handleNavigate("settings")}>Settings</button>
+                  <button className={`shell-nav-link ${screen === 'rules' ? 'is-active' : ''}`} onClick={() => handleNavigate("rules")}>Rules</button>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-zinc-400 font-mono">Selvi R. (Reviewer)</span>
+                <Avatar initials="SR" color="#6ea8ff" />
+                <Btn kind="ghost" size="sm" icon="x" onClick={() => handleNavigate("auth")} title="Sign out" />
+              </div>
+            </header>
+          )}
+
+          {/* Core Content Switching Router */}
+          <main className="flex-1 min-h-0 flex flex-col">
+            {screen === "auth" && <AuthScreen onSignIn={() => handleNavigate("dashboard")} />}
+            {screen === "dashboard" && <Dashboard onNavigate={handleNavigate} />}
+            {screen === "projects" && <ProjectsList onNavigate={handleNavigate} />}
+            {screen === "projectDetail" && <ProjectDetail project={screenData} onNavigate={handleNavigate} onBack={handleBack} />}
+            {screen === "queue" && <Queue onNavigate={handleNavigate} />}
+            {screen === "review" && <Review onNavigate={handleNavigate} onBack={handleBack} />}
+            {screen === "workbench" && <Workbench onNavigate={handleNavigate} onBack={handleBack} />}
+            {screen === "genres" && <GenresList onNavigate={handleNavigate} />}
+            {screen === "genreEditor" && <GenreEditor genre={screenData} onBack={handleBack} />}
+            {screen === "admin" && <Admin onNavigate={handleNavigate} />}
+            {screen === "team" && <Team />}
+            {screen === "settings" && <Settings />}
+            {screen === "rules" && <Rules />}
+          </main>
+        </div>
+      );
+    };
+
+    const rootElement = document.getElementById("root");
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(<App />);
+  </script>
+</body>
+</html>

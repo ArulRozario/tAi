@@ -1,0 +1,37 @@
+<p-card styleClass="tai-style-guide-card hoverable" (click)="onClick()">
+  <div class="card-header">
+    <div class="styleGuide-icon" [ngStyle]="{'background-color': styleGuide.color + '20', 'color': styleGuide.color}">
+      <i [class]="styleGuide.icon"></i>
+    </div>
+    @if (styleGuide.currentVersion) {
+      <p-tag [value]="styleGuide.currentVersion.version" severity="secondary" [rounded]="true"></p-tag>
+    }
+  </div>
+
+  <div class="card-body">
+    <h3 class="styleGuide-title">{{ styleGuide.name }}</h3>
+    <p class="styleGuide-desc">{{ styleGuide.description }}</p>
+  </div>
+
+  <div class="card-footer">
+    <div class="meta-row">
+      <div class="meta-item">
+        <span class="meta-label">Segment ·</span>
+        <span class="meta-value">{{ styleGuide.segmentUnit }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-value">{{ styleGuide._count?.projects || 0 }} projects</span>
+      </div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-item">
+        <span class="meta-label">Updated</span>
+        <span class="meta-value">2 days ago</span> <!-- Hardcoded for now based on image, ideally use a relative time pipe -->
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">by</span>
+        <span class="meta-value">Ravi</span> <!-- Hardcoded based on image, would come from styleGuide object -->
+      </div>
+    </div>
+  </div>
+</p-card>

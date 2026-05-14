@@ -4,6 +4,7 @@ import { ModelsService } from '../models/models.service';
 import { AgentType, ErrorSeverity, ErrorCategory } from '@prisma/client';
 
 export interface ReviewErrorOutput {
+  segmentId?: string;
   severity: ErrorSeverity;
   category: ErrorCategory;
   location: string;
@@ -31,14 +32,15 @@ export class ReviewAgent {
     pageId: string,
     originalHtml: string,
     translatedHtml: string,
-  ): Promise<ReviewErrorOutput[]> {
+    modelOverride?: string,
+  ): Promise<{ errors: ReviewErrorOutput[]; modelUsed: string }> {
     this.logger.log(`Evaluating translation quality for page ${pageId} on project ${projectId}`);
 
     // 1. Fetch project details & style guide reference
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
-        genre: {
+        styleGuide: {
           include: {
             currentVersion: true,
           },
@@ -52,11 +54,11 @@ export class ReviewAgent {
 
     const sourceLang = project.sourceLang;
     const targetLang = project.targetLang;
-    const styleGuide = project.genre.currentVersion?.content || 'Standard theological formal register.';
+    const styleGuide = project.styleGuide.currentVersion?.content || 'Standard theological formal register.';
 
     // 2. Fetch top 50 glossary terms for this genre
     const glossaryTerms = await this.prisma.glossaryTerm.findMany({
-      where: { genreId: project.genreId },
+      where: { styleGuideId: project.styleGuideId },
       take: 50,
       orderBy: { sourceTerm: 'asc' },
     });
@@ -110,11 +112,16 @@ ${translatedHtml}
 
 Please review the translation and output the JSON list of errors.`;
 
-    // 5. Execute Prompt using ModelsService
-    const response = await this.modelsService.executePrompt(AgentType.REVIEW, `${systemPrompt}\n\n${userPrompt}`, {
-      temperature: 0.1,
-      max_tokens: 4096,
-    });
+    // 5. Execute Prompt using ModelsService (with Gemini fallback)
+    const response = await this.modelsService.executePrompt(
+      AgentType.REVIEW,
+      `${systemPrompt}\n\n${userPrompt}`,
+      {
+        temperature: 0.1,
+        max_tokens: 4096,
+      },
+      modelOverride,
+    );
 
     // 6. Safely Parse and Validate JSON
     try {
@@ -158,10 +165,10 @@ Please review the translation and output the JSON list of errors.`;
         };
       });
 
-      return mappedErrors;
+      return { errors: mappedErrors, modelUsed: response.model };
     } catch (parseErr) {
       this.logger.error(`Failed parsing review response: ${(parseErr as Error).message}`);
-      return []; // Recover gracefully by returning empty error array
+      return { errors: [], modelUsed: response.model };
     }
   }
 }

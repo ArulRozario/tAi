@@ -1,0 +1,76 @@
+/* Global Design Tokens & Theme Handler */
+:root {
+  /* Canvas Layout Variables */
+  --bg-canvas: #f8fafc;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --border-color: #e2e8f0;
+  
+  /* Typography and Interaction */
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-disabled: #94a3b8;
+  --bg-hover: #f1f5f9;
+  
+  /* Tabular Grids */
+  --table-header-bg: #ffffff;
+  --table-row-hover: #fafbfc;
+
+  /* Accent & Brand Variables (Light Mode) */
+  --accent-primary: #f43f5e;        /* Rose red brand color */
+  --accent-primary-hover: #e11d48;  /* Rose hover state */
+  --accent-primary-text: #ffffff;
+
+  --accent-success: #10b981;        /* Emerald green success status */
+  --accent-success-bg: #f0fdf4;     /* Light green capsule fill */
+
+  --accent-info: #3b82f6;           /* Royal blue active status */
+  --accent-info-bg: #eff6ff;        /* Light blue capsule fill */
+
+  --accent-warning: #f59e0b;        /* Warning Amber status */
+  --accent-warning-bg: #fffbeb;     /* Light amber capsule fill */
+
+  --accent-danger: #f43f5e;         /* Danger Rose status */
+  --accent-danger-bg: #fff1f2;      /* Light rose capsule fill */
+
+  --accent-highlight: #fde047;      /* Bright yellow for active text focus */
+  --accent-highlight-text: #000000;
+}
+
+html.dark {
+  /* Canvas Layout Variables */
+  --bg-canvas: #090d16;      /* Deep Slate-950 canvas background */
+  --bg-sidebar: #0f172a;    /* Dark Slate-900 sidebar/topbar */
+  --bg-card: #1e293b;       /* Slate-800 container card */
+  --border-color: #334155;   /* Slate-700 lines/dividers */
+  
+  /* Typography and Interaction */
+  --text-main: #f8fafc;     /* High-contrast soft white text */
+  --text-muted: #94a3b8;    /* Medium contrast slate */
+  --text-disabled: #64748b; /* Low contrast dim slate */
+  --bg-hover: #1e293b;      /* Slate-800 list-item hover */
+  
+  /* Tabular Grids */
+  --table-header-bg: #111827;/* Charcoal tables headers */
+  --table-row-hover: #1e293b;/* Slate-800 table rows hover */
+
+  /* Accent & Brand Variables (Dark Mode - optimized for WCAG accessibility contrast) */
+  --accent-primary: #f43f5e;
+  --accent-primary-hover: #fb7185;  /* Soft rose-pink hover highlight */
+  --accent-primary-text: #ffffff;
+
+  --accent-success: #34d399;        /* Pastel emerald green text */
+  --accent-success-bg: #064e3b;     /* Deep forest green capsule fill */
+
+  --accent-info: #60a5fa;           /* Soft pastel blue text */
+  --accent-info-bg: #1e3a8a;        /* Deep royal blue capsule fill */
+
+  --accent-warning: #fbbf24;        /* Soft amber yellow warning text */
+  --accent-warning-bg: #451a03;     /* Deep amber capsule fill */
+
+  --accent-danger: #f43f5e;         /* Rose-red text */
+  --accent-danger-bg: #4c0519;      /* Deep rose capsule fill */
+
+  --accent-highlight: #facc15;      /* Optimized yellow for dark contrast */
+  --accent-highlight-text: #000000;
+}

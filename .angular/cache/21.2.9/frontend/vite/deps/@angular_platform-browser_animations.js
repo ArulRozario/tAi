@@ -1,35 +1,33 @@
 import {
   BrowserModule,
   DomRendererFactory2
-} from "./chunk-C3L7JQTT.js";
-import "./chunk-SO6KPK33.js";
-import "./chunk-4FSBW6TR.js";
+} from "./chunk-W54INCC5.js";
+import "./chunk-7WBDEVG2.js";
+import "./chunk-MIJCVNFH.js";
 import {
   ANIMATION_MODULE_TYPE,
+  DOCUMENT,
   Inject,
   Injectable,
   NgModule,
-  RendererFactory2,
-  performanceMarkFeature,
-  setClassMetadata,
-  ɵɵdefineNgModule
-} from "./chunk-MEPECJH5.js";
-import {
-  DOCUMENT,
   NgZone,
+  RendererFactory2,
   RuntimeError,
   inject,
+  performanceMarkFeature,
+  setClassMetadata,
   ɵɵdefineInjectable,
   ɵɵdefineInjector,
+  ɵɵdefineNgModule,
   ɵɵinject
-} from "./chunk-BDTBJ5A5.js";
-import "./chunk-BGJDQHGH.js";
+} from "./chunk-IDZCX6FW.js";
 import "./chunk-FX47LQWG.js";
+import "./chunk-BGJDQHGH.js";
 import "./chunk-KHPDHDQC.js";
 import {
   __objRest,
   __spreadValues
-} from "./chunk-GOMI4DH3.js";
+} from "./chunk-46DXP6YY.js";
 
 // node_modules/.pnpm/@angular+animations@21.2.11_@angular+core@21.2.11_@angular+compiler@21.2.11_rxjs@7.8.2_/node_modules/@angular/animations/fesm2022/_private_export-chunk.mjs
 var AnimationMetadataType;

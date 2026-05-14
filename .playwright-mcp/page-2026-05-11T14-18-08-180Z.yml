@@ -1,0 +1,86 @@
+- generic [ref=e3]:
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - text: tAI
+        - generic [ref=e8]: .
+      - button "" [ref=e9] [cursor=pointer]:
+        - generic [ref=e10]: 
+    - navigation [ref=e11]:
+      - menu [ref=e14]:
+        - text: WORKSPACE
+        - menuitem "Dashboard" [ref=e15]:
+          - link " Dashboard" [ref=e17] [cursor=pointer]:
+            - /url: /dashboard
+            - generic [ref=e18]: 
+            - generic [ref=e19]: Dashboard
+        - menuitem "Projects" [ref=e20]:
+          - link " Projects" [ref=e22] [cursor=pointer]:
+            - /url: /projects
+            - generic [ref=e23]: 
+            - generic [ref=e24]: Projects
+        - menuitem "Queue" [ref=e25]:
+          - link " Queue 5" [ref=e27] [cursor=pointer]:
+            - /url: /queue
+            - generic [ref=e28]: 
+            - generic [ref=e29]: Queue
+            - generic [ref=e30]: "5"
+        - menuitem "Review" [ref=e31]:
+          - link " Review" [ref=e33] [cursor=pointer]:
+            - /url: /review
+            - generic [ref=e34]: 
+            - generic [ref=e35]: Review
+        - menuitem "Workbench" [ref=e36]:
+          - link " Workbench" [ref=e38] [cursor=pointer]:
+            - /url: /workbench
+            - generic [ref=e39]: 
+            - generic [ref=e40]: Workbench
+        - text: ADMIN
+        - menuitem "Admin" [ref=e41]:
+          - link " Admin" [ref=e43] [cursor=pointer]:
+            - /url: /admin
+            - generic [ref=e44]: 
+            - generic [ref=e45]: Admin
+        - menuitem "Team" [ref=e46]:
+          - link " Team" [ref=e48] [cursor=pointer]:
+            - /url: /team
+            - generic [ref=e49]: 
+            - generic [ref=e50]: Team
+        - menuitem "Style Guides" [ref=e51]:
+          - link " Style Guides" [ref=e53] [cursor=pointer]:
+            - /url: /style-guides
+            - generic [ref=e54]: 
+            - generic [ref=e55]: Style Guides
+        - menuitem "Settings" [ref=e56]:
+          - link " Settings" [ref=e58] [cursor=pointer]:
+            - /url: /settings
+            - generic [ref=e59]: 
+            - generic [ref=e60]: Settings
+        - text: ACCOUNT
+        - menuitem "Sign out" [ref=e61]:
+          - generic [ref=e63] [cursor=pointer]:
+            - generic [ref=e64]: 
+            - generic [ref=e65]: Sign out
+    - generic [ref=e66]:
+      - generic [ref=e67]:
+        - button "" [ref=e69] [cursor=pointer]:
+          - generic [ref=e70]: 
+        - button "" [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]: 
+      - generic [ref=e73]:
+        - generic [ref=e75]: RK
+        - generic [ref=e76]:
+          - generic [ref=e77]: Ravi Kumaran
+          - generic [ref=e78]: Master reviewer
+  - main [ref=e79]:
+    - generic [ref=e84]:
+      - generic [ref=e85]:
+        - heading "Genres" [level=1] [ref=e86]
+        - paragraph [ref=e87]: Translation contexts that drive agent behavior · 0 defined
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - generic [ref=e90]: 
+          - textbox "Search styleGuides" [ref=e91]
+        - button " New styleGuide" [ref=e93] [cursor=pointer]:
+          - generic [ref=e94]: 
+          - generic [ref=e95]: New styleGuide

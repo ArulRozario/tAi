@@ -1,0 +1,54 @@
+.styleGuides-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+
+.styleGuides-content {
+  flex: 1;
+  padding: 40px 48px;
+  overflow-y: auto;
+  background-color: var(--bg-canvas);
+}
+
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+
+  .title-section {
+    .page-title {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin: 0 0 8px 0;
+      letter-spacing: -0.02em;
+    }
+
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin: 0;
+      font-weight: 500;
+    }
+  }
+
+  .action-section {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    p-iconField {
+      width: 240px;
+    }
+  }
+}
+
+.styleGuides-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 24px;
+}

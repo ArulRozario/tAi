@@ -21,7 +21,7 @@ export class QueueService {
     lowQualityOnly?: boolean;
   }) {
     const where: any = {
-      status: { in: [PageStatus.HUMAN_REVIEW, PageStatus.ESCALATED] },
+      status: { in: [PageStatus.HUMAN_REVIEW] },
     };
 
     if (filters.lowQualityOnly) {
@@ -144,7 +144,7 @@ export class QueueService {
 
   async getEscalations() {
     const pages = await this.prisma.page.findMany({
-      where: { status: PageStatus.ESCALATED },
+      where: { status: PageStatus.HUMAN_REVIEW },
       orderBy: { updatedAt: 'desc' },
       include: {
         project: { select: { id: true, name: true } },

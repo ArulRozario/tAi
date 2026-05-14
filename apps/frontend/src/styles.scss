@@ -34,6 +34,18 @@
   --text: var(--text-1);
 }
 
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+app-root {
+  display: block;
+  height: 100%;
+}
+
 @layer base {
   body {
     @apply bg-bg text-text-1 font-sans antialiased m-0 p-0;

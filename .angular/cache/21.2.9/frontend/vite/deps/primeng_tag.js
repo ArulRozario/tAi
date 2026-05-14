@@ -1,32 +1,37 @@
 import {
   BaseComponent,
-  Bind,
   PARENT_INSTANCE
-} from "./chunk-RDGPVRJM.js";
+} from "./chunk-5Q3QJLUY.js";
+import {
+  Bind
+} from "./chunk-FDDOVCH6.js";
 import {
   BaseStyle
-} from "./chunk-YMFEJ3C6.js";
+} from "./chunk-5LSILY4Y.js";
 import {
   PrimeTemplate,
   SharedModule
-} from "./chunk-6X4SBNEN.js";
+} from "./chunk-DFX2PQFP.js";
+import "./chunk-N457OPXR.js";
 import {
   CommonModule,
   NgClass,
   NgIf,
   NgTemplateOutlet
-} from "./chunk-SO6KPK33.js";
-import "./chunk-4FSBW6TR.js";
+} from "./chunk-7WBDEVG2.js";
+import "./chunk-MIJCVNFH.js";
 import {
   ChangeDetectionStrategy,
   Component,
   ContentChild,
   ContentChildren,
   Injectable,
+  InjectionToken,
   Input,
   NgModule,
   ViewEncapsulation,
   booleanAttribute,
+  inject,
   setClassMetadata,
   ɵɵHostDirectivesFeature,
   ɵɵInheritDefinitionFeature,
@@ -36,6 +41,8 @@ import {
   ɵɵclassMap,
   ɵɵcontentQuery,
   ɵɵdefineComponent,
+  ɵɵdefineInjectable,
+  ɵɵdefineInjector,
   ɵɵdefineNgModule,
   ɵɵelement,
   ɵɵelementContainerEnd,
@@ -52,17 +59,11 @@ import {
   ɵɵtemplate,
   ɵɵtext,
   ɵɵtextInterpolate
-} from "./chunk-MEPECJH5.js";
-import {
-  InjectionToken,
-  inject,
-  ɵɵdefineInjectable,
-  ɵɵdefineInjector
-} from "./chunk-BDTBJ5A5.js";
-import "./chunk-BGJDQHGH.js";
+} from "./chunk-IDZCX6FW.js";
 import "./chunk-FX47LQWG.js";
+import "./chunk-BGJDQHGH.js";
 import "./chunk-KHPDHDQC.js";
-import "./chunk-GOMI4DH3.js";
+import "./chunk-46DXP6YY.js";
 
 // node_modules/.pnpm/@primeuix+styles@2.0.3/node_modules/@primeuix/styles/dist/tag/index.mjs
 var style = "\n    .p-tag {\n        display: inline-flex;\n        align-items: center;\n        justify-content: center;\n        background: dt('tag.primary.background');\n        color: dt('tag.primary.color');\n        font-size: dt('tag.font.size');\n        font-weight: dt('tag.font.weight');\n        padding: dt('tag.padding');\n        border-radius: dt('tag.border.radius');\n        gap: dt('tag.gap');\n    }\n\n    .p-tag-icon {\n        font-size: dt('tag.icon.size');\n        width: dt('tag.icon.size');\n        height: dt('tag.icon.size');\n    }\n\n    .p-tag-rounded {\n        border-radius: dt('tag.rounded.border.radius');\n    }\n\n    .p-tag-success {\n        background: dt('tag.success.background');\n        color: dt('tag.success.color');\n    }\n\n    .p-tag-info {\n        background: dt('tag.info.background');\n        color: dt('tag.info.color');\n    }\n\n    .p-tag-warn {\n        background: dt('tag.warn.background');\n        color: dt('tag.warn.color');\n    }\n\n    .p-tag-danger {\n        background: dt('tag.danger.background');\n        color: dt('tag.danger.color');\n    }\n\n    .p-tag-secondary {\n        background: dt('tag.secondary.background');\n        color: dt('tag.secondary.color');\n    }\n\n    .p-tag-contrast {\n        background: dt('tag.contrast.background');\n        color: dt('tag.contrast.color');\n    }\n";

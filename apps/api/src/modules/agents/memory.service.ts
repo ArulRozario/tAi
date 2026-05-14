@@ -70,7 +70,7 @@ export class MemoryService {
           data: {
             pageId: page.id,
             projectId: project.id,
-            genreId: project.genreId,
+            styleGuideId: project.styleGuideId,
             sourceLang: project.sourceLang,
             targetLang: project.targetLang,
             originalText: origText,
@@ -100,7 +100,7 @@ export class MemoryService {
    */
   async retrieve(
     originalText: string,
-    genreId: string,
+    styleGuideId: string,
     sourceLang: string,
     targetLang: string,
     limit = 3,
@@ -123,7 +123,7 @@ export class MemoryService {
         `SELECT "originalText", "translatedText",
                 1 - (embedding <=> $1::vector) AS similarity
          FROM "TranslationMemory"
-         WHERE "genreId" = $2
+          WHERE "styleGuideId" = $2
            AND "sourceLang" = $3
            AND "targetLang" = $4
            AND embedding IS NOT NULL
@@ -131,7 +131,7 @@ export class MemoryService {
          ORDER BY embedding <=> $1::vector ASC
          LIMIT $5`,
         vectorStr,
-        genreId,
+        styleGuideId,
         sourceLang,
         targetLang,
         limit,

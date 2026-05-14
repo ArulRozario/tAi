@@ -7,11 +7,11 @@ export class GlossaryService {
 
   constructor(private prisma: PrismaService) {}
 
-  async findMany(filters: { genreId?: string; q?: string; limit: number }) {
+  async findMany(filters: { styleGuideId?: string; q?: string; limit: number }) {
     const where: any = {};
 
-    if (filters.genreId) {
-      where.styleGuideId = filters.genreId;
+    if (filters.styleGuideId) {
+      where.styleGuideId = filters.styleGuideId;
     }
 
     if (filters.q) {
@@ -39,17 +39,17 @@ export class GlossaryService {
   }
 
   async create(data: {
-    genreId: string;
+    styleGuideId: string;
     sourceTerm: string;
     targetTerm: string;
     context?: string;
     notes?: string;
   }) {
-    // Check if duplicate sourceTerm for this genre
+    // Check if duplicate sourceTerm for this style guide
     const existing = await this.prisma.glossaryTerm.findUnique({
       where: {
         styleGuideId_sourceTerm: {
-          styleGuideId: data.genreId,
+          styleGuideId: data.styleGuideId,
           sourceTerm: data.sourceTerm,
         },
       },
@@ -57,13 +57,13 @@ export class GlossaryService {
 
     if (existing) {
       throw new ConflictException(
-        `A glossary term for "${data.sourceTerm}" already exists in this genre`
+        `A glossary term for "${data.sourceTerm}" already exists in this style guide`
       );
     }
 
     return this.prisma.glossaryTerm.create({
       data: {
-        styleGuideId: data.genreId,
+        styleGuideId: data.styleGuideId,
         sourceTerm: data.sourceTerm,
         targetTerm: data.targetTerm,
         context: data.context || null,
@@ -103,7 +103,7 @@ export class GlossaryService {
   }
 
   async bulkCreate(data: {
-    genreId: string;
+    styleGuideId: string;
     terms: Array<{ sourceTerm: string; targetTerm: string; context?: string }>;
   }) {
     let created = 0;
@@ -115,7 +115,7 @@ export class GlossaryService {
       await this.prisma.glossaryTerm.upsert({
         where: {
           styleGuideId_sourceTerm: {
-            styleGuideId: data.genreId,
+            styleGuideId: data.styleGuideId,
             sourceTerm: term.sourceTerm,
           },
         },
@@ -124,7 +124,7 @@ export class GlossaryService {
           context: term.context || undefined,
         },
         create: {
-          styleGuideId: data.genreId,
+          styleGuideId: data.styleGuideId,
           sourceTerm: term.sourceTerm,
           targetTerm: term.targetTerm,
           context: term.context || undefined,
@@ -134,7 +134,7 @@ export class GlossaryService {
       created++;
     }
 
-    this.logger.log(`Bulk created ${created} glossary terms for genre ${data.genreId}`);
+    this.logger.log(`Bulk created ${created} glossary terms for style guide ${data.styleGuideId}`);
     return { created };
   }
 }

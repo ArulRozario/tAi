@@ -1,0 +1,48 @@
+:host {
+  display: inline-block;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+
+  &.active {
+    background-color: var(--accent-info-bg);
+    color: var(--accent-info);
+
+    .status-dot {
+      background-color: var(--accent-info);
+    }
+  }
+
+  &.complete {
+    background-color: var(--accent-success-bg);
+    color: var(--accent-success);
+
+    .status-dot {
+      background-color: var(--accent-success);
+    }
+  }
+
+  &.new {
+    background-color: var(--border-color);
+    color: var(--text-muted);
+
+    .status-dot {
+      background-color: var(--text-muted);
+    }
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+}

@@ -1,0 +1,143 @@
+<!-- Page Title Row -->
+<div class="page-header-row">
+  <div class="title-meta">
+    <h1 class="page-title">Good morning, {{ userName }}</h1>
+    <p class="page-subtitle">
+      5 pages need your review · 3 escalations open · last sync {{ lastSync }}
+    </p>
+  </div>
+  <p-button label="New project" icon="pi pi-plus" size="small" />
+</div>
+
+<div class="dashboard-container">
+
+  <!-- ── Top Stats Row ──────────────────────────────────────── -->
+  <div class="stats-grid">
+    @for (s of stats; track s.label) {
+      <p-card styleClass="tai-stat-card">
+        <span class="tai-eyebrow">{{ s.label }}</span>
+        <div class="stat-main">
+          <span class="stat-value">{{ s.value }}</span>
+        </div>
+        <div class="stat-delta" [class.up]="s.deltaUp" [class.down]="!s.deltaUp">
+          <i class="pi" [class.pi-arrow-up]="s.deltaUp" [class.pi-arrow-down]="!s.deltaUp"></i>
+          <span class="delta-val">{{ s.delta }}</span>
+          <span class="delta-label">{{ s.deltaLabel }}</span>
+        </div>
+      </p-card>
+    }
+  </div>
+
+  <!-- ── Middle Row: Throughput + My Queue ──────────────────── -->
+  <div class="content-grid">
+    
+    <!-- Throughput Chart Card -->
+    <p-card styleClass="tai-chart-card">
+      <div class="card-header">
+        <span class="card-title">Throughput · last 12 weeks</span>
+        <div class="metric-toggle">
+          <button 
+            [class.active]="throughputMetric === 'Pages'" 
+            (click)="setMetric('Pages')">Pages</button>
+          <button 
+            [class.active]="throughputMetric === 'Words'" 
+            (click)="setMetric('Words')">Words</button>
+        </div>
+      </div>
+      
+      <div class="chart-canvas">
+        <div class="bar-container">
+          @for (h of throughputData; track $index) {
+            <div class="bar-wrap">
+              <div class="bar" [style.height.%]="h"></div>
+            </div>
+          }
+        </div>
+      </div>
+      
+      <div class="chart-footer">
+        Total: {{ throughputTotal | number }} pages · 
+        peak {{ throughputPeak }} · 
+        avg {{ throughputAvg }}
+      </div>
+    </p-card>
+
+    <!-- My Queue Card -->
+    <p-card styleClass="tai-list-card">
+      <div class="card-header">
+        <span class="card-title">My queue</span>
+        <a routerLink="/queue" class="view-all">View all →</a>
+      </div>
+      
+      <div class="list-content">
+        @for (item of queueItems; track item.id) {
+          <div class="list-item queue-item" [routerLink]="['/review', item.id]">
+            <div class="queue-main">
+              <p-tag styleClass="tai-dot approved" />
+              <span class="page-num">{{ item.page }}</span>
+              <span class="dot-sep">·</span>
+              <span class="project-name">{{ item.project }}</span>
+            </div>
+            <div class="queue-meta">
+              <span class="err-count">{{ item.errors }}err</span>
+              <p-tag [value]="item.priority" [severity]="item.prioritySeverity" styleClass="priority-tag" />
+            </div>
+          </div>
+        }
+      </div>
+    </p-card>
+
+  </div>
+
+  <!-- ── Bottom Row: Recent Projects + Recent Activity ──────── -->
+  <div class="content-grid">
+
+    <!-- Recent Projects Card -->
+    <p-card styleClass="tai-list-card">
+      <div class="card-header">
+        <span class="card-title">Recent projects</span>
+        <a routerLink="/projects" class="view-all">View all →</a>
+      </div>
+      
+      <div class="list-content">
+        @for (p of recentProjects; track p.id) {
+          <div class="list-item project-row" [routerLink]="['/projects', p.id]">
+            <span class="project-name">{{ p.name }}</span>
+            <div class="progress-wrap">
+              <p-progressBar [value]="p.progress" [showValue]="false" styleClass="mini-bar" />
+              <span class="progress-pct">{{ p.progress }}%</span>
+            </div>
+          </div>
+        }
+      </div>
+    </p-card>
+
+    <!-- Recent Activity Card -->
+    <p-card styleClass="tai-list-card">
+      <div class="card-header">
+        <span class="card-title">Recent activity</span>
+        <a class="view-all">View all →</a>
+      </div>
+      
+      <div class="list-content">
+        @for (act of recentActivity; track $index) {
+          <div class="list-item activity-item">
+            <p-avatar 
+              [label]="act.initials" 
+              shape="circle" 
+              [style]="{'background-color': act.avatarBg, 'color': '#fff'}" 
+              styleClass="activity-avatar"
+            />
+            <div class="activity-text">
+              <span class="user">{{ act.user }}</span>
+              <span class="action"> {{ act.action }} </span>
+              <span class="target">{{ act.target }}</span>
+              <span class="time">{{ act.time }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    </p-card>
+
+  </div>
+</div>

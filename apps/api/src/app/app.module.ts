@@ -8,7 +8,7 @@ import { PagesModule } from '../modules/pages/pages.module';
 import { AuthModule } from '../modules/auth/auth.module';
 import { UsersModule } from '../modules/users/users.module';
 import { ExportModule } from '../modules/export/export.module';
-import { GenresModule } from '../modules/genres/genres.module';
+import { StyleGuidesModule } from '../modules/style-guides/style-guides.module';
 import { ModelsModule } from '../modules/models/models.module';
 import { JobsModule } from '../modules/jobs/jobs.module';
 import { ErrorsModule } from '../modules/errors/errors.module';
@@ -40,7 +40,7 @@ import { AppService } from './app.service';
     AuthModule,
     UsersModule,
     ExportModule,
-    GenresModule,
+    StyleGuidesModule,
     ModelsModule,
     JobsModule,
     ErrorsModule,

@@ -132,7 +132,7 @@ export class ProjectsController {
   }
 
   /**
-   * Retrieves all glossary cards/terms associated with a project's Genre.
+   * Retrieves all glossary terms associated with a project's StyleGuide.
    * Authorized: ADMIN, MASTER, REVIEWER (REVIEWER+ tier).
    */
   @Get(':id/glossary')

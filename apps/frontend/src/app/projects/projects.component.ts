@@ -1,6 +1,6 @@
-import { Component, ViewChild, inject, signal, OnInit } from '@angular/core';
+import { Component, ViewChild, inject, signal, OnInit, OnDestroy } from '@angular/core';
 import { faro } from '@grafana/faro-web-sdk';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 
@@ -22,6 +22,7 @@ import { ProjectService, Project } from './projects.service';
   standalone: true,
   imports: [
     CommonModule,
+    DecimalPipe,
     FormsModule,
     RouterModule,
     TableModule,
@@ -38,25 +39,29 @@ import { ProjectService, Project } from './projects.service';
   templateUrl: './projects.component.html',
   styleUrl: './projects.component.scss'
 })
-export class ProjectsComponent implements OnInit {
+export class ProjectsComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private projectService = inject(ProjectService);
 
   @ViewChild('createModal') createModal!: CreateProjectModal;
 
-  /* Dynamic project dataset */
   projects = signal<Project[]>([]);
   totalProjects = signal(0);
   loading = signal(false);
+  translationStatus = signal<Record<string, { isRunning: boolean; isPaused: boolean; done: number; total: number; percent: number }>>({});
 
-  /* Select dropdown items */
-  filterOptions = [
-    { label: 'All', value: 'all' }
-  ];
+  filterOptions = [{ label: 'All', value: 'all' }];
   selectedFilter = 'all';
+
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   ngOnInit() {
     this.loadProjects();
+    this.pollTranslationStatus();
+  }
+
+  ngOnDestroy() {
+    if (this.pollTimer) clearTimeout(this.pollTimer);
   }
 
   loadProjects() {
@@ -70,7 +75,20 @@ export class ProjectsComponent implements OnInit {
       error: (err) => {
         faro.api?.pushError(new Error('Failed to load projects list'), { context: { error: String(err) } });
         this.loading.set(false);
-      }
+      },
+    });
+  }
+
+  private pollTranslationStatus() {
+    this.projectService.getActiveTranslations().subscribe({
+      next: (status) => {
+        this.translationStatus.set(status);
+        const delay = Object.keys(status).length > 0 ? 3000 : 10000;
+        this.pollTimer = setTimeout(() => this.pollTranslationStatus(), delay);
+      },
+      error: () => {
+        this.pollTimer = setTimeout(() => this.pollTranslationStatus(), 10000);
+      },
     });
   }
 

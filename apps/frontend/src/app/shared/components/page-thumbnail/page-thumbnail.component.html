@@ -1,0 +1,39 @@
+<div
+  class="thumbnail-item"
+  [class.active]="active()"
+  [class]="statusClass"
+  (click)="onClick()"
+  [title]="'Page ' + page().pageNumber + ' · ' + page().status"
+>
+  <div class="thumbnail-image-wrap">
+
+    <!-- Real page image (available once READY and beyond) -->
+    @if (showImage && imageSrc() && !imageError()) {
+      <img
+        [src]="imageSrc()"
+        [alt]="'Page ' + page().pageNumber"
+      />
+    }
+
+    <!-- Fallback: image failed to load for a status that should have one -->
+    @if (showImage && imageError()) {
+      <div class="thumbnail-fallback">
+        <span class="page-number-fallback">{{ page().pageNumber }}</span>
+      </div>
+    }
+
+    <!-- Skeleton: no image yet (PENDING or RENDERING) -->
+    @if (!showImage) {
+      <div class="thumbnail-skeleton">
+        <span class="page-number-fallback">{{ page().pageNumber }}</span>
+      </div>
+    }
+
+    <!-- Scan line overlay — only for active pipeline states -->
+    @if (isRendering || isTranslating) {
+      <div class="scan-line" [class.scan-green]="isTranslating"></div>
+    }
+
+  </div>
+  <span class="thumbnail-page-number">{{ page().pageNumber }}</span>
+</div>

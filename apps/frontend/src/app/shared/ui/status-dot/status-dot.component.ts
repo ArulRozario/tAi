@@ -26,6 +26,8 @@ export class StatusDotComponent {
       case 'TRANSLATING':
       case 'REVIEWING':
       case 'EXTRACTING': return 'bg-primary shadow-primary/20 animate-pulse';
+      case 'RENDER_ERROR':
+      case 'TRANSLATION_ERROR':
       case 'ERROR': return 'bg-error shadow-error/20';
       default: return 'bg-surface-2';
     }

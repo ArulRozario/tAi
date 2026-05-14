@@ -1,0 +1,122 @@
+@if (!project()) {
+  <div class="loading-container">
+    @if (loadError()) {
+      <p class="load-error"><i class="pi pi-exclamation-circle"></i> {{ loadError() }}</p>
+    } @else {
+      <p-progressBar mode="indeterminate" [style]="{ height: '4px' }" />
+    }
+  </div>
+} @else {
+
+  <!-- ── Breadcrumb ──────────────────────────────────────────── -->
+  <div class="breadcrumb-nav">
+    <a routerLink="/projects" class="back-link">
+      <i class="pi pi-arrow-left"></i>
+      <span>Back</span>
+    </a>
+    <span class="sep">/</span>
+    <a routerLink="/projects" class="crumb-link">Projects</a>
+    <span class="sep">/</span>
+    <span class="crumb-current">{{ project()!.name }}</span>
+  </div>
+
+  <!-- ── Project Header ─────────────────────────────────────── -->
+  <div class="project-header">
+    <div class="title-block">
+      <h1 class="project-name">{{ project()!.name }}</h1>
+      <p class="project-meta">
+        {{ project()!.sourceLang }}<span class="meta-arrow"> → </span>{{ project()!.targetLang }}
+        @if (project()!.styleGuide) {
+          · {{ project()!.styleGuide!.name }}
+        }
+        · {{ pages.length }} {{ pages.length === 1 ? 'page' : 'pages' }}
+      </p>
+    </div>
+
+    <div class="action-row">
+      <tai-model-picker [showDefault]="true" (modelChange)="selectedModel.set($event)" />
+
+      <div class="project-actions">
+        @if (translationState() === 'running') {
+          <span class="translation-progress-label">
+            {{ translationDone }} / {{ translationTotal }} translated
+          </span>
+          <p-button label="Pause" icon="pi pi-pause" severity="warn" (onClick)="pauseTranslation()" />
+          <p-button label="Stop" icon="pi pi-stop" severity="danger" [outlined]="true" (onClick)="stopTranslation()" />
+        } @else if (translationState() === 'paused') {
+          <p-button label="Resume" icon="pi pi-play" severity="success" (onClick)="resumeTranslation()" />
+          <p-button label="Stop" icon="pi pi-stop" severity="danger" [outlined]="true" (onClick)="stopTranslation()" />
+        } @else {
+          @if (canTranslate) {
+            <p-button label="Translate" icon="pi pi-sparkles" severity="primary" (onClick)="startTranslation()" />
+          }
+          <p-button
+            label="AI Review"
+            icon="pi pi-search"
+            severity="secondary"
+            [loading]="isReviewing()"
+            [disabled]="!hasPages || isReviewing()"
+            (onClick)="startReview()"
+          />
+        }
+        <p-splitButton
+          label="Export PDF"
+          icon="pi pi-download"
+          severity="secondary"
+          [model]="exportItems"
+          styleClass="export-split-btn"
+          (onClick)="exportProject('pdf')"
+        />
+        <p-button
+          label="Delete"
+          icon="pi pi-trash"
+          severity="danger"
+          [outlined]="true"
+          (onClick)="onDeleteProject()"
+        />
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Pages Grid ─────────────────────────────────────────── -->
+  <p-card styleClass="tai-section-card page-grid-card">
+    <ng-template pTemplate="title">
+      <div class="card-header">
+        <span class="card-title">Pages</span>
+        <span class="card-hint">Click any page to open in workbench</span>
+      </div>
+    </ng-template>
+
+    <div class="page-grid-scroll">
+      <div class="page-grid">
+        @if (!hasPages) {
+          <div class="empty-pages">
+            <i class="pi pi-spinner pi-spin" style="font-size: 2rem; display: block; margin-bottom: 0.75rem;"></i>
+            Preparing pages...
+          </div>
+        } @else {
+          @for (page of pages; track page.id) {
+            <app-page-thumbnail
+              [page]="page"
+              [projectId]="projectId()!"
+              (select)="navigateToWorkbench($event)"
+            />
+          }
+        }
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="page-legend">
+      <span class="legend-item"><span class="legend-dot l-approved"></span> Approved</span>
+      <span class="legend-item"><span class="legend-dot l-in-review"></span> In review</span>
+      <span class="legend-item"><span class="legend-dot l-translated"></span> Translated</span>
+      <span class="legend-item"><span class="legend-dot l-translating"></span> Translating</span>
+      <span class="legend-item"><span class="legend-dot l-ready"></span> Ready</span>
+      <span class="legend-item"><span class="legend-dot l-rendering"></span> Rendering</span>
+      <span class="legend-item"><span class="legend-dot l-pending"></span> Pending</span>
+      <span class="legend-item"><span class="legend-dot l-error"></span> Error</span>
+    </div>
+  </p-card>
+
+}

@@ -1,0 +1,233 @@
+@if (pageData()) {
+  <div class="workbench-container">
+
+    <!-- ── Top Toolbar ───────────────────────────────────────── -->
+    <header class="workbench-toolbar">
+      <div class="toolbar-left">
+        <p-button icon="pi pi-arrow-left" label="Back" [text]="true" (onClick)="goBack()" styleClass="back-btn" />
+        <div class="context-info">
+          <span class="project-name">Project <strong>{{ pageData()?.projectName }}</strong></span>
+          <span class="sep">·</span>
+          <span class="location">Page {{ pageData()?.pageNum }}</span>
+        </div>
+      </div>
+
+      <div class="toolbar-center">
+        <div class="pagination">
+          <button
+            class="nav-btn"
+            [disabled]="!state.prevPageId()"
+            (click)="goToPrevPage()"
+            title="Previous page">
+            <i class="pi pi-chevron-left"></i>
+          </button>
+          <span class="page-count"><strong>{{ pageData()?.pageNum }}</strong></span>
+          <button
+            class="nav-btn"
+            [disabled]="!state.nextPageId()"
+            (click)="goToNextPage()"
+            title="Next page">
+            <i class="pi pi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="toolbar-right">
+        <div class="view-controls">
+          <div class="zoom-controls">
+            <button (click)="setZoom(-10)"><i class="pi pi-minus"></i></button>
+            <span class="zoom-val">{{ state.zoomLevel() }}%</span>
+            <button (click)="setZoom(10)"><i class="pi pi-plus"></i></button>
+          </div>
+          <div class="mode-toggles">
+            <button
+              [class.active]="state.viewMode() === 'side-by-side'"
+              (click)="state.viewMode.set('side-by-side')">
+              <i class="pi pi-pause"></i> Side-by-side
+            </button>
+            <button
+              [class.active]="state.viewMode() === 'overlay'"
+              (click)="state.viewMode.set('overlay')">
+              <i class="pi pi-clone"></i> Overlay
+            </button>
+          </div>
+        </div>
+        <p-button
+          [icon]="state.rightPanelCollapsed() ? 'pi pi-chevron-left' : 'pi pi-chevron-right'"
+          [label]="state.rightPanelCollapsed() ? 'Open Chat' : 'Close Chat'"
+          severity="secondary"
+          [outlined]="true"
+          size="small"
+          (click)="toggleRightPanel()"
+          styleClass="chat-toggle-btn"
+        />
+        <p-button label="Open analysis" severity="secondary" [outlined]="true" size="small" styleClass="analysis-btn" />
+      </div>
+    </header>
+
+    <div class="workbench-workspace" [class.left-collapsed]="state.leftPanelCollapsed()">
+
+      <!-- ── Left Sidebar (Page Thumbnails) ──────────────────── -->
+      <app-page-thumbnail-sidebar
+        [projectId]="pageData()!.projectId"
+        [activePageId]="pageData()?.id ?? null"
+        [collapsed]="state.leftPanelCollapsed()"
+        (pageSelect)="onSidebarPageSelect($event)"
+        (collapsedChange)="state.leftPanelCollapsed.set($event)">
+      </app-page-thumbnail-sidebar>
+
+      <!-- ── Center Workspace (Translation) ──────────────────── -->
+      <main class="translation-columns" [class.overlay-mode]="state.viewMode() === 'overlay'">
+        <!-- Source Column -->
+        <section class="text-column source-col">
+          <div class="column-header">
+            <span class="lang-label">ORIGINAL · ENGLISH</span>
+            <div class="source-view-toggle">
+              <button
+                [class.active]="state.sourceViewMode() === 'html'"
+                (click)="state.sourceViewMode.set('html')"
+                title="HTML view">
+                <i class="pi pi-code"></i>
+              </button>
+              <button
+                [class.active]="state.sourceViewMode() === 'image'"
+                (click)="state.sourceViewMode.set('image')"
+                title="Page image">
+                <i class="pi pi-image"></i>
+              </button>
+              <button
+                title="Replace image"
+                [disabled]="isReplacingImage()"
+                (click)="triggerImageReplace(imageInput)">
+                <i class="pi pi-upload"></i>
+              </button>
+              <input
+                #imageInput
+                type="file"
+                accept="image/*"
+                style="display: none"
+                (change)="onImageReplaceSelected($event, pageData()!.id)">
+            </div>
+            <p-tag [value]="'PAGE ' + pageData()?.pageNum" styleClass="page-tag" />
+          </div>
+          
+          @if (state.sourceViewMode() === 'html') {
+            <app-page-content-renderer 
+              mode="source" 
+              [content]="sourceHtml"
+              (scroll)="onScroll($event, 'source')">
+            </app-page-content-renderer>
+          } @else {
+            <div class="scroll-content">
+              <div class="page-image-wrapper">
+                @if (sourceImageUrl() && !imageLoadError()) {
+                  <img
+                    [src]="sourceImageUrl()!"
+                    alt="Source page {{ pageData()?.pageNum }}"
+                    class="page-image"
+                    (load)="imageLoadError.set(false)"
+                    (error)="imageLoadError.set(true)">
+                } @else {
+                  <div class="page-image-fallback">
+                    <i class="pi pi-image"></i>
+                    <span>Page image not available</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </section>
+
+        <!-- Target Column -->
+        <section class="text-column target-col">
+          <div class="column-header">
+            <span class="lang-label">TRANSLATION · TAMIL</span>
+            <div class="target-actions">
+              <p-button
+                icon="pi pi-refresh"
+                severity="secondary"
+                [text]="true"
+                [loading]="isRetranslating()"
+                (onClick)="retranslatePage()"
+                pTooltip="Retranslate this page"
+                tooltipPosition="top"
+                size="small"
+              />
+              <tai-model-picker
+                [showDefault]="true"
+                [disabled]="isReviewing()"
+                (modelChange)="selectedModel.set($event)"
+              />
+              <p-button
+                icon="pi pi-search"
+                severity="secondary"
+                [text]="true"
+                [loading]="isReviewing()"
+                (onClick)="startReview()"
+                pTooltip="Run AI review on this page"
+                tooltipPosition="top"
+                size="small"
+              />
+              <p-button
+                icon="pi pi-undo"
+                severity="secondary"
+                [text]="true"
+                (onClick)="resetAllEdits()"
+                pTooltip="Reset all edits"
+                tooltipPosition="top"
+                size="small"
+              />
+              <p-select
+                [options]="pageStatusOptions"
+                [(ngModel)]="pageData()!.status"
+                optionLabel="label"
+                optionValue="value"
+                (onChange)="onStatusChange($event.value)"
+                placeholder="Status"
+                styleClass="status-select"
+                size="small"
+              />
+            </div>
+          </div>
+          
+          <div class="scroll-content" style="position: relative;">
+            <app-page-content-renderer 
+              mode="target" 
+              [content]="targetHtml"
+              (scroll)="onScroll($event, 'target')">
+            </app-page-content-renderer>
+
+            <!-- ── Inline Segment Editor ─────────────────────── -->
+            @if (state.editingSegmentId()) {
+              <app-inline-segment-editor 
+                [sourceText]="state.activeSourceText()" 
+                [style.top.px]="state.editorTop()">
+              </app-inline-segment-editor>
+            }
+          </div>
+        </section>
+      </main>
+
+      <!-- ── Right Panel (AI Assistance) ─────────────────────── -->
+      <aside class="side-panel right-panel" [class.collapsed]="state.rightPanelCollapsed()">
+        <app-ai-chat
+          #aiChat
+          *ngIf="!state.rightPanelCollapsed()"
+          title="Translation assistant"
+          greeting="Hello! I'm your translation assistant. Select a segment and click the sparkle icon to retranslate it with AI."
+          [showPlanMode]="false"
+          userInitials="RK"
+          placeholder="Ask about this segment...">
+        </app-ai-chat>
+      </aside>
+
+    </div>
+  </div>
+} @else {
+  <div class="loading-state-container">
+    <div class="spinner-box">
+      <p-progressBar mode="indeterminate" [style]="{ height: '4px', width: '300px' }" />
+      <p>Synchronizing with Intelligence Core...</p>
+    </div>
+  </div>
+}

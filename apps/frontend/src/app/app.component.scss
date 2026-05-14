@@ -1,0 +1,35 @@
+:host {
+  display: block;
+}
+
+.app-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: var(--bg-canvas);
+  color: var(--text-main);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Main Content Area */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Canvas Area */
+.canvas {
+  flex: 1;
+  padding: 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.login-layout {
+  .canvas {
+    padding: 0;
+  }
+}

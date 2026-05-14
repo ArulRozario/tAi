@@ -1,28 +1,34 @@
 import {
   BaseComponent,
-  Bind,
   PARENT_INSTANCE
-} from "./chunk-RDGPVRJM.js";
+} from "./chunk-5Q3QJLUY.js";
+import {
+  Bind
+} from "./chunk-FDDOVCH6.js";
 import {
   BaseStyle
-} from "./chunk-YMFEJ3C6.js";
+} from "./chunk-5LSILY4Y.js";
 import {
   SharedModule
-} from "./chunk-6X4SBNEN.js";
+} from "./chunk-DFX2PQFP.js";
+import "./chunk-N457OPXR.js";
 import {
   CommonModule,
   NgClass,
   NgIf
-} from "./chunk-SO6KPK33.js";
-import "./chunk-4FSBW6TR.js";
+} from "./chunk-7WBDEVG2.js";
+import "./chunk-MIJCVNFH.js";
 import {
   ChangeDetectionStrategy,
   Component,
+  EventEmitter,
   Injectable,
+  InjectionToken,
   Input,
   NgModule,
   Output,
   ViewEncapsulation,
+  inject,
   setClassMetadata,
   ɵɵHostDirectivesFeature,
   ɵɵInheritDefinitionFeature,
@@ -31,6 +37,8 @@ import {
   ɵɵattribute,
   ɵɵclassMap,
   ɵɵdefineComponent,
+  ɵɵdefineInjectable,
+  ɵɵdefineInjector,
   ɵɵdefineNgModule,
   ɵɵelement,
   ɵɵelementEnd,
@@ -43,25 +51,18 @@ import {
   ɵɵprojectionDef,
   ɵɵproperty,
   ɵɵreference,
+  ɵɵresetView,
+  ɵɵrestoreView,
   ɵɵsanitizeUrl,
   ɵɵtemplate,
   ɵɵtemplateRefExtractor,
   ɵɵtext,
   ɵɵtextInterpolate
-} from "./chunk-MEPECJH5.js";
-import {
-  EventEmitter,
-  InjectionToken,
-  inject,
-  ɵɵdefineInjectable,
-  ɵɵdefineInjector,
-  ɵɵresetView,
-  ɵɵrestoreView
-} from "./chunk-BDTBJ5A5.js";
-import "./chunk-BGJDQHGH.js";
+} from "./chunk-IDZCX6FW.js";
 import "./chunk-FX47LQWG.js";
+import "./chunk-BGJDQHGH.js";
 import "./chunk-KHPDHDQC.js";
-import "./chunk-GOMI4DH3.js";
+import "./chunk-46DXP6YY.js";
 
 // node_modules/.pnpm/@primeuix+styles@2.0.3/node_modules/@primeuix/styles/dist/avatar/index.mjs
 var style = "\n    .p-avatar {\n        display: inline-flex;\n        align-items: center;\n        justify-content: center;\n        width: dt('avatar.width');\n        height: dt('avatar.height');\n        font-size: dt('avatar.font.size');\n        background: dt('avatar.background');\n        color: dt('avatar.color');\n        border-radius: dt('avatar.border.radius');\n    }\n\n    .p-avatar-image {\n        background: transparent;\n    }\n\n    .p-avatar-circle {\n        border-radius: 50%;\n    }\n\n    .p-avatar-circle img {\n        border-radius: 50%;\n    }\n\n    .p-avatar-icon {\n        font-size: dt('avatar.icon.size');\n        width: dt('avatar.icon.size');\n        height: dt('avatar.icon.size');\n    }\n\n    .p-avatar img {\n        width: 100%;\n        height: 100%;\n    }\n\n    .p-avatar-lg {\n        width: dt('avatar.lg.width');\n        height: dt('avatar.lg.width');\n        font-size: dt('avatar.lg.font.size');\n    }\n\n    .p-avatar-lg .p-avatar-icon {\n        font-size: dt('avatar.lg.icon.size');\n        width: dt('avatar.lg.icon.size');\n        height: dt('avatar.lg.icon.size');\n    }\n\n    .p-avatar-xl {\n        width: dt('avatar.xl.width');\n        height: dt('avatar.xl.width');\n        font-size: dt('avatar.xl.font.size');\n    }\n\n    .p-avatar-xl .p-avatar-icon {\n        font-size: dt('avatar.xl.icon.size');\n        width: dt('avatar.xl.icon.size');\n        height: dt('avatar.xl.icon.size');\n    }\n\n    .p-avatar-group {\n        display: flex;\n        align-items: center;\n    }\n\n    .p-avatar-group .p-avatar + .p-avatar {\n        margin-inline-start: dt('avatar.group.offset');\n    }\n\n    .p-avatar-group .p-avatar {\n        border: 2px solid dt('avatar.group.border.color');\n    }\n\n    .p-avatar-group .p-avatar-lg + .p-avatar-lg {\n        margin-inline-start: dt('avatar.lg.group.offset');\n    }\n\n    .p-avatar-group .p-avatar-xl + .p-avatar-xl {\n        margin-inline-start: dt('avatar.xl.group.offset');\n    }\n";

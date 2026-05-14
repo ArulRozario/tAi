@@ -1,0 +1,102 @@
+.scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background: var(--bg-canvas);
+  height: 100%;
+}
+
+.page-paper {
+  background: var(--bg-sidebar);
+  padding: 10px;
+  min-height: 100%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid var(--border-color);
+  margin: 0 auto;
+}
+
+/* Injected segment interaction styles */
+:host ::ng-deep .segment {
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease, border 0.15s ease;
+  display: block;
+  padding: 4px 6px;
+  border-radius: 4px;
+  margin-top: 5px;
+  border-left: 2px solid transparent;
+}
+
+:host ::ng-deep .segment.active {
+  background-color: var(--accent-danger-bg) !important;
+  color: var(--text-main) !important;
+  border: 1px solid var(--accent-danger) !important;
+}
+
+:host ::ng-deep .segment.approved {
+  border-left-color: var(--accent-success) !important;
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+:host ::ng-deep .segment.edited {
+  border-left-color: var(--accent-primary) !important;
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+:host ::ng-deep .segment.rejected {
+  border-left-color: var(--accent-danger) !important;
+}
+
+:host ::ng-deep .segment.has-error {
+  border-left-color: var(--accent-warning) !important;
+  background-color: rgba(245, 158, 11, 0.08) !important;
+}
+
+:host ::ng-deep .segment .error-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-warning);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-sidebar);
+}
+
+:host ::ng-deep .segment.hovered { 
+  background-color: var(--accent-highlight) !important; 
+  color: var(--accent-highlight-text) !important;
+}
+
+:host ::ng-deep .segment:hover { 
+  background-color: var(--accent-highlight) !important; 
+  color: var(--accent-highlight-text) !important;
+}
+
+:host ::ng-deep .segment[contenteditable="true"] {
+  outline: 2px solid var(--accent-primary) !important;
+  border-radius: 4px;
+  background: var(--bg-sidebar) !important;
+  cursor: text;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+:host ::ng-deep .segment ins.diff-added {
+  background-color: var(--accent-success-bg);
+  color: var(--accent-success);
+  text-decoration: none;
+  border-radius: 2px;
+}
+
+:host ::ng-deep .segment del.diff-removed {
+  background-color: var(--accent-danger-bg);
+  color: var(--accent-danger);
+  text-decoration: line-through;
+  opacity: 0.8;
+}

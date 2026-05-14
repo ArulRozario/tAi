@@ -1,0 +1,50 @@
+-- Rename PageStatus: EXTRACTING→RENDERING, EXTRACTED→READY
+-- Rename JobType: PROCESS_DOCUMENT→SPLIT_DOCUMENT, EXTRACT_PAGE→RENDER_PAGE, remove DETECT_CHAPTERS
+
+-- Step 1: Add new enum values to existing types
+ALTER TYPE "PageStatus" ADD VALUE IF NOT EXISTS 'RENDERING';
+ALTER TYPE "PageStatus" ADD VALUE IF NOT EXISTS 'READY';
+ALTER TYPE "JobType"   ADD VALUE IF NOT EXISTS 'SPLIT_DOCUMENT';
+ALTER TYPE "JobType"   ADD VALUE IF NOT EXISTS 'RENDER_PAGE';
+
+-- Step 2: Migrate data to new values
+UPDATE "Page" SET status = 'RENDERING' WHERE status = 'EXTRACTING';
+UPDATE "Page" SET status = 'READY'     WHERE status = 'EXTRACTED';
+UPDATE "Job"  SET type   = 'SPLIT_DOCUMENT' WHERE type = 'PROCESS_DOCUMENT';
+UPDATE "Job"  SET type   = 'RENDER_PAGE'    WHERE type = 'EXTRACT_PAGE';
+UPDATE "Job"  SET status = 'CANCELLED'      WHERE type::text = 'DETECT_CHAPTERS' AND status = 'QUEUED';
+
+-- Step 3: Recreate PageStatus without old values
+ALTER TABLE "Page" ALTER COLUMN status DROP DEFAULT;
+ALTER TABLE "Page" ALTER COLUMN status TYPE text USING status::text;
+DROP TYPE "PageStatus";
+CREATE TYPE "PageStatus" AS ENUM (
+  'PENDING',
+  'RENDERING',
+  'READY',
+  'TRANSLATING',
+  'TRANSLATED',
+  'REVIEWING',
+  'HUMAN_REVIEW',
+  'APPROVED',
+  'REJECTED',
+  'ESCALATED',
+  'ERROR'
+);
+ALTER TABLE "Page" ALTER COLUMN status TYPE "PageStatus" USING status::"PageStatus";
+ALTER TABLE "Page" ALTER COLUMN status SET DEFAULT 'PENDING';
+
+-- Step 4: Recreate JobType without old values
+ALTER TABLE "Job" ALTER COLUMN type TYPE text USING type::text;
+DROP TYPE "JobType";
+CREATE TYPE "JobType" AS ENUM (
+  'SPLIT_DOCUMENT',
+  'RENDER_PAGE',
+  'TRANSLATE_BATCH',
+  'REVIEW_PAGE',
+  'INDEX_MEMORY',
+  'EXPORT_PROJECT',
+  'EXPORT_PAGE_REPORT',
+  'EXPORT_ADMIN_REPORT'
+);
+ALTER TABLE "Job" ALTER COLUMN type TYPE "JobType" USING type::"JobType";

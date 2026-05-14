@@ -1,70 +1,46 @@
 import { Routes } from '@angular/router';
-import { AppLayoutComponent } from './layout/app.layout.component';
 import { authGuard } from './core/guards/auth.guard';
-import { roleGuard } from './core/guards/role.guard';
+import { AppComponent } from './app.component';
 
 export const routes: Routes = [
   {
     path: 'login',
-    loadComponent: () => import('./features/login/login.component').then(m => m.LoginComponent),
+    loadComponent: () => import('./login/login.component').then(m => m.LoginComponent),
   },
-  {
-    path: 'reset-password/:token',
-    loadComponent: () => import('./features/login/reset-password.component').then(m => m.ResetPasswordComponent),
-  },
-  {
-    path: 'workbench/:pageId',
-    loadComponent: () => import('./features/workbench/workbench.component').then(m => m.WorkbenchComponent),
-    canActivate: [authGuard],
-    data: { mode: 'browse' },
-  },
-  {
-    path: 'review/:pageId',
-    loadComponent: () => import('./features/workbench/workbench.component').then(m => m.WorkbenchComponent),
-    canActivate: [authGuard],
-    data: { mode: 'queue' },
-  },
+
   {
     path: '',
-    component: AppLayoutComponent,
+    component: AppComponent,
     canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       {
         path: 'dashboard',
-        loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent),
+        loadComponent: () => import('./dashboard/dashboard.component').then(m => m.DashboardComponent),
       },
       {
         path: 'projects',
-        loadComponent: () => import('./features/projects/project-list.component').then(m => m.ProjectListComponent),
+        loadComponent: () => import('./projects/projects.component').then(m => m.ProjectsComponent),
       },
       {
         path: 'projects/:id',
-        loadComponent: () => import('./features/projects/project-detail.component').then(m => m.ProjectDetailComponent),
+        loadComponent: () => import('./projects/project-detail/project-detail.component').then(m => m.ProjectDetailComponent),
       },
       {
-        path: 'queue',
-        loadComponent: () => import('./features/review-queue/review-queue.component').then(m => m.ReviewQueueComponent),
+        path: 'style-guides',
+        loadComponent: () => import('./style-guides/style-guides.component').then(m => m.StyleGuidesComponent),
       },
       {
-        path: 'genres',
-        loadComponent: () => import('./features/genres/genre-list.component').then(m => m.GenreListComponent),
+        path: 'workbench/:pageId',
+        loadComponent: () => import('./workbench/workbench.component').then(m => m.WorkbenchComponent),
+        canActivate: [authGuard],
+        data: { mode: 'browse' },
       },
       {
-        path: 'genres/:id',
-        loadComponent: () => import('./features/genres/genre-editor.component').then(m => m.GenreEditorComponent),
-      },
-      {
-        path: 'admin/team',
-        loadComponent: () => import('./features/admin/team.component').then(m => m.TeamComponent),
-        canActivate: [roleGuard],
-        data: { roles: ['MASTER', 'ADMIN'] },
-      },
-      {
-        path: 'admin/settings',
-        loadComponent: () => import('./features/admin/settings.component').then(m => m.SettingsComponent),
-        canActivate: [roleGuard],
-        data: { roles: ['ADMIN'] },
+        path: 'review/:pageId',
+        loadComponent: () => import('./workbench/workbench.component').then(m => m.WorkbenchComponent),
+        canActivate: [authGuard],
+        data: { mode: 'queue' },
       },
     ],
   },

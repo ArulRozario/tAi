@@ -3,11 +3,14 @@ import {
   Get,
   Patch,
   Post,
+  Delete,
   Param,
   Query,
   Body,
   UseGuards,
   ParseUUIDPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { PagesService } from './pages.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -126,5 +129,95 @@ export class PagesController {
     @CurrentUser() user: any,
   ) {
     return this.pagesService.nextInQueue(id, user);
+  }
+
+  /**
+   * Runs AI review on a single page.
+   * Creates/updates Error records per segment.
+   * Authorized: ADMIN, MASTER, REVIEWER.
+   */
+  @Post(':id/review')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  @HttpCode(HttpStatus.OK)
+  async reviewPage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: any,
+    @Body() body: { modelOverride?: string },
+  ) {
+    return this.pagesService.reviewPage(id, user, body?.modelOverride);
+  }
+
+  // ── Workbench endpoints ──────────────────────────────────────────────
+
+  @Get(':id/siblings')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  async getSiblings(@Param('id', ParseUUIDPipe) id: string) {
+    return this.pagesService.getSiblings(id);
+  }
+
+  @Post(':id/replace-image')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  async replaceImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.pagesService.replaceImage(id);
+  }
+
+  @Post(':id/retranslate')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  async retranslatePage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { modelOverride?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.pagesService.retranslatePage(id, body.modelOverride, user);
+  }
+
+  @Get(':id/edits')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  async getEdits(@Param('id', ParseUUIDPipe) id: string) {
+    return this.pagesService.getEdits(id);
+  }
+
+  @Post(':id/edits')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  @HttpCode(HttpStatus.CREATED)
+  async saveEdit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { segmentId: string; editedText: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.pagesService.saveEdit(id, body.segmentId, body.editedText, user);
+  }
+
+  @Delete(':id/edits/:segmentId')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resetEdit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('segmentId') segmentId: string,
+  ) {
+    await this.pagesService.resetEdit(id, segmentId);
+  }
+
+  @Delete(':id/edits')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  @HttpCode(HttpStatus.OK)
+  async resetAllEdits(@Param('id', ParseUUIDPipe) id: string) {
+    return this.pagesService.resetAllEdits(id);
+  }
+
+  // ── Segment retranslation ────────────────────────────────────────────
+
+  @Post(':id/segments/:segmentId/retranslate')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  async retranslateSegment(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('segmentId') segmentId: string,
+    @Body() body: { prompt?: string; modelOverride?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.pagesService.retranslateSegment(id, segmentId, body.prompt, body.modelOverride, user);
   }
 }

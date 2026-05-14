@@ -326,6 +326,19 @@ export class PagesService {
       },
     });
 
+    // If every page in the project is now approved, mark the project COMPLETED
+    const [total, approved] = await Promise.all([
+      this.prisma.page.count({ where: { projectId: page.projectId } }),
+      this.prisma.page.count({ where: { projectId: page.projectId, status: PageStatus.APPROVED } }),
+    ]);
+    if (total > 0 && approved === total) {
+      await this.prisma.project.update({
+        where: { id: page.projectId },
+        data: { status: 'COMPLETED' },
+      });
+      this.logger.log(`Project ${page.projectId}: all pages approved → COMPLETED`);
+    }
+
     this.logger.log(`Page approved: ${id} by user ${user.id} (${user.role})`);
     return updatedPage;
   }
@@ -481,7 +494,7 @@ export class PagesService {
     const result = await this.prisma.page.update({
       where: { id },
       data: {
-        status: PageStatus.ESCALATED,
+        status: PageStatus.HUMAN_REVIEW,
         notes: `${page.notes || ''}\nEscalation by ${user.name || 'reviewer'}: ${reason}`.trim(),
       },
     });
@@ -579,5 +592,87 @@ export class PagesService {
     }
 
     return null;
+  }
+
+  // ── Workbench helpers ────────────────────────────────────────────────
+
+  async getSiblings(id: string) {
+    const page = await this.prisma.page.findUnique({
+      where: { id },
+      include: { project: { select: { id: true } } },
+    });
+    if (!page) throw new NotFoundException('Page not found');
+
+    const siblings = await this.prisma.page.findMany({
+      where: { projectId: page.projectId },
+      orderBy: { pageNumber: 'asc' },
+      select: { id: true, pageNumber: true },
+    });
+
+    const idx = siblings.findIndex((p) => p.id === id);
+    const prev = idx > 0 ? siblings[idx - 1] : null;
+    const next = idx < siblings.length - 1 ? siblings[idx + 1] : null;
+
+    return {
+      prevPageId: prev?.id ?? null,
+      prevPageNumber: prev?.pageNumber ?? null,
+      nextPageId: next?.id ?? null,
+      nextPageNumber: next?.pageNumber ?? null,
+      currentPageNumber: page.pageNumber,
+    };
+  }
+
+  async replaceImage(id: string) {
+    return this.prisma.page.findUniqueOrThrow({ where: { id } });
+  }
+
+  async retranslatePage(id: string, modelOverride: string | undefined, user: any) {
+    return this.prisma.page.update({
+      where: { id },
+      data: { status: PageStatus.TRANSLATING, errorMessage: null },
+    });
+  }
+
+  async getEdits(id: string) {
+    return this.prisma.pageEdit.findMany({
+      where: { pageId: id },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        segmentId: true,
+        editedText: true,
+        editedById: true,
+        createdAt: true,
+      },
+    });
+  }
+
+  async saveEdit(pageId: string, segmentId: string, editedText: string, user: any) {
+    return this.prisma.pageEdit.upsert({
+      where: { pageId_segmentId: { pageId, segmentId } },
+      create: { pageId, segmentId, editedText, editedById: user.id },
+      update: { editedText },
+    });
+  }
+
+  async resetEdit(pageId: string, segmentId: string) {
+    await this.prisma.pageEdit.delete({
+      where: { pageId_segmentId: { pageId, segmentId } },
+    });
+  }
+
+  async resetAllEdits(pageId: string) {
+    const deleted = await this.prisma.pageEdit.deleteMany({ where: { pageId } });
+    return { deletedCount: deleted.count };
+  }
+
+  async retranslateSegment(
+    pageId: string,
+    segmentId: string,
+    prompt: string | undefined,
+    modelOverride: string | undefined,
+    user: any,
+  ) {
+    throw new Error('Segment retranslation not implemented yet');
   }
 }

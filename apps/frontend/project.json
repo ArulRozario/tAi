@@ -20,7 +20,11 @@
             "input": "apps/frontend/public"
           }
         ],
-        "styles": ["apps/frontend/src/styles.scss"]
+        "styles": [
+          "apps/frontend/src/styles.scss",
+          "apps/frontend/src/theme.scss",
+          "apps/frontend/src/primeng-overrides.scss"
+        ]
       },
       "configurations": {
         "production": {

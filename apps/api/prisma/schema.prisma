@@ -24,10 +24,11 @@ model User {
   refreshTokens       RefreshToken[]
   ownedProjects       Project[]        @relation("ProjectOwner")
   pageReviews         PageReviewer[]
-  genreVersions       GenreVersion[]
+  styleGuideVersions  StyleGuideVersion[]
   chatSessions        ChatSession[]
   activityLogs        ActivityLog[]
-  createdGenres       Genre[]
+  createdStyleGuides  StyleGuide[]
+  pageEdits           PageEdit[]
 }
 
 model RefreshToken {
@@ -39,9 +40,9 @@ model RefreshToken {
   createdAt DateTime @default(now())
 }
 
-// ─── Genre ───────────────────────────────────────────────────────────────────
+// ─── StyleGuide ──────────────────────────────────────────────────────────────
 
-model Genre {
+model StyleGuide {
   id               String       @id @default(uuid())
   name             String
   description      String?
@@ -51,22 +52,22 @@ model Genre {
   pdfTemplate      Json?        // export typography/layout settings (see 07-architecture.md § PDF Export)
   docxTemplate     Json?        // export Word document styles (see 07-architecture.md § DOCX Export)
   currentVersionId String?      @unique
-  currentVersion   GenreVersion? @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  currentVersion   StyleGuideVersion? @relation("CurrentVersion", fields: [currentVersionId], references: [id])
   createdById      String?
   createdBy        User?        @relation(fields: [createdById], references: [id])
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
-  versions      GenreVersion[] @relation("AllVersions")
+  versions      StyleGuideVersion[] @relation("AllVersions")
   projects      Project[]
   glossaryTerms GlossaryTerm[]
   memories      TranslationMemory[]
 }
 
-model GenreVersion {
+model StyleGuideVersion {
   id          String   @id @default(uuid())
-  genreId     String
-  genre       Genre    @relation("AllVersions", fields: [genreId], references: [id], onDelete: Cascade)
+  styleGuideId     String
+  styleGuide       StyleGuide    @relation("AllVersions", fields: [styleGuideId], references: [id], onDelete: Cascade)
   version     String   // e.g. "1.0", "1.1", "2.0"
   content     String   // full markdown content (system prompt + style guide + glossary hints)
   note        String?  // change summary
@@ -74,7 +75,7 @@ model GenreVersion {
   createdBy   User?    @relation(fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
 
-  currentForGenre Genre? @relation("CurrentVersion")
+  currentForStyleGuide StyleGuide? @relation("CurrentVersion")
 }
 
 // ─── Project ─────────────────────────────────────────────────────────────────
@@ -85,8 +86,8 @@ model Project {
   description String?
   sourceLang  String
   targetLang  String
-  genreId     String
-  genre       Genre         @relation(fields: [genreId], references: [id])
+  styleGuideId     String
+  styleGuide       StyleGuide         @relation(fields: [styleGuideId], references: [id])
   status      ProjectStatus @default(DRAFT)
   ownerId     String?
   owner       User?         @relation("ProjectOwner", fields: [ownerId], references: [id])
@@ -135,6 +136,8 @@ model Page {
   errorMessage       String?    // last job error
   retryCount         Int        @default(0)
   maxRetries         Int        @default(3)
+  translationModel   String?    // which Gemini model translated this page
+  reviewModel        String?    // which Gemini model reviewed this page
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
@@ -142,6 +145,7 @@ model Page {
   memories         TranslationMemory[]
   jobs             Job[]
   reviewers        PageReviewer[]
+  edits            PageEdit[]
 
   @@unique([projectId, pageNumber])
 }
@@ -166,6 +170,7 @@ model Error {
   id               String        @id @default(uuid())
   pageId           String
   page             Page          @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  segmentId        String?       // ID of the HTML segment this error relates to
   severity         ErrorSeverity
   category         ErrorCategory
   location         String?       // snippet/phrase selector
@@ -182,12 +187,28 @@ model Error {
   createdAt        DateTime      @default(now())
 }
 
+// ─── PageEdit ──────────────────────────────────────────────────────────────────
+
+model PageEdit {
+  id         String   @id @default(uuid())
+  pageId     String
+  page       Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  segmentId  String   // ID of the HTML segment that was edited
+  editedText String   @db.Text
+  editedById String
+  user       User     @relation(fields: [editedById], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([pageId, segmentId])
+}
+
 // ─── Glossary ─────────────────────────────────────────────────────────────────
 
 model GlossaryTerm {
   id         String   @id @default(uuid())
-  genreId    String
-  genre      Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  styleGuideId    String
+  styleGuide      StyleGuide    @relation(fields: [styleGuideId], references: [id], onDelete: Cascade)
   sourceTerm String
   targetTerm String
   context    String?  // which sense / topic area
@@ -196,15 +217,15 @@ model GlossaryTerm {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([genreId, sourceTerm])
+  @@unique([styleGuideId, sourceTerm])
 }
 
 // ─── Translation Memory (RAG) ─────────────────────────────────────────────────
 
 model TranslationMemory {
   id             String   @id @default(uuid())
-  genreId        String
-  genre          Genre    @relation(fields: [genreId], references: [id], onDelete: Cascade)
+  styleGuideId        String
+  styleGuide          StyleGuide    @relation(fields: [styleGuideId], references: [id], onDelete: Cascade)
   projectId      String
   project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   pageId         String?
@@ -216,7 +237,7 @@ model TranslationMemory {
   embedding      Unsupported("vector(768)")?  // nomic-embed-text output
   createdAt      DateTime @default(now())
 
-  @@index([genreId, sourceLang, targetLang])
+  @@index([styleGuideId, sourceLang, targetLang])
 }
 
 // ─── Jobs ────────────────────────────────────────────────────────────────────
@@ -319,16 +340,16 @@ enum ProjectStatus {
 
 enum PageStatus {
   PENDING
-  EXTRACTING
-  EXTRACTED
+  RENDERING
+  READY
   TRANSLATING
   TRANSLATED
   REVIEWING
   HUMAN_REVIEW
   APPROVED
   REJECTED
-  ESCALATED
-  ERROR
+  RENDER_ERROR
+  TRANSLATION_ERROR
 }
 
 enum ErrorSeverity {
@@ -355,9 +376,8 @@ enum ErrorStatus {
 }
 
 enum JobType {
-  PROCESS_DOCUMENT
-  EXTRACT_PAGE
-  DETECT_CHAPTERS
+  SPLIT_DOCUMENT
+  RENDER_PAGE
   TRANSLATE_BATCH
   REVIEW_PAGE
   INDEX_MEMORY
@@ -389,7 +409,7 @@ enum Provider {
 }
 
 enum ChatContext {
-  GENRE
+  STYLE_GUIDE
   REVIEW
   GLOSSARY
   GENERAL

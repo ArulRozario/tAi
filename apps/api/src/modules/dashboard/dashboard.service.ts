@@ -74,7 +74,7 @@ export class DashboardService {
         where: { status: PageStatus.HUMAN_REVIEW, createdAt: { lte: thirtyDaysAgo } },
       }),
       this.prisma.pageReviewer.count({ where: { userId, page: { status: PageStatus.HUMAN_REVIEW } } }),
-      this.prisma.page.count({ where: { status: PageStatus.ESCALATED } }),
+      this.prisma.page.count({ where: { status: { in: [PageStatus.RENDER_ERROR, PageStatus.TRANSLATION_ERROR] } } }),
       this.prisma.page.aggregate({
         where: { status: { in: [PageStatus.HUMAN_REVIEW, PageStatus.APPROVED] }, quality: { not: null } },
         _avg: { quality: true },
@@ -196,9 +196,7 @@ export class DashboardService {
       take: limit,
       orderBy: { updatedAt: 'desc' },
       include: {
-        genre: { select: { id: true, name: true, icon: true, color: true } },
-        owner: { select: { id: true, name: true, email: true } },
-        _count: { select: { pages: true } },
+        styleGuide: { select: { id: true, name: true, icon: true, color: true } },
       },
     });
 
@@ -212,8 +210,7 @@ export class DashboardService {
           id: p.id,
           name: p.name,
           status: p.status,
-          genre: p.genre,
-          owner: p.owner,
+          styleGuide: p.styleGuide,
           sourceLang: p.sourceLang,
           targetLang: p.targetLang,
           pageCount: totalCount,
