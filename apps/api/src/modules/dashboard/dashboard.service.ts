@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PageStatus, ProjectStatus } from '@prisma/client';
+import { ErrorStatus, PageStatus, ProjectStatus } from '@prisma/client';
 
 interface CacheEntry<T> {
   data: T;
@@ -74,7 +74,7 @@ export class DashboardService {
         where: { status: PageStatus.HUMAN_REVIEW, createdAt: { lte: thirtyDaysAgo } },
       }),
       this.prisma.pageReviewer.count({ where: { userId, page: { status: PageStatus.HUMAN_REVIEW } } }),
-      this.prisma.page.count({ where: { status: { in: [PageStatus.RENDER_ERROR, PageStatus.TRANSLATION_ERROR] } } }),
+      this.prisma.page.count({ where: { status: PageStatus.REVIEWING } }),
       this.prisma.page.aggregate({
         where: { status: { in: [PageStatus.HUMAN_REVIEW, PageStatus.APPROVED] }, quality: { not: null } },
         _avg: { quality: true },
@@ -169,8 +169,9 @@ export class DashboardService {
         project: { select: { id: true, name: true, sourceLang: true, targetLang: true } },
         chapter: { select: { id: true, number: true, title: true } },
         reviewers: {
-          include: { user: { select: { id: true, name: true, email: true, role: true } } },
+          include: { user: { select: { id: true, name: true, email: true, role: true, avatarUrl: true } } },
         },
+        _count: { select: { errors: { where: { status: ErrorStatus.OPEN } } } },
       },
     });
 
@@ -184,6 +185,7 @@ export class DashboardService {
       quality: p.quality,
       assignedAt: p.assignedAt,
       reviewers: p.reviewers.map((r) => r.user),
+      errorCount: p._count.errors,
     }));
   }
 
@@ -233,7 +235,7 @@ export class DashboardService {
       take: limit,
       orderBy: { createdAt: 'desc' },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true, avatarUrl: true } },
       },
     });
 

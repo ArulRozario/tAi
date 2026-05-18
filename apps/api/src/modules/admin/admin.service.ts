@@ -35,7 +35,7 @@ export class AdminService {
           project: { select: { id: true, name: true, sourceLang: true, targetLang: true } },
           chapter: { select: { id: true, number: true, title: true } },
           reviewers: {
-            include: { user: { select: { id: true, name: true, email: true, role: true } } },
+            include: { user: { select: { id: true, name: true, email: true, role: true, avatarUrl: true } } },
           },
         },
       }),

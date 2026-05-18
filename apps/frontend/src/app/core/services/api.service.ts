@@ -9,6 +9,7 @@ export interface User {
   email: string;
   role: 'REVIEWER' | 'MASTER' | 'ADMIN';
   isActive: boolean;
+  avatarUrl?: string | null;
   createdAt: string;
 }
 
@@ -293,6 +294,10 @@ export class ApiService {
     return this.http.post<Page>(`${this.base}/pages/${id}/approve`, { notes });
   }
 
+  revokePage(id: string): Observable<Page> {
+    return this.http.post<Page>(`${this.base}/pages/${id}/revoke`, {});
+  }
+
   requestChanges(id: string, note: string): Observable<Page> {
     return this.http.post<Page>(`${this.base}/pages/${id}/request-changes`, { note });
   }
@@ -315,8 +320,8 @@ export class ApiService {
     return this.http.post<Segment>(`${this.base}/pages/${pageId}/segments/${segmentId}/retranslate`, { prompt });
   }
 
-  patchSentence(id: string, data: { isApproved?: boolean; translatedText?: string }): Observable<Segment> {
-    return this.http.patch<Segment>(`${this.base}/sentences/${id}`, data);
+  patchSegmentApproval(segmentId: string, pageId: string, isApproved: boolean): Observable<{ segmentId: string; isApproved: boolean; segmentApprovals: Record<string, boolean> }> {
+    return this.http.patch<any>(`${this.base}/pages/segments/${segmentId}/approval`, { pageId, isApproved });
   }
 
   addReviewer(pageId: string, userId: string): Observable<Page> {

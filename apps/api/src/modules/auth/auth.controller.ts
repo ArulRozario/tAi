@@ -10,8 +10,12 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
-  ParseUUIDPipe
+  ParseUUIDPipe,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthService } from './auth.service';
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -136,5 +140,19 @@ export class AuthController {
     @Query('refreshToken') refreshToken?: string
   ) {
     await this.authService.revokeSession(user.id, refreshToken, sessionId);
+  }
+
+  @Post('me/avatar')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('avatar', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  async uploadAvatar(@CurrentUser() user: any, @UploadedFile() file: any) {
+    if (!file) throw new BadRequestException('Field "avatar" is required');
+    return this.authService.uploadAvatar(user.id, file.buffer, file.mimetype);
+  }
+
+  @Delete('me/avatar')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteAvatar(@CurrentUser() user: any) {
+    await this.authService.deleteAvatar(user.id);
   }
 }

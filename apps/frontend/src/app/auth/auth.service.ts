@@ -13,6 +13,7 @@ export interface User {
   role: 'ADMIN' | 'MASTER' | 'REVIEWER';
   isActive: boolean;
   mustChangePassword: boolean;
+  avatarUrl?: string | null;
 }
 
 export interface LoginResponse {
@@ -294,5 +295,27 @@ export class AuthService {
   private loadUser(): User | null {
     const raw = localStorage.getItem(this.USER_KEY);
     return raw ? JSON.parse(raw) : null;
+  }
+
+  uploadAvatar(file: File): Observable<{ avatarUrl: string }> {
+    const form = new FormData();
+    form.append('avatar', file);
+    return this.http.post<{ avatarUrl: string }>(`${this.API_URL}/me/avatar`, form).pipe(
+      tap(() => this.fetchMe().subscribe()),
+      catchError((err) => {
+        this.messageService.add({ severity: 'error', summary: 'Upload failed', detail: err.error?.message || 'Could not upload avatar' });
+        return throwError(() => err);
+      })
+    );
+  }
+
+  deleteAvatar(): Observable<void> {
+    return this.http.delete<void>(`${this.API_URL}/me/avatar`).pipe(
+      tap(() => this.fetchMe().subscribe()),
+      catchError((err) => {
+        this.messageService.add({ severity: 'error', summary: 'Delete failed', detail: err.error?.message || 'Could not remove avatar' });
+        return throwError(() => err);
+      })
+    );
   }
 }

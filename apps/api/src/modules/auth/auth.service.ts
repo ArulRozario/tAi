@@ -1,8 +1,10 @@
 import { Injectable, UnauthorizedException, ConflictException, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { MinIOService } from '../files/minio.service';
 import { comparePassword, hashPassword } from './password.util';
 import { randomBytes } from 'crypto';
+import sharp from 'sharp';
 
 interface ResetTokenInfo {
   email: string;
@@ -19,6 +21,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private minioService: MinIOService,
   ) {}
 
   /**
@@ -213,6 +216,7 @@ export class AuthService {
       role: user.role,
       isActive: user.isActive,
       mustChangePassword: user.mustChangePassword,
+      avatarUrl: user.avatarUrl ? `/api/v1/files/avatars/${user.id}` : null,
     };
   }
 
@@ -355,5 +359,42 @@ export class AuthService {
 
     await this.prisma.refreshToken.delete({ where: { id: sessionId } });
     this.logger.log(`Session revoked for user ${userId}: ${sessionId}`);
+  }
+
+  async uploadAvatar(userId: string, buffer: Buffer, mimeType: string): Promise<{ avatarUrl: string }> {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(mimeType)) {
+      throw new BadRequestException('Avatar must be JPEG, PNG, WebP, or GIF');
+    }
+
+    const resized = await sharp(buffer)
+      .resize(256, 256, { fit: 'cover', position: 'centre' })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    const key = `avatars/${userId}.jpg`;
+    await this.minioService.uploadBuffer(resized, key, 'image/jpeg');
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: key },
+    });
+
+    this.logger.log(`Avatar uploaded for user ${userId}`);
+    return { avatarUrl: `/api/v1/files/avatars/${userId}` };
+  }
+
+  async deleteAvatar(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } });
+    if (user?.avatarUrl) {
+      await this.minioService.deleteFile(user.avatarUrl).catch(() => {});
+      await this.prisma.user.update({ where: { id: userId }, data: { avatarUrl: null } });
+    }
+    this.logger.log(`Avatar deleted for user ${userId}`);
+  }
+
+  async getAvatarKey(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } });
+    return user?.avatarUrl ?? null;
   }
 }

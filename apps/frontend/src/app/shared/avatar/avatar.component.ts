@@ -10,4 +10,12 @@ import { CommonModule } from '@angular/common';
 })
 export class AvatarComponent {
   @Input() initials = '';
+  @Input() imageUrl: string | null | undefined = null;
+  @Input() size: 'sm' | 'md' | 'lg' = 'sm';
+
+  imgError = false;
+
+  onImgError() {
+    this.imgError = true;
+  }
 }

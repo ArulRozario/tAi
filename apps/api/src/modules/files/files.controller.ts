@@ -14,15 +14,22 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
+import { MinIOService } from './minio.service';
+import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { Public } from '../auth/public.decorator';
 import { Response } from 'express';
 
 @Controller()
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class FilesController {
-  constructor(private readonly filesService: FilesService) {}
+  constructor(
+    private readonly filesService: FilesService,
+    private readonly minioService: MinIOService,
+    private readonly authService: AuthService,
+  ) {}
 
   /**
    * Uploads a file without a project context.
@@ -77,6 +84,25 @@ export class FilesController {
   @HttpCode(HttpStatus.OK)
   async listFiles(@Param('id', ParseUUIDPipe) projectId: string) {
     return this.filesService.listProjectFiles(projectId);
+  }
+
+  @Public()
+  @Get('files/avatars/:userId')
+  async serveAvatar(@Param('userId') userId: string, @Res() res: Response) {
+    const key = await this.authService.getAvatarKey(userId);
+    if (!key) {
+      return res.status(404).end();
+    }
+    try {
+      const buffer = await this.minioService.downloadFile(key);
+      res.set({
+        'Content-Type': 'image/jpeg',
+        'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600',
+      });
+      return res.send(buffer);
+    } catch {
+      return res.status(404).end();
+    }
   }
 
   /**

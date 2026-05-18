@@ -19,6 +19,7 @@ model User {
   role              Role     @default(REVIEWER)
   isActive          Boolean  @default(true)
   mustChangePassword Boolean  @default(true)
+  avatarUrl         String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -30,6 +31,7 @@ model User {
   activityLogs        ActivityLog[]
   createdStyleGuides  StyleGuide[]
   pageEdits           PageEdit[]
+  reviewSubmissions   PageReviewSubmission[]
 }
 
 model RefreshToken {
@@ -149,6 +151,9 @@ model Page {
   jobs             Job[]
   reviewers        PageReviewer[]
   edits            PageEdit[]
+  reviewSubmissions PageReviewSubmission[] @relation("PageSubmissions")
+  approvedSubmissionId String? @unique
+  approvedSubmission   PageReviewSubmission? @relation("ApprovedSubmission", fields: [approvedSubmissionId], references: [id])
 
   @@unique([projectId, pageNumber])
 }
@@ -204,6 +209,41 @@ model PageEdit {
   updatedAt  DateTime @updatedAt
 
   @@unique([pageId, segmentId])
+}
+
+// ─── Page Review Submissions ───────────────────────────────────────────────────
+
+model PageReviewSubmission {
+  id            String   @id @default(uuid())
+  pageId        String
+  page          Page     @relation("PageSubmissions", fields: [pageId], references: [id], onDelete: Cascade)
+  submittedById String
+  submittedBy   User     @relation(fields: [submittedById], references: [id])
+  status        ReviewSubmissionStatus @default(PENDING)
+  notes         String?
+  rejectedAt    DateTime?
+  rejectedById  String?
+  rejectionReason String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items         PageReviewSubmissionItem[]
+  approvedForPage Page?  @relation("ApprovedSubmission")
+
+  @@index([pageId, status])
+  @@index([submittedById])
+}
+
+model PageReviewSubmissionItem {
+  id           String   @id @default(uuid())
+  submissionId String
+  submission   PageReviewSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  segmentId    String
+  editedText   String   @db.Text
+  createdAt    DateTime @default(now())
+
+  @@index([submissionId])
+  @@index([segmentId])
 }
 
 // ─── Glossary ─────────────────────────────────────────────────────────────────
@@ -440,4 +480,10 @@ enum SegmentUnit {
   VERSE
   PARAGRAPH
   PAGE
+}
+
+enum ReviewSubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

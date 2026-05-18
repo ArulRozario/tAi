@@ -170,7 +170,10 @@
         <div class="reviewer-list">
           @for (r of assignTargetPage()!.reviewers!; track r.id) {
             <div class="reviewer-row-item">
-              <span class="reviewer-avatar-lg">{{ getInitials(r.user.name) }}</span>
+              <span class="reviewer-avatar-lg">
+                <img *ngIf="r.user.avatarUrl" [src]="r.user.avatarUrl" class="reviewer-avatar-img" [alt]="r.user.name" />
+                <ng-container *ngIf="!r.user.avatarUrl">{{ getInitials(r.user.name) }}</ng-container>
+              </span>
               <div class="reviewer-info">
                 <span class="reviewer-name">{{ r.user.name }}</span>
                 @if (r.isPrimary) { <span class="primary-badge">Primary</span> }
@@ -197,6 +200,7 @@
         placeholder="Select reviewers"
         styleClass="w-full"
         display="chip"
+        appendTo="body"
       />
     </div>
   }
@@ -226,6 +230,7 @@
       [(ngModel)]="bulkSingleReviewerId"
       placeholder="Select reviewer"
       styleClass="w-full"
+      appendTo="body"
     />
   } @else {
     <p class="dialog-hint">Replace all reviewers on selected pages with the following list.</p>
@@ -235,6 +240,7 @@
       placeholder="Select reviewers"
       styleClass="w-full"
       display="chip"
+      appendTo="body"
     />
   }
 

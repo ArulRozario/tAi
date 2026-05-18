@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { ThemeService } from '../../theme.service';
@@ -8,7 +8,6 @@ import { AuthService, User } from '../../auth/auth.service';
 /* Import PrimeNG Modules & types */
 import { MenuModule } from 'primeng/menu';
 import { ButtonModule } from 'primeng/button';
-import { AvatarModule } from 'primeng/avatar';
 import { TooltipModule } from 'primeng/tooltip';
 import { MenuItem } from 'primeng/api';
 
@@ -20,7 +19,6 @@ import { MenuItem } from 'primeng/api';
     RouterModule,
     MenuModule,
     ButtonModule,
-    AvatarModule,
     TooltipModule,
   ],
   templateUrl: './sidebar.component.html',
@@ -31,6 +29,9 @@ export class SidebarComponent implements OnInit {
   public layout = inject(LayoutService);
   public router = inject(Router);
   private authService = inject(AuthService);
+  private cdr = inject(ChangeDetectorRef);
+
+  @ViewChild('avatarInput') avatarInput!: ElementRef<HTMLInputElement>;
 
   user: User | null = null;
   userInitials = '';
@@ -39,10 +40,29 @@ export class SidebarComponent implements OnInit {
   sidebarMenuItems: MenuItem[] = [];
 
   ngOnInit() {
-    const u = this.authService.getCurrentUser();
-    this.user = u;
-    this.userInitials = this.computeInitials(u?.name || '');
+    this.authService.user$.subscribe(u => {
+      this.user = u;
+      this.userInitials = this.computeInitials(u?.name || '');
+      this.cdr.markForCheck();
+    });
     this.buildMenu();
+  }
+
+  triggerAvatarUpload() {
+    this.avatarInput.nativeElement.click();
+  }
+
+  onAvatarFileSelected(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    this.authService.uploadAvatar(file).subscribe();
+    (event.target as HTMLInputElement).value = '';
+  }
+
+  onAvatarError() {
+    if (this.user) {
+      this.user = { ...this.user, avatarUrl: null };
+    }
   }
 
   private buildMenu() {

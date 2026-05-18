@@ -55,7 +55,7 @@ export class PagesService {
           reviewers: {
             include: {
               user: {
-                select: { id: true, name: true, email: true, role: true },
+                select: { id: true, name: true, email: true, role: true, avatarUrl: true },
               },
             },
           },
@@ -85,7 +85,7 @@ export class PagesService {
         reviewers: {
           include: {
             user: {
-              select: { id: true, name: true, email: true, role: true },
+              select: { id: true, name: true, email: true, role: true, avatarUrl: true },
             },
           },
         },
@@ -99,7 +99,27 @@ export class PagesService {
       throw new NotFoundException(`Page with ID ${id} not found`);
     }
 
-    return page;
+    const meta = (page.translationMetadata as any) ?? {};
+    return {
+      ...page,
+      segmentApprovals: (meta.segmentApprovals ?? {}) as Record<string, boolean>,
+    };
+  }
+
+  async patchSegmentApproval(pageId: string, segmentId: string, isApproved: boolean) {
+    const page = await this.prisma.page.findUnique({ where: { id: pageId } });
+    if (!page) throw new NotFoundException(`Page ${pageId} not found`);
+
+    const meta = (page.translationMetadata as any) ?? {};
+    const approvals = { ...(meta.segmentApprovals ?? {}), [segmentId]: isApproved };
+
+    const updated = await this.prisma.page.update({
+      where: { id: pageId },
+      data: { translationMetadata: { ...meta, segmentApprovals: approvals } },
+    });
+
+    const updatedMeta = (updated.translationMetadata as any) ?? {};
+    return { segmentId, isApproved, segmentApprovals: updatedMeta.segmentApprovals ?? {} };
   }
 
   /**
@@ -343,6 +363,27 @@ export class PagesService {
     return updatedPage;
   }
 
+  async revoke(id: string, user: any) {
+    const page = await this.findOne(id);
+    if (page.status !== PageStatus.APPROVED) {
+      throw new BadRequestException('Only APPROVED pages can be revoked');
+    }
+
+    const updatedPage = await this.prisma.page.update({
+      where: { id },
+      data: { status: PageStatus.HUMAN_REVIEW },
+    });
+
+    // If the project was COMPLETED, revert it to REVIEW
+    await this.prisma.project.updateMany({
+      where: { id: page.projectId, status: 'COMPLETED' },
+      data: { status: 'REVIEW' },
+    });
+
+    this.logger.log(`Page revoked: ${id} by user ${user.id} (${user.role})`);
+    return updatedPage;
+  }
+
   async submitForReview(id: string, user: any) {
     const page = await this.findOne(id);
     if (page.status !== PageStatus.HUMAN_REVIEW) {
@@ -447,7 +488,7 @@ export class PagesService {
         reviewers: {
           include: {
             user: {
-              select: { id: true, name: true, email: true },
+              select: { id: true, name: true, email: true, avatarUrl: true },
             },
           },
         },

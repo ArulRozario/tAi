@@ -43,7 +43,13 @@
   @if (reviewers.length > 0) {
     <div class="reviewer-row">
       @for (r of visibleReviewers; track r.id) {
-        <span class="reviewer-avatar" [title]="r.user.name">{{ getInitials(r.user.name) }}</span>
+        <span class="reviewer-avatar" [title]="r.user.name" [style.background]="r.user.avatarUrl ? 'transparent' : null">
+          @if (r.user.avatarUrl) {
+            <img [src]="r.user.avatarUrl" class="reviewer-avatar-img" [alt]="r.user.name" />
+          } @else {
+            {{ getInitials(r.user.name) }}
+          }
+        </span>
       }
       @if (extraCount > 0) {
         <span class="reviewer-avatar reviewer-extra">+{{ extraCount }}</span>

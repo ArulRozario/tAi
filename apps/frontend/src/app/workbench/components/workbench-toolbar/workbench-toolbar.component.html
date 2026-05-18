@@ -1,16 +1,11 @@
 <header class="tb">
 
-  <!-- ── Left: project context ────────────────────────────── -->
+  <!-- ── Left: project name + page navigation ─────────────── -->
   <div class="tb-left">
     <span class="tb-context">
       <strong>{{ pageData().projectName }}</strong>
-      <span class="tb-sep-dot">·</span>
-      <span class="tb-page-label">Page {{ pageData().pageNum }}</span>
     </span>
-  </div>
-
-  <!-- ── Center: page navigation ──────────────────────────── -->
-  <div class="tb-center">
+    <div class="tb-left-sep"></div>
     <div class="tb-nav">
       <button class="tb-icon-btn" [disabled]="!state.prevPageId()" (click)="prevPage.emit()" title="Previous page">
         <i class="pi pi-chevron-left"></i>
@@ -24,12 +19,6 @@
 
   <!-- ── Right: all actions ───────────────────────────────── -->
   <div class="tb-right">
-
-    <!-- Progress -->
-    <div class="tb-progress">
-      <i class="pi pi-check-circle"></i>
-      <span>{{ state.approvedSegmentIds().size }}&nbsp;/&nbsp;{{ state.totalSegmentCount() }}</span>
-    </div>
 
     <!-- View mode toggle -->
     <div class="tb-toggle-group">
@@ -53,7 +42,7 @@
 
     <!-- Translation actions -->
     <div class="tb-group">
-      <button class="tb-action-btn" [class.loading]="isRetranslating()" [disabled]="isRetranslating()" (click)="retranslate.emit()">
+      <button class="tb-filled-btn tb-filled-primary" [class.loading]="isRetranslating()" [disabled]="isRetranslating()" (click)="retranslate.emit()">
         <i class="pi" [class.pi-refresh]="!isRetranslating()" [class.pi-spin]="isRetranslating()" [class.pi-spinner]="isRetranslating()"></i>
         Retranslate
       </button>
@@ -62,7 +51,7 @@
         [disabled]="isRetranslating()"
         (modelChange)="modelChange.emit($event)"
       />
-      <button class="tb-action-btn" (click)="resetEdits.emit()">
+      <button class="tb-filled-btn tb-filled-warning" (click)="resetEdits.emit()">
         <i class="pi pi-undo"></i>
         Reset
       </button>
@@ -81,64 +70,133 @@
 
     <div class="tb-divider"></div>
 
-    <!-- Reviewers -->
-    <div class="tb-group tb-reviewers">
-      @for (r of pageData().reviewers; track r.userId) {
-        <span
-          class="tb-avatar"
-          [style.background]="getAvatarColor(r.userId)"
-          [pTooltip]="r.user?.name || r.user?.email"
-          tooltipPosition="bottom">
-          {{ (r.user?.name || r.user?.email || '?').charAt(0).toUpperCase() }}
-        </span>
-      }
-      @if (!pageData().reviewers?.length) {
-        <span class="tb-no-reviewers">No reviewers</span>
-      }
-      @if (isMasterOrAdmin()) {
-        <button class="tb-action-btn" (click)="addReviewer.emit()">
-          <i class="pi pi-user-plus"></i> Add
-        </button>
-        @if (pageData().reviewers.length) {
-          <button class="tb-icon-btn" (click)="reassignReviewers.emit()" title="Reassign reviewers">
-            <i class="pi pi-sync"></i>
-          </button>
-        }
-      }
-    </div>
-
-    <div class="tb-divider"></div>
-
-    <!-- Chat toggle -->
-    <button class="tb-action-btn tb-outlined" (click)="toggleChat.emit()">
-      <i class="pi" [class.pi-chevron-left]="!state.rightPanelCollapsed()" [class.pi-chevron-right]="state.rightPanelCollapsed()"></i>
-      {{ state.rightPanelCollapsed() ? 'Open Chat' : 'Close Chat' }}
-    </button>
-
     <!-- Primary action -->
     @if (isMasterOrAdmin()) {
-      <button class="tb-primary-btn" [class.loading]="isCompleting()" [disabled]="isCompleting()" (click)="approve.emit()">
-        <i class="pi" [class.pi-check]="!isCompleting()" [class.pi-spin]="isCompleting()" [class.pi-spinner]="isCompleting()"></i>
-        Approve
-      </button>
-    } @else {
-      @if (pageData().submittedAt) {
-        <button class="tb-action-btn" disabled>
-          <i class="pi pi-check-circle"></i> Submitted
+      @if (pendingSubmissionCount() > 0) {
+        <button class="tb-filled-btn tb-filled-primary" (click)="openSubmissionsPanel.emit()">
+          <i class="pi pi-users"></i>
+          Review Submissions
+          <span class="tb-badge">{{ pendingSubmissionCount() }}</span>
+        </button>
+      }
+      @if (pageData().status === 'APPROVED') {
+        <button class="tb-filled-btn tb-filled-danger" [class.loading]="isCompleting()" [disabled]="isCompleting()" (click)="revoke.emit()">
+          <i class="pi" [class.pi-times-circle]="!isCompleting()" [class.pi-spin]="isCompleting()" [class.pi-spinner]="isCompleting()"></i>
+          Revoke
         </button>
       } @else {
-        <button class="tb-primary-btn" [class.loading]="isCompleting()" [disabled]="isCompleting()" (click)="submitForReview.emit()">
+        <button class="tb-filled-btn tb-filled-success" [class.loading]="isCompleting()" [disabled]="isCompleting()" (click)="approve.emit()">
+          <i class="pi" [class.pi-check]="!isCompleting()" [class.pi-spin]="isCompleting()" [class.pi-spinner]="isCompleting()"></i>
+          Approve
+        </button>
+      }
+    } @else {
+      @if (mySubmission()) {
+        <div class="tb-submitted-group">
+          <button class="tb-action-btn" disabled>
+            <i class="pi pi-check-circle"></i> Submitted
+          </button>
+          <button class="tb-icon-btn" title="Unsubmit" (click)="unsubmitReview.emit(mySubmission()!.id)">
+            <i class="pi pi-undo"></i>
+          </button>
+        </div>
+      } @else {
+        <button
+          class="tb-filled-btn tb-filled-success"
+          [class.loading]="isCompleting()"
+          [disabled]="isCompleting() || !hasWorkingEdits()"
+          (click)="submitForReview.emit()"
+          [pTooltip]="!hasWorkingEdits() ? 'Make some segment edits first' : 'Submit your corrections for master review'">
           <i class="pi" [class.pi-send]="!isCompleting()" [class.pi-spin]="isCompleting()" [class.pi-spinner]="isCompleting()"></i>
-          Submit for Review
+          Submit Review
         </button>
       }
     }
 
-    <!-- Overflow -->
-    <button class="tb-icon-btn" (click)="openOverflow($event)" title="More actions">
-      <i class="pi pi-ellipsis-v"></i>
+    <!-- Reviewer badge -->
+    <button class="tb-reviewer-badge" (click)="openReviewerPanel($event)">
+      <i class="pi pi-users"></i>
+      @if (pageData().reviewers?.length) {
+        <span class="tb-reviewer-badge-name">{{ getDisplayName(pageData().reviewers[0]) }}</span>
+        @if (pageData().reviewers.length > 1) {
+          <span class="tb-reviewer-badge-count">+{{ pageData().reviewers.length - 1 }}</span>
+        }
+      } @else {
+        <span class="tb-reviewer-badge-label">No reviewers</span>
+      }
     </button>
-    <p-menu #overflowMenu [model]="overflowMenuItems()" [popup]="true" />
+
+    <p-popover #reviewerPanel styleClass="tb-reviewer-panel">
+      <div class="tbr-panel">
+
+        @if (isMasterOrAdmin()) {
+          <div class="tbr-add-row">
+            <p-select
+              [options]="availableUsers()"
+              [(ngModel)]="selectedUser"
+              optionLabel="name"
+              placeholder="Add reviewer…"
+              [filter]="true"
+              filterBy="name,email"
+              [showClear]="false"
+              appendTo="body"
+              styleClass="tbr-user-select"
+              (onChange)="onUserSelected($event.value)"
+            >
+              <ng-template pTemplate="selectedItem" let-u>
+                <div class="tbr-ac-item">
+                  <span class="tbr-avatar" [style.background]="u.avatarUrl ? 'transparent' : getAvatarColor(u.id)">
+                    <img *ngIf="u.avatarUrl" [src]="u.avatarUrl" class="tbr-avatar-img" [alt]="u.name" />
+                    <ng-container *ngIf="!u.avatarUrl">{{ (u.name || u.email).charAt(0).toUpperCase() }}</ng-container>
+                  </span>
+                  <span class="tbr-search-name">{{ u.name || u.email }}</span>
+                </div>
+              </ng-template>
+              <ng-template pTemplate="item" let-u>
+                <div class="tbr-ac-item">
+                  <span class="tbr-avatar" [style.background]="u.avatarUrl ? 'transparent' : getAvatarColor(u.id)">
+                    <img *ngIf="u.avatarUrl" [src]="u.avatarUrl" class="tbr-avatar-img" [alt]="u.name" />
+                    <ng-container *ngIf="!u.avatarUrl">{{ (u.name || u.email).charAt(0).toUpperCase() }}</ng-container>
+                  </span>
+                  <span class="tbr-search-info">
+                    <span class="tbr-search-name">{{ u.name || u.email }}</span>
+                    @if (u.name) {
+                      <span class="tbr-search-email">{{ u.email }}</span>
+                    }
+                  </span>
+                </div>
+              </ng-template>
+            </p-select>
+          </div>
+          <div class="tbr-separator"></div>
+        }
+
+        @if (pageData().reviewers?.length) {
+          <ul class="tbr-list">
+            @for (r of pageData().reviewers; track r.userId) {
+              <li class="tbr-item">
+                <span class="tbr-avatar" [style.background]="r.user?.avatarUrl ? 'transparent' : getAvatarColor(r.userId)">
+                  <img *ngIf="r.user?.avatarUrl" [src]="r.user!.avatarUrl!" class="tbr-avatar-img" [alt]="getDisplayName(r)" />
+                  <ng-container *ngIf="!r.user?.avatarUrl">{{ getInitial(r) }}</ng-container>
+                </span>
+                <span class="tbr-name">{{ getDisplayName(r) }}</span>
+                @if (isMasterOrAdmin()) {
+                  <button class="tbr-remove-btn" (click)="onRemoveReviewer(r.userId)" title="Remove">
+                    <i class="pi pi-times"></i>
+                  </button>
+                }
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="tbr-empty">
+            <i class="pi pi-user-plus"></i>
+            No reviewers assigned
+          </p>
+        }
+
+      </div>
+    </p-popover>
 
   </div>
 </header>

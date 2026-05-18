@@ -52,9 +52,16 @@
       </button>
     </div>
     
-    <!-- User profile card with PrimeNG circular avatar -->
+    <!-- User profile card with click-to-upload avatar -->
     <div class="profile-card" [pTooltip]="layout.sidebarCollapsed() ? (user?.name || 'User') : ''" tooltipPosition="right">
-      <p-avatar [label]="userInitials" shape="circle" styleClass="profile-avatar"></p-avatar>
+      <div class="profile-avatar-wrap" (click)="triggerAvatarUpload()" pTooltip="Change photo" tooltipPosition="right">
+        <div class="profile-avatar">
+          <img *ngIf="user?.avatarUrl" [src]="user!.avatarUrl!" class="profile-avatar-img" [alt]="user!.name" (error)="onAvatarError()" />
+          <span *ngIf="!user?.avatarUrl">{{ userInitials }}</span>
+        </div>
+        <div class="profile-avatar-overlay"><i class="pi pi-camera"></i></div>
+      </div>
+      <input #avatarInput type="file" accept="image/*" class="hidden-file-input" (change)="onAvatarFileSelected($event)" />
       <div class="profile-info" *ngIf="!layout.sidebarCollapsed()">
         <div class="profile-name">{{ user?.name || 'Loading...' }}</div>
         <div class="profile-role">{{ user?.role || '' }}</div>

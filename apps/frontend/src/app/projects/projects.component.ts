@@ -12,7 +12,6 @@ import { InputIconModule } from 'primeng/inputicon';
 import { InputTextModule } from 'primeng/inputtext';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TagModule } from 'primeng/tag';
-import { AvatarModule } from 'primeng/avatar';
 import { SelectModule } from 'primeng/select';
 import { CreateProjectModal } from './create-project-modal/create-project-modal';
 import { ProjectService, Project } from './projects.service';
@@ -33,7 +32,6 @@ import { AuthService } from '../auth/auth.service';
     InputTextModule,
     ProgressBarModule,
     TagModule,
-    AvatarModule,
     SelectModule,
     CreateProjectModal
   ],
@@ -49,10 +47,17 @@ export class ProjectsComponent implements OnInit, OnDestroy {
 
   projects = signal<Project[]>([]);
   totalProjects = signal(0);
+  totalPages = signal(0);
   loading = signal(false);
+  searchQuery = signal('');
   translationStatus = signal<Record<string, { isRunning: boolean; isPaused: boolean; done: number; total: number; percent: number }>>({});
 
-  filterOptions = [{ label: 'All', value: 'all' }];
+  readonly filteredProjects = computed(() => {
+    const q = this.searchQuery().toLowerCase().trim();
+    return q ? this.projects().filter(p => p.name.toLowerCase().includes(q)) : this.projects();
+  });
+
+  filterOptions = [{ label: 'All', value: 'all' }, { label: 'Active', value: 'REVIEW' }, { label: 'Paused', value: 'PAUSED' }, { label: 'Complete', value: 'COMPLETED' }, { label: 'Draft', value: 'DRAFT' }];
   selectedFilter = 'all';
 
   readonly isReviewer = computed(() => {
@@ -83,6 +88,7 @@ export class ProjectsComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.projects.set(res.data);
         this.totalProjects.set(res.pagination.total);
+        this.totalPages.set(res.data.reduce((sum, p) => sum + (p._count?.pages ?? 0), 0));
         this.loading.set(false);
       },
       error: (err) => {
@@ -123,5 +129,34 @@ export class ProjectsComponent implements OnInit, OnDestroy {
 
   getProjectStatus(status: string): string {
     return status.toLowerCase();
+  }
+
+  isActive(project: Project): boolean {
+    return project.status === 'PROCESSING' || project.status === 'REVIEW';
+  }
+
+  isPaused(project: Project): boolean {
+    return project.status === 'PAUSED';
+  }
+
+  pauseProject(event: Event, project: Project): void {
+    event.stopPropagation();
+    this.projectService.pauseProject(project.id).subscribe({ next: () => this.loadProjects() });
+  }
+
+  resumeProject(event: Event, project: Project): void {
+    event.stopPropagation();
+    this.projectService.resumeProject(project.id).subscribe({ next: () => this.loadProjects() });
+  }
+
+  cancelJobs(event: Event, project: Project): void {
+    event.stopPropagation();
+    this.projectService.cancelProjectJobs(project.id).subscribe({ next: () => this.loadProjects() });
+  }
+
+  deleteProject(event: Event, project: Project): void {
+    event.stopPropagation();
+    if (!confirm(`Delete "${project.name}"? This cannot be undone.`)) return;
+    this.projectService.deleteProject(project.id).subscribe({ next: () => this.loadProjects() });
   }
 }

@@ -24,6 +24,7 @@ export interface Project {
     id: string;
     name: string;
     email: string;
+    avatarUrl?: string | null;
   };
   styleGuide?: {
     id: string;
@@ -62,7 +63,7 @@ export interface Chapter {
 export interface PageReviewer {
   id: string;
   userId: string;
-  user: { id: string; name: string; email: string; role: string };
+  user: { id: string; name: string; email: string; role: string; avatarUrl?: string | null };
   isPrimary: boolean;
   assignedAt: string;
 }

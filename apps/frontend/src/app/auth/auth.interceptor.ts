@@ -8,9 +8,9 @@ let isRefreshing = false;
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
 
-  // Skip auth header for public auth endpoints (login, refresh, forgot-password, etc.)
-  const isPublicAuthEndpoint =
-    req.url.includes('/api/v1/auth') && req.method === 'POST';
+  // Skip auth header for truly public auth endpoints only
+  const publicPaths = ['/auth/login', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password'];
+  const isPublicAuthEndpoint = publicPaths.some(p => req.url.includes(p));
 
   if (isPublicAuthEndpoint) {
     return next(req);

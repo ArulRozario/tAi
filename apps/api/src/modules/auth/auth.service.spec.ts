@@ -26,7 +26,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new AuthService(mockPrisma as any, mockJwt as any);
+    service = new AuthService(mockPrisma as any, mockJwt as any, {} as any);
   });
 
   describe('validateUser', () => {

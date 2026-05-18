@@ -42,7 +42,7 @@ export class ProjectsService {
       include: {
         styleGuide: true,
         owner: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, avatarUrl: true },
         },
       }
     });
@@ -67,7 +67,7 @@ export class ProjectsService {
           include: {
             styleGuide: true,
             owner: {
-              select: { id: true, name: true, email: true },
+              select: { id: true, name: true, email: true, avatarUrl: true },
             },
           }
         });
@@ -103,7 +103,7 @@ export class ProjectsService {
         orderBy: { createdAt: 'desc' },
         include: {
           owner: {
-            select: { id: true, name: true, email: true },
+            select: { id: true, name: true, email: true, avatarUrl: true },
           },
           styleGuide: {
             select: { id: true, name: true },
@@ -135,7 +135,7 @@ export class ProjectsService {
       where: { id },
       include: {
         owner: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, avatarUrl: true },
         },
         styleGuide: {
           select: { id: true, name: true },
@@ -154,7 +154,7 @@ export class ProjectsService {
                 userId: true,
                 isPrimary: true,
                 assignedAt: true,
-                user: { select: { id: true, name: true, email: true, role: true } },
+                user: { select: { id: true, name: true, email: true, role: true, avatarUrl: true } },
               },
             },
           },
@@ -187,7 +187,7 @@ export class ProjectsService {
       },
       include: {
         owner: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true, email: true, avatarUrl: true },
         },
         styleGuide: {
           select: { id: true, name: true },

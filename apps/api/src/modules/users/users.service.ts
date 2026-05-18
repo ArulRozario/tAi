@@ -62,6 +62,7 @@ export class UsersService {
           name: true,
           role: true,
           isActive: true,
+          avatarUrl: true,
           createdAt: true,
           _count: {
             select: { refreshTokens: { where: { expiresAt: { gt: new Date() } } } },
@@ -86,6 +87,7 @@ export class UsersService {
       name: user.name,
       role: user.role,
       isActive: user.isActive,
+      avatarUrl: user.avatarUrl ? `/api/v1/files/avatars/${user.id}` : null,
       sessionCount: user._count.refreshTokens,
       lastActiveAt: user.refreshTokens[0]?.createdAt || null,
       createdAt: user.createdAt,
@@ -112,6 +114,7 @@ export class UsersService {
         name: true,
         role: true,
         isActive: true,
+        avatarUrl: true,
         createdAt: true,
         updatedAt: true,
         refreshTokens: {
@@ -132,6 +135,7 @@ export class UsersService {
 
     return {
       ...user,
+      avatarUrl: user.avatarUrl ? `/api/v1/files/avatars/${user.id}` : null,
       sessionCount: user.refreshTokens.length,
     };
   }

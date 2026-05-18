@@ -1,1 +1,10 @@
-<div class="owner-badge">{{ initials }}</div>
+<div class="owner-badge" [class]="'owner-badge--' + size">
+  <img
+    *ngIf="imageUrl && !imgError"
+    [src]="imageUrl"
+    [alt]="initials"
+    (error)="onImgError()"
+    class="avatar-img"
+  />
+  <span *ngIf="!imageUrl || imgError">{{ initials }}</span>
+</div>

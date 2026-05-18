@@ -6,7 +6,7 @@
       @if (isReviewer()) {
         {{ totalProjects() }} {{ totalProjects() === 1 ? 'project' : 'projects' }} assigned to you
       } @else {
-        {{ totalProjects() }} projects &bull; {{ totalProjects() > 0 ? (totalProjects() + ' total projects') : 'No data' }}
+        {{ totalProjects() }} {{ totalProjects() === 1 ? 'project' : 'projects' }} &bull; {{ totalPages() }} total pages
       }
     </p>
   </div>
@@ -15,7 +15,7 @@
     <!-- PrimeNG Icon Field & Search text input -->
     <p-iconField iconPosition="left" class="search-box-wrapper">
       <p-inputIcon class="pi pi-search"></p-inputIcon>
-      <input type="text" pInputText placeholder="Search projects" class="projects-search" />
+      <input type="text" pInputText placeholder="Search projects" class="projects-search" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" />
     </p-iconField>
 
     <!-- PrimeNG Filter Select Dropdown -->
@@ -31,17 +31,17 @@
 
 <!-- Dynamic data grid mapping our projects dataset using PrimeNG p-table -->
 <div class="table-card">
-  <p-table [value]="projects()" [loading]="loading()" class="projects-table">
+  <p-table [value]="filteredProjects()" [loading]="loading()" class="projects-table">
     <ng-template pTemplate="header">
       <tr>
-        <th style="width: 35%">PROJECT</th>
-        <th style="width: 12%">CHAPTERS</th>
-        <th style="width: 12%">PAGES</th>
-        <th style="width: 18%">PROGRESS</th>
-        <th style="width: 10%">QUALITY</th>
-        <th style="width: 13%">STATUS</th>
-        <th style="width: 10%">OWNER</th>
-        <th style="width: 5%"></th>
+        <th style="width: 30%">PROJECT</th>
+        <th style="width: 8%">CHAPTERS</th>
+        <th style="width: 8%">PAGES</th>
+        <th style="width: 20%">PROGRESS</th>
+        <th style="width: 8%">QUALITY</th>
+        <th style="width: 12%">STATUS</th>
+        <th style="width: 8%">OWNER</th>
+        <th style="width: 6%"></th>
       </tr>
     </ng-template>
     <ng-template pTemplate="body" let-project>
@@ -104,11 +104,22 @@
           }
         </td>
         <td>
-          <!-- PrimeNG User circle initial labels -->
-          <p-avatar [label]="getInitials(project.owner?.name)" shape="circle"></p-avatar>
+          <div class="owner-avatar" [title]="project.owner?.name || ''">
+            <img *ngIf="project.owner?.avatarUrl" [src]="project.owner!.avatarUrl!" class="owner-avatar-img" [alt]="project.owner!.name" />
+            <span *ngIf="!project.owner?.avatarUrl">{{ getInitials(project.owner?.name) }}</span>
+          </div>
         </td>
         <td class="text-right">
-          <button class="row-menu-btn" (click)="$event.stopPropagation()"><i class="pi pi-ellipsis-v"></i></button>
+          <div class="row-actions" (click)="$event.stopPropagation()">
+            @if (canCreateProject()) {
+              @if (isActive(project)) {
+                <button class="row-action-btn" title="Pause" (click)="pauseProject($event, project)"><i class="pi pi-pause"></i></button>
+              } @else if (isPaused(project)) {
+                <button class="row-action-btn" title="Resume" (click)="resumeProject($event, project)"><i class="pi pi-play"></i></button>
+              }
+              <button class="row-action-btn danger" title="Delete" (click)="deleteProject($event, project)"><i class="pi pi-trash"></i></button>
+            }
+          </div>
         </td>
       </tr>
     </ng-template>
