@@ -1,7 +1,7 @@
-<div class="app-layout" [class.login-layout]="loginPage()" [class.fullpage-layout]="fullPage()">
+<div class="app-layout" [class.login-layout]="loginPage()">
   <p-toast position="top-right" [breakpoints]="{ '920px': { width: '100%', right: '0', left: '0' } }"></p-toast>
 
-  @if (!loginPage() && !fullPage()) {
+  @if (!loginPage()) {
     <app-sidebar></app-sidebar>
   }
 

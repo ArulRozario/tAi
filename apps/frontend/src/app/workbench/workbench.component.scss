@@ -1,6 +1,7 @@
 :host {
   display: block;
-  height: 100%;
+  height: calc(100% + 20px);
+  margin: -10px;
   overflow: hidden;
   background: var(--bg-card);
 }
