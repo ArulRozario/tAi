@@ -1,0 +1,144 @@
+<header class="tb">
+
+  <!-- ── Left: project context ────────────────────────────── -->
+  <div class="tb-left">
+    <span class="tb-context">
+      <strong>{{ pageData().projectName }}</strong>
+      <span class="tb-sep-dot">·</span>
+      <span class="tb-page-label">Page {{ pageData().pageNum }}</span>
+    </span>
+  </div>
+
+  <!-- ── Center: page navigation ──────────────────────────── -->
+  <div class="tb-center">
+    <div class="tb-nav">
+      <button class="tb-icon-btn" [disabled]="!state.prevPageId()" (click)="prevPage.emit()" title="Previous page">
+        <i class="pi pi-chevron-left"></i>
+      </button>
+      <span class="tb-nav-num">{{ pageData().pageNum }}</span>
+      <button class="tb-icon-btn" [disabled]="!state.nextPageId()" (click)="nextPage.emit()" title="Next page">
+        <i class="pi pi-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Right: all actions ───────────────────────────────── -->
+  <div class="tb-right">
+
+    <!-- Progress -->
+    <div class="tb-progress">
+      <i class="pi pi-check-circle"></i>
+      <span>{{ state.approvedSegmentIds().size }}&nbsp;/&nbsp;{{ state.totalSegmentCount() }}</span>
+    </div>
+
+    <!-- View mode toggle -->
+    <div class="tb-toggle-group">
+      <button
+        class="tb-toggle-btn"
+        [class.active]="state.viewMode() === 'side-by-side'"
+        (click)="state.viewMode.set('side-by-side')"
+        title="Side-by-side">
+        <i class="pi pi-pause"></i>
+      </button>
+      <button
+        class="tb-toggle-btn"
+        [class.active]="state.viewMode() === 'overlay'"
+        (click)="state.viewMode.set('overlay')"
+        title="Overlay">
+        <i class="pi pi-clone"></i>
+      </button>
+    </div>
+
+    <div class="tb-divider"></div>
+
+    <!-- Translation actions -->
+    <div class="tb-group">
+      <button class="tb-action-btn" [class.loading]="isRetranslating()" [disabled]="isRetranslating()" (click)="retranslate.emit()">
+        <i class="pi" [class.pi-refresh]="!isRetranslating()" [class.pi-spin]="isRetranslating()" [class.pi-spinner]="isRetranslating()"></i>
+        Retranslate
+      </button>
+      <tai-model-picker
+        [showDefault]="true"
+        [disabled]="isRetranslating()"
+        (modelChange)="modelChange.emit($event)"
+      />
+      <button class="tb-action-btn" (click)="resetEdits.emit()">
+        <i class="pi pi-undo"></i>
+        Reset
+      </button>
+      @if (isMasterOrAdmin()) {
+        <p-select
+          [options]="pageStatusOptions()"
+          [(ngModel)]="pageData().status"
+          optionLabel="label"
+          optionValue="value"
+          (onChange)="statusChange.emit($event.value)"
+          placeholder="Status"
+          styleClass="tb-status-select"
+        />
+      }
+    </div>
+
+    <div class="tb-divider"></div>
+
+    <!-- Reviewers -->
+    <div class="tb-group tb-reviewers">
+      @for (r of pageData().reviewers; track r.userId) {
+        <span
+          class="tb-avatar"
+          [style.background]="getAvatarColor(r.userId)"
+          [pTooltip]="r.user?.name || r.user?.email"
+          tooltipPosition="bottom">
+          {{ (r.user?.name || r.user?.email || '?').charAt(0).toUpperCase() }}
+        </span>
+      }
+      @if (!pageData().reviewers?.length) {
+        <span class="tb-no-reviewers">No reviewers</span>
+      }
+      @if (isMasterOrAdmin()) {
+        <button class="tb-action-btn" (click)="addReviewer.emit()">
+          <i class="pi pi-user-plus"></i> Add
+        </button>
+        @if (pageData().reviewers.length) {
+          <button class="tb-icon-btn" (click)="reassignReviewers.emit()" title="Reassign reviewers">
+            <i class="pi pi-sync"></i>
+          </button>
+        }
+      }
+    </div>
+
+    <div class="tb-divider"></div>
+
+    <!-- Chat toggle -->
+    <button class="tb-action-btn tb-outlined" (click)="toggleChat.emit()">
+      <i class="pi" [class.pi-chevron-left]="!state.rightPanelCollapsed()" [class.pi-chevron-right]="state.rightPanelCollapsed()"></i>
+      {{ state.rightPanelCollapsed() ? 'Open Chat' : 'Close Chat' }}
+    </button>
+
+    <!-- Primary action -->
+    @if (isMasterOrAdmin()) {
+      <button class="tb-primary-btn" [class.loading]="isCompleting()" [disabled]="isCompleting()" (click)="approve.emit()">
+        <i class="pi" [class.pi-check]="!isCompleting()" [class.pi-spin]="isCompleting()" [class.pi-spinner]="isCompleting()"></i>
+        Approve
+      </button>
+    } @else {
+      @if (pageData().submittedAt) {
+        <button class="tb-action-btn" disabled>
+          <i class="pi pi-check-circle"></i> Submitted
+        </button>
+      } @else {
+        <button class="tb-primary-btn" [class.loading]="isCompleting()" [disabled]="isCompleting()" (click)="submitForReview.emit()">
+          <i class="pi" [class.pi-send]="!isCompleting()" [class.pi-spin]="isCompleting()" [class.pi-spinner]="isCompleting()"></i>
+          Submit for Review
+        </button>
+      }
+    }
+
+    <!-- Overflow -->
+    <button class="tb-icon-btn" (click)="openOverflow($event)" title="More actions">
+      <i class="pi pi-ellipsis-v"></i>
+    </button>
+    <p-menu #overflowMenu [model]="overflowMenuItems()" [popup]="true" />
+
+  </div>
+</header>

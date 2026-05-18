@@ -2,112 +2,25 @@
   <div class="workbench-container">
 
     <!-- ── Top Toolbar ───────────────────────────────────────── -->
-    <header class="workbench-toolbar">
-      <div class="toolbar-left">
-        <p-button icon="pi pi-arrow-left" label="Back" [text]="true" (onClick)="goBack()" styleClass="back-btn" />
-        <div class="context-info">
-          <span class="project-name">Project <strong>{{ pageData()?.projectName }}</strong></span>
-          <span class="sep">·</span>
-          <span class="location">Page {{ pageData()?.pageNum }}</span>
-        </div>
-      </div>
-
-      <div class="toolbar-center">
-        <div class="pagination">
-          <button
-            class="nav-btn"
-            [disabled]="!state.prevPageId()"
-            (click)="goToPrevPage()"
-            title="Previous page">
-            <i class="pi pi-chevron-left"></i>
-          </button>
-          <span class="page-count"><strong>{{ pageData()?.pageNum }}</strong></span>
-          <button
-            class="nav-btn"
-            [disabled]="!state.nextPageId()"
-            (click)="goToNextPage()"
-            title="Next page">
-            <i class="pi pi-chevron-right"></i>
-          </button>
-        </div>
-      </div>
-
-      <div class="toolbar-right">
-        <div class="view-controls">
-          <div class="zoom-controls">
-            <button (click)="setZoom(-10)"><i class="pi pi-minus"></i></button>
-            <span class="zoom-val">{{ state.zoomLevel() }}%</span>
-            <button (click)="setZoom(10)"><i class="pi pi-plus"></i></button>
-          </div>
-          <div class="mode-toggles">
-            <button
-              [class.active]="state.viewMode() === 'side-by-side'"
-              (click)="state.viewMode.set('side-by-side')">
-              <i class="pi pi-pause"></i> Side-by-side
-            </button>
-            <button
-              [class.active]="state.viewMode() === 'overlay'"
-              (click)="state.viewMode.set('overlay')">
-              <i class="pi pi-clone"></i> Overlay
-            </button>
-          </div>
-        </div>
-        <p-button
-          [icon]="state.rightPanelCollapsed() ? 'pi pi-chevron-left' : 'pi pi-chevron-right'"
-          [label]="state.rightPanelCollapsed() ? 'Open Chat' : 'Close Chat'"
-          severity="secondary"
-          [outlined]="true"
-          size="small"
-          (click)="toggleRightPanel()"
-          styleClass="chat-toggle-btn"
-        />
-        <p-button label="Open analysis" severity="secondary" [outlined]="true" size="small" styleClass="analysis-btn" />
-
-        <!-- Role-based primary action -->
-        @if (isMasterOrAdmin()) {
-          <p-button
-            label="Approve"
-            icon="pi pi-check"
-            severity="success"
-            size="small"
-            [loading]="isCompleting()"
-            (onClick)="completePage()"
-            styleClass="approve-btn"
-          />
-        } @else {
-          @if (pageData()?.submittedAt) {
-            <p-button
-              label="Submitted"
-              icon="pi pi-check-circle"
-              severity="secondary"
-              size="small"
-              [disabled]="true"
-              styleClass="submitted-btn"
-            />
-          } @else {
-            <p-button
-              label="Submit for Review"
-              icon="pi pi-send"
-              severity="success"
-              size="small"
-              [loading]="isCompleting()"
-              (onClick)="submitForReview()"
-              styleClass="submit-btn"
-            />
-          }
-        }
-
-        <p-button
-          icon="pi pi-ellipsis-v"
-          severity="secondary"
-          [text]="true"
-          size="small"
-          (onClick)="overflowMenu.toggle($event)"
-          styleClass="overflow-btn"
-        />
-        <p-menu #overflowMenu [model]="overflowMenuItems" [popup]="true" />
-      </div>
-    </header>
+    <app-workbench-toolbar
+      [pageData]="pageData()!"
+      [isRetranslating]="isRetranslating()"
+      [isCompleting]="isCompleting()"
+      [isMasterOrAdmin]="isMasterOrAdmin()"
+      [pageStatusOptions]="pageStatusOptions"
+      [overflowMenuItems]="overflowMenuItems"
+      (prevPage)="goToPrevPage()"
+      (nextPage)="goToNextPage()"
+      (retranslate)="retranslatePage()"
+      (modelChange)="selectedModel.set($event)"
+      (resetEdits)="resetAllEdits()"
+      (statusChange)="onStatusChange($event)"
+      (addReviewer)="openAddReviewer()"
+      (reassignReviewers)="openReassign()"
+      (toggleChat)="toggleRightPanel()"
+      (approve)="completePage()"
+      (submitForReview)="submitForReview()"
+    />
 
     <div class="workbench-workspace" [class.left-collapsed]="state.leftPanelCollapsed()">
 
@@ -125,7 +38,7 @@
         <!-- Source Column -->
         <section class="text-column source-col">
           <div class="column-header">
-            <span class="lang-label">ORIGINAL · ENGLISH</span>
+            <span class="lang-label">ORIGINAL · {{ (pageData()?.sourceLang || 'SOURCE') | uppercase }}</span>
             <div class="source-view-toggle">
               <button
                 [class.active]="state.sourceViewMode() === 'html'"
@@ -184,53 +97,7 @@
         <!-- Target Column -->
         <section class="text-column target-col">
           <div class="column-header">
-            <span class="lang-label">TRANSLATION · TAMIL</span>
-            <div class="target-actions">
-              <p-button
-                icon="pi pi-refresh"
-                severity="secondary"
-                [text]="true"
-                [loading]="isRetranslating()"
-                (onClick)="retranslatePage()"
-                pTooltip="Retranslate this page"
-                tooltipPosition="top"
-                size="small"
-              />
-              <tai-model-picker
-                [showDefault]="true"
-                [disabled]="isReviewing()"
-                (modelChange)="selectedModel.set($event)"
-              />
-              <p-button
-                icon="pi pi-search"
-                severity="secondary"
-                [text]="true"
-                [loading]="isReviewing()"
-                (onClick)="startReview()"
-                pTooltip="Run AI review on this page"
-                tooltipPosition="top"
-                size="small"
-              />
-              <p-button
-                icon="pi pi-undo"
-                severity="secondary"
-                [text]="true"
-                (onClick)="resetAllEdits()"
-                pTooltip="Reset all edits"
-                tooltipPosition="top"
-                size="small"
-              />
-              <p-select
-                [options]="pageStatusOptions"
-                [(ngModel)]="pageData()!.status"
-                optionLabel="label"
-                optionValue="value"
-                (onChange)="onStatusChange($event.value)"
-                placeholder="Status"
-                styleClass="status-select"
-                size="small"
-              />
-            </div>
+            <span class="lang-label">TRANSLATION · {{ (pageData()?.targetLang || 'TARGET') | uppercase }}</span>
           </div>
           
           <app-page-content-renderer
@@ -239,6 +106,39 @@
               [pageId]="pageData()!.id"
               (contentChanged)="loadEdits(pageData()!.id)">
             </app-page-content-renderer>
+
+          @if (state.pageErrors().length > 0) {
+            <div class="error-panel" [class.collapsed]="errorPanelCollapsed">
+              <div class="error-panel-header" (click)="errorPanelCollapsed = !errorPanelCollapsed">
+                <span class="error-panel-title">
+                  <i class="pi pi-exclamation-triangle"></i>
+                  {{ state.pageErrors().length }} issue{{ state.pageErrors().length !== 1 ? 's' : '' }}
+                </span>
+                <i class="pi" [class.pi-chevron-up]="!errorPanelCollapsed" [class.pi-chevron-down]="errorPanelCollapsed"></i>
+              </div>
+              @if (!errorPanelCollapsed) {
+                <div class="error-panel-body">
+                  @for (err of state.pageErrors(); track err.id) {
+                    <div class="error-card" [class.error-card--active]="state.activeSegmentId() === err.segmentId"
+                         (click)="state.setActiveSegment(err.segmentId)">
+                      <div class="error-card-top">
+                        <span class="err-sev" [attr.data-sev]="err.severity">{{ err.severity }}</span>
+                        <span class="err-cat">{{ err.category }}</span>
+                        @if (err.suggestedText) {
+                          <button class="err-apply-btn" (click)="$event.stopPropagation(); applyError(err)">Apply fix</button>
+                        }
+                      </div>
+                      <p class="err-desc">{{ err.issueDescription }}</p>
+                      @if (err.suggestedText) {
+                        <code class="err-suggestion">{{ err.suggestedText }}</code>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+
         </section>
       </main>
 
@@ -250,13 +150,70 @@
           title="Translation assistant"
           greeting="Select a segment in the translation to refine it with AI."
           [showPlanMode]="false"
-          userInitials="RK"
+          [userInitials]="userInitials()"
           placeholder="Ask about this segment...">
         </app-ai-chat>
       </aside>
 
     </div>
-  </div>
+  <!-- ── Dialogs ──────────────────────────────────────────── -->
+  <p-dialog header="Request Changes" [(visible)]="showRequestChangesDialog"
+    [modal]="true" [style]="{width: '420px'}" [draggable]="false">
+    <div class="dialog-body">
+      <label class="dialog-label">Describe what needs to change</label>
+      <textarea pTextarea [(ngModel)]="requestChangesNote" rows="4"
+        placeholder="Explain what the translator should fix..." style="width:100%"></textarea>
+    </div>
+    <ng-template pTemplate="footer">
+      <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="showRequestChangesDialog = false" />
+      <p-button label="Send" icon="pi pi-send" severity="danger"
+        [disabled]="!requestChangesNote.trim()" (onClick)="submitRequestChanges()" />
+    </ng-template>
+  </p-dialog>
+
+  <p-dialog header="Escalate Page" [(visible)]="showEscalateDialog"
+    [modal]="true" [style]="{width: '420px'}" [draggable]="false">
+    <div class="dialog-body">
+      <label class="dialog-label">Reason for escalation</label>
+      <textarea pTextarea [(ngModel)]="escalateReason" rows="4"
+        placeholder="Describe why this page needs escalation..." style="width:100%"></textarea>
+    </div>
+    <ng-template pTemplate="footer">
+      <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="showEscalateDialog = false" />
+      <p-button label="Escalate" icon="pi pi-exclamation-triangle" severity="contrast"
+        [disabled]="!escalateReason.trim()" (onClick)="submitEscalate()" />
+    </ng-template>
+  </p-dialog>
+
+  <p-dialog header="Add Reviewer" [(visible)]="showAddReviewerDialog"
+    [modal]="true" [style]="{width: '400px'}" [draggable]="false">
+    <div class="dialog-body">
+      <label class="dialog-label">Select user</label>
+      <p-select [options]="allUsers()" [(ngModel)]="selectedNewReviewerUserId"
+        optionLabel="name" optionValue="id" placeholder="Choose reviewer"
+        [filter]="true" filterBy="name,email" style="width:100%" />
+    </div>
+    <ng-template pTemplate="footer">
+      <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="showAddReviewerDialog = false" />
+      <p-button label="Add" icon="pi pi-user-plus" [disabled]="!selectedNewReviewerUserId" (onClick)="submitAddReviewer()" />
+    </ng-template>
+  </p-dialog>
+
+  <p-dialog header="Reassign Reviewers" [(visible)]="showReassignDialog"
+    [modal]="true" [style]="{width: '420px'}" [draggable]="false">
+    <div class="dialog-body">
+      <label class="dialog-label">Select reviewers</label>
+      <p-multiselect [options]="allUsers()" [(ngModel)]="selectedReassignUserIds"
+        optionLabel="name" optionValue="id" placeholder="Choose reviewers"
+        [filter]="true" filterBy="name,email" display="chip" style="width:100%" />
+    </div>
+    <ng-template pTemplate="footer">
+      <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="showReassignDialog = false" />
+      <p-button label="Update" icon="pi pi-sync" [disabled]="!selectedReassignUserIds.length" (onClick)="submitReassign()" />
+    </ng-template>
+  </p-dialog>
+
+</div>
 } @else {
   <div class="loading-state-container">
     <div class="spinner-box">

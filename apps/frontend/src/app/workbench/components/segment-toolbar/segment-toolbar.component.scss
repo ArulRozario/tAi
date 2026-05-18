@@ -76,6 +76,20 @@
     pointer-events: none;
   }
 
+  &.approve-btn {
+    color: rgba(249, 250, 251, 0.7);
+
+    &.is-approved {
+      color: #6ee7b7; /* emerald-300 */
+      background: rgba(16, 185, 129, 0.2);
+    }
+
+    &:hover {
+      color: #6ee7b7;
+      background: rgba(16, 185, 129, 0.2);
+    }
+  }
+
   &.save-btn {
     background: var(--accent-success);
     color: #fff;
@@ -96,8 +110,7 @@
     }
   }
 
-  // AI button highlighted with accent-primary colour.
-  &:first-child:not(.save-btn):not(.close-btn) {
+  &.ask-ai-btn {
     color: #fda4af; /* rose-300 — readable on gray in both themes */
 
     &:hover {

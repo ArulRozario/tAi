@@ -13,139 +13,11 @@
   overflow: hidden;
 }
 
-// ─── Toolbar ────────────────────────────────────────────────
-.workbench-toolbar {
-  height: 48px;
-  min-height: 48px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-sidebar);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 16px;
-  flex-shrink: 0;
-  z-index: 10;
-
-  .toolbar-left, .toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex: 1;
-  }
-
-  .toolbar-center {
-    flex: 0 0 auto;
-  }
-
-  .back-btn {
-    font-weight: 600;
-    color: var(--text-muted);
-  }
-
-  .context-info {
-    font-size: 13px;
-    color: var(--text-main);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    .sep { color: var(--text-disabled); }
-    strong { font-weight: 700; }
-  }
-
-  .pagination {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: var(--bg-hover);
-    padding: 4px 12px;
-    border-radius: 6px;
-
-    .nav-btn {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      padding: 4px;
-      &:hover { color: var(--text-main); }
-    }
-
-    .page-count {
-      font-size: 13px;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      strong { color: var(--text-main); }
-    }
-  }
-
-  .view-controls {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    background: var(--bg-sidebar);
-    padding: 4px;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-  }
-
-  .zoom-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 8px;
-    border-right: 1px solid var(--border-color);
-
-    button {
-      background: none;
-      border: none;
-      color: var(--text-disabled);
-      cursor: pointer;
-      font-size: 10px;
-      &:hover { color: var(--text-main); }
-    }
-
-    .zoom-val {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      min-width: 35px;
-      text-align: center;
-    }
-  }
-
-  .mode-toggles {
-    display: flex;
-    gap: 4px;
-
-    button {
-      background: none;
-      border: none;
-      padding: 4px 10px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-disabled);
-      cursor: pointer;
-      border-radius: 4px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-
-      &.active {
-        background: var(--bg-sidebar);
-        color: var(--text-main);
-        border: 1px solid var(--border-color);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      }
-
-      .pi { font-size: 10px; }
-    }
-  }
-}
 
 // ─── Workspace Layout ───────────────────────────────────────
 .workbench-workspace {
   display: grid;
-  grid-template-columns: 160px 1fr 320px;
+  grid-template-columns: 240px 1fr 360px;
   height: calc(100% - 48px);
   overflow: hidden;
   background: var(--bg-sidebar);
@@ -160,12 +32,12 @@
 
   // Right panel collapsed
   &:has(.right-panel.collapsed) {
-    grid-template-columns: 160px 1fr 0px;
+    grid-template-columns: 240px 1fr 0px;
   }
 
   // Left sidebar collapsed — keep 32px so the toggle button stays visible
   &.left-collapsed {
-    grid-template-columns: 32px 1fr 320px;
+    grid-template-columns: 32px 1fr 360px;
 
     &:has(.right-panel.collapsed) {
       grid-template-columns: 32px 1fr 0px;
@@ -390,206 +262,145 @@
   }
 }
 
-/* Segment base styles are moved to ::ng-deep for injected content support */
-
-
-:host ::ng-deep .segment.active {
-  background-color: var(--accent-danger-bg) !important;
-  color: var(--text-main) !important;
-  border: 1px solid var(--accent-danger) !important;
-}
-
-.seg-num {
-  position: absolute;
-  left: -24px;
-  top: 14px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-disabled);
-  font-family: var(--font-mono);
-}
-
-.seg-text {
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--text-main);
-  margin: 0;
-}
-
-/* Injected segment interaction styles */
-:host ::ng-deep .segment {
-  position: relative;
-  cursor: pointer;
-  transition: background 0.15s ease, border 0.15s ease;
-  display:inline-block;
-  padding: 4px 6px;
-  border-radius: 4px;
-  margin-top:5px;
-  border-left: 2px solid transparent; /* Placeholder for status */
-}
-
-:host ::ng-deep .segment.approved {
-  border-left-color: var(--accent-success) !important;
-  background-color: rgba(16, 185, 129, 0.05); /* very subtle green */
-}
-
-:host ::ng-deep .segment.edited {
-  border-left-color: var(--accent-primary) !important;
-  background-color: rgba(59, 130, 246, 0.05); /* very subtle blue */
-}
-
-:host ::ng-deep .segment.rejected {
-  border-left-color: var(--accent-danger) !important;
-}
-
-:host ::ng-deep .segment.has-error {
-  border-left-color: var(--accent-warning) !important;
-  background-color: rgba(245, 158, 11, 0.08) !important;
-}
-
-:host ::ng-deep .segment .error-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--accent-warning);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--bg-sidebar);
-}
-
-:host ::ng-deep .segment.hovered { 
-  background-color: var(--accent-highlight) !important; 
-  color: var(--accent-highlight-text) !important;
-}
-
-:host ::ng-deep .segment:hover { 
-  background-color: var(--accent-highlight) !important; 
-  color: var(--accent-highlight-text) !important;
-}
-
-:host ::ng-deep .segment[contenteditable="true"] {
-  outline: 2px solid var(--accent-primary) !important;
-  border-radius: 4px;
-  background: var(--bg-sidebar) !important;
-  cursor: text;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-}
-
-:host ::ng-deep .segment {
-  ins.diff-added {
-    background-color: var(--accent-success-bg);
-    color: var(--accent-success);
-    text-decoration: none;
-    border-radius: 2px;
-  }
-  
-  del.diff-removed {
-    background-color: var(--accent-danger-bg);
-    color: var(--accent-danger);
-    text-decoration: line-through;
-    opacity: 0.8;
-  }
-
-  .diff-stacked {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-
-    .diff-stacked-original {
-      display: block;
-      background-color: var(--accent-danger-bg);
-      color: var(--accent-danger);
-      text-decoration: line-through;
-      opacity: 0.8;
-      border-radius: 2px;
-      padding: 0 2px;
-    }
-
-    .diff-stacked-edited {
-      display: block;
-      background-color: var(--accent-success-bg);
-      color: var(--accent-success);
-      border-radius: 2px;
-      padding: 0 2px;
-    }
-  }
-}
-
-// ─── Reviewer Panel ──────────────────────────────────────────
-.reviewer-panel {
-  border-top: 1px solid var(--border-color);
-  padding: 12px 16px;
+// ─── Error Panel ────────────────────────────────────────────
+.error-panel {
   flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+  max-height: 260px;
+  display: flex;
+  flex-direction: column;
 
-  .reviewer-panel-header {
+  &.collapsed {
+    max-height: 33px;
+  }
+
+  .error-panel-header {
+    height: 33px;
+    min-height: 33px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    padding: 0 16px;
+    cursor: pointer;
+    user-select: none;
+    background: var(--bg-hover);
+    border-bottom: 1px solid var(--border-color);
 
-    .reviewer-panel-title {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--text-muted);
-    }
+    &:hover { background: var(--bg-card); }
 
-    .reviewer-actions {
+    .error-panel-title {
       display: flex;
-      gap: 2px;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-warning);
+
+      .pi { font-size: 12px; }
     }
+
+    > .pi { font-size: 11px; color: var(--text-muted); }
   }
 
-  .reviewer-chips {
+  .error-panel-body {
+    flex: 1;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 6px;
+    padding: 8px 12px;
   }
 
-  .reviewer-chip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 6px;
-    border-radius: 6px;
-    background: var(--bg-card);
+  .error-card {
     border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: var(--bg-card);
+    cursor: pointer;
+    transition: border-color 0.15s ease;
 
-    &.primary {
-      border-color: var(--primary-color);
-      background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+    &:hover { border-color: var(--accent-warning); }
+
+    &--active {
+      border-color: var(--accent-warning) !important;
+      background: rgba(245, 158, 11, 0.05);
     }
 
-    .reviewer-name {
-      font-size: 13px;
-      color: var(--text-primary);
-      flex: 1;
+    .error-card-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
     }
 
-    .primary-badge {
+    .err-sev {
       font-size: 10px;
-      background: var(--primary-color);
-      color: #fff;
+      font-weight: 700;
       padding: 1px 6px;
-      border-radius: 10px;
-      font-weight: 600;
-    }
-  }
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
 
-  .no-reviewers {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin: 0;
+      &[data-sev="CRITICAL"], &[data-sev="HIGH"] {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--accent-danger);
+      }
+      &[data-sev="MEDIUM"] {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--accent-warning);
+      }
+      &[data-sev="LOW"] {
+        background: rgba(156, 163, 175, 0.2);
+        color: var(--text-muted);
+      }
+    }
+
+    .err-cat {
+      font-size: 11px;
+      color: var(--text-muted);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .err-apply-btn {
+      flex-shrink: 0;
+      height: 22px;
+      padding: 0 8px;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--accent-success);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: filter 0.1s ease;
+
+      &:hover { filter: brightness(1.1); }
+    }
+
+    .err-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 0 0 4px;
+      line-height: 1.4;
+    }
+
+    .err-suggestion {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent-success);
+      background: rgba(16, 185, 129, 0.08);
+      padding: 3px 6px;
+      border-radius: 4px;
+      word-break: break-word;
+    }
   }
 }
+
 
 // ─── Dialog shared styles ─────────────────────────────────────
 .dialog-body {

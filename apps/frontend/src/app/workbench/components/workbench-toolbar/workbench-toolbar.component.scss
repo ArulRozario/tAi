@@ -1,0 +1,278 @@
+$h: 32px;
+$radius: 6px;
+$font-size: 12px;
+
+:host {
+  display: block;
+  flex-shrink: 0;
+}
+
+// ── Shell ────────────────────────────────────────────────────
+.tb {
+  height: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-sidebar);
+  z-index: 10;
+}
+
+// ── Columns ──────────────────────────────────────────────────
+.tb-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.tb-center {
+  flex: 0 0 auto;
+}
+
+.tb-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+// ── Context label ────────────────────────────────────────────
+.tb-context {
+  font-size: 13px;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  strong { font-weight: 700; }
+  .tb-sep-dot { color: var(--text-disabled); }
+  .tb-page-label { color: var(--text-muted); }
+}
+
+// ── Page navigation ──────────────────────────────────────────
+.tb-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: $h;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: $radius;
+  padding: 0 4px;
+
+  .tb-nav-num {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+    font-variant-numeric: tabular-nums;
+    padding: 0 8px;
+  }
+}
+
+// ── Shared primitive: icon-only button ───────────────────────
+.tb-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: $h;
+  width: $h;
+  background: none;
+  border: none;
+  border-radius: $radius;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+
+  .pi { font-size: 13px; }
+
+  &:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-main);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+// ── Shared primitive: labelled action button ─────────────────
+.tb-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: $h;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  border-radius: $radius;
+  font-size: $font-size;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+
+  .pi { font-size: 12px; }
+
+  &:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-main);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  &.tb-outlined {
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+
+    &:hover {
+      background: var(--bg-hover);
+    }
+  }
+}
+
+// ── Primary action button ────────────────────────────────────
+.tb-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: $h;
+  padding: 0 14px;
+  background: var(--accent-success);
+  border: none;
+  border-radius: $radius;
+  font-size: $font-size;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: filter 0.15s;
+
+  .pi { font-size: 12px; }
+
+  &:hover:not(:disabled) { filter: brightness(1.1); }
+  &:disabled { opacity: 0.55; cursor: not-allowed; }
+}
+
+// ── Progress pill ────────────────────────────────────────────
+.tb-progress {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: $h;
+  padding: 0 10px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-color);
+  border-radius: $radius;
+  font-size: $font-size;
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+
+  .pi {
+    font-size: 12px;
+    color: var(--accent-success);
+  }
+}
+
+// ── View-mode toggle group ───────────────────────────────────
+.tb-toggle-group {
+  display: flex;
+  align-items: center;
+  height: $h;
+  padding: 3px;
+  gap: 2px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  flex-shrink: 0;
+
+  .tb-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: calc(#{$h} - 8px);
+    width: 28px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-disabled);
+    cursor: pointer;
+    transition: all 0.15s;
+
+    .pi { font-size: 13px; }
+
+    &:hover { color: var(--text-main); }
+
+    &.active {
+      background: var(--bg-card);
+      border-color: var(--border-color);
+      color: var(--text-main);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+  }
+}
+
+// ── Divider ──────────────────────────────────────────────────
+.tb-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color);
+  flex-shrink: 0;
+}
+
+// ── Generic group (flex row of same-height items) ────────────
+.tb-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+// ── Reviewer avatars ─────────────────────────────────────────
+.tb-reviewers {
+  gap: 4px;
+}
+
+.tb-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: $h;
+  height: $h;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.tb-no-reviewers {
+  font-size: $font-size;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+// ── PrimeNG select inside toolbar ────────────────────────────
+// Height is forced via global styles.scss; only min-width here.
+::ng-deep {
+  .tb-status-select { min-width: 110px; }
+  .model-picker-select { min-width: 140px; }
+}

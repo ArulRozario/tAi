@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 export interface User {
   id: string;
@@ -44,6 +45,7 @@ export interface Page {
   priority: string;
   quality?: number;
   notes?: string;
+  errorCount?: number;
   assignedAt?: string;
   lastAiRunAt?: string;
   reviewers?: User[];
@@ -114,6 +116,7 @@ export interface ActivityLog {
   action: string;
   entityType: string;
   entityId?: string;
+  entityName?: string;
   entityHref?: string;
   createdAt: string;
   user?: { id: string; name: string; email: string };
@@ -312,6 +315,10 @@ export class ApiService {
     return this.http.post<Segment>(`${this.base}/pages/${pageId}/segments/${segmentId}/retranslate`, { prompt });
   }
 
+  patchSentence(id: string, data: { isApproved?: boolean; translatedText?: string }): Observable<Segment> {
+    return this.http.patch<Segment>(`${this.base}/sentences/${id}`, data);
+  }
+
   addReviewer(pageId: string, userId: string): Observable<Page> {
     return this.http.post<Page>(`${this.base}/pages/${pageId}/add-reviewer`, { reviewerId: userId });
   }
@@ -389,7 +396,15 @@ export class ApiService {
   // ── Users ─────────────────────────────────────────────────────────────────
 
   getUsers(): Observable<User[]> {
-    return this.http.get<User[]>(`${this.base}/users`);
+    return this.http.get<{ users: User[] }>(`${this.base}/users`).pipe(
+      map(res => res.users)
+    );
+  }
+
+  // ── Errors ────────────────────────────────────────────────────────────────
+
+  getPageErrors(pageId: string): Observable<SegmentError[]> {
+    return this.http.get<SegmentError[]>(`${this.base}/errors?pageId=${pageId}&status=OPEN`);
   }
 
   inviteUser(data: { name: string; email: string; role: string }): Observable<User> {
@@ -412,6 +427,10 @@ export class ApiService {
 
   testModelConnection(data: unknown): Observable<{ online: boolean; latencyMs: number; error?: string }> {
     return this.http.post<{ online: boolean; latencyMs: number; error?: string }>(`${this.base}/models/test`, data);
+  }
+
+  getModelLogs(agentType: string, limit = 10): Observable<{ logs: string[] }> {
+    return this.http.get<{ logs: string[] }>(`${this.base}/models/${agentType}/logs`, { params: { limit } });
   }
 
   // ── Jobs ──────────────────────────────────────────────────────────────────

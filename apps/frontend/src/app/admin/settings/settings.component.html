@@ -1,0 +1,155 @@
+<p-toast></p-toast>
+
+<div class="page-header-row">
+  <div class="title-meta">
+    <h1 class="page-title">Settings</h1>
+    <p class="page-subtitle">Model configuration, languages, and system defaults</p>
+  </div>
+</div>
+
+<div class="settings-tabs">
+  <div class="tab-bar">
+    <button class="tab-btn" [class.active]="activeTab() === 'models'" (click)="activeTab.set('models')">Models</button>
+    <button class="tab-btn" [class.active]="activeTab() === 'languages'" (click)="activeTab.set('languages')">Languages</button>
+    <button class="tab-btn" [class.active]="activeTab() === 'system'" (click)="activeTab.set('system')">System</button>
+  </div>
+
+  @if (activeTab() === 'models') {
+    @if (loading()) {
+      <div class="loading-state">
+        <p-progressSpinner styleClass="sm-spinner" />
+        <span>Loading model configurations…</span>
+      </div>
+    } @else {
+      <div class="agent-cards">
+        @for (card of agents(); track card.agentType) {
+          <div class="agent-card">
+            <div class="agent-card-header">
+              <div class="agent-info">
+                <span class="agent-label">{{ card.label }}</span>
+                <span class="agent-desc">{{ card.description }}</span>
+              </div>
+              <div class="agent-status">
+                @if (card.online === true) {
+                  <span class="status-dot online"></span>
+                  <span class="status-text">Online · {{ card.latencyMs }}ms</span>
+                } @else if (card.online === false) {
+                  <span class="status-dot offline"></span>
+                  <span class="status-text error-text">{{ card.testError || 'Offline' }}</span>
+                } @else {
+                  <span class="status-dot unknown"></span>
+                  <span class="status-text muted">Not tested</span>
+                }
+              </div>
+            </div>
+
+            @if (card.providerWarning) {
+              <div class="provider-warning">
+                <i class="pi pi-exclamation-triangle"></i>
+                {{ card.providerWarning }}
+              </div>
+            }
+
+            <div class="agent-fields">
+              <div class="field-group">
+                <label>Provider</label>
+                <p-select
+                  [options]="providerOptions"
+                  [(ngModel)]="card.provider"
+                  optionLabel="label"
+                  optionValue="value"
+                  [disabled]="card.agentType === 'EMBEDDING'"
+                  (onChange)="onProviderChange(card)"
+                  styleClass="field-select"
+                />
+              </div>
+              <div class="field-group">
+                <label>Model</label>
+                <input
+                  type="text"
+                  pInputText
+                  [(ngModel)]="card.modelName"
+                  placeholder="e.g. qwen2.5:7b"
+                  class="field-input"
+                />
+              </div>
+              <div class="field-group">
+                <label>Endpoint</label>
+                <input
+                  type="text"
+                  pInputText
+                  [(ngModel)]="card.endpoint"
+                  [placeholder]="card.provider === 'ANTHROPIC' ? '—' : 'http://ollama:11434'"
+                  [disabled]="card.provider === 'ANTHROPIC'"
+                  class="field-input"
+                />
+              </div>
+              @if (card.provider === 'ANTHROPIC') {
+                <div class="field-group">
+                  <label>API Key</label>
+                  <input
+                    type="password"
+                    pInputText
+                    [(ngModel)]="card.apiKey"
+                    placeholder="sk-ant-…"
+                    class="field-input"
+                  />
+                </div>
+              }
+            </div>
+
+            <div class="agent-actions">
+              <div class="agent-actions-left">
+                <button class="action-btn" [disabled]="card.testing" (click)="testConnection(card)">
+                  <i class="pi" [class.pi-bolt]="!card.testing" [class.pi-spin]="card.testing" [class.pi-spinner]="card.testing"></i>
+                  Test connection
+                </button>
+                <button class="action-btn" (click)="toggleLogs(card)">
+                  <i class="pi pi-align-left"></i>
+                  {{ card.logsExpanded ? 'Hide logs' : 'View logs' }}
+                </button>
+              </div>
+              <button class="save-btn" [disabled]="card.saving" (click)="saveConfig(card)">
+                <i class="pi" [class.pi-check]="!card.saving" [class.pi-spin]="card.saving" [class.pi-spinner]="card.saving"></i>
+                Save
+              </button>
+            </div>
+
+            @if (card.logsExpanded) {
+              <div class="logs-panel">
+                @if (card.logsLoading) {
+                  <div class="logs-loading">
+                    <p-progressSpinner styleClass="xs-spinner" />
+                    <span>Loading logs…</span>
+                  </div>
+                } @else if (card.logs.length === 0) {
+                  <p class="logs-empty">No prompt logs available.</p>
+                } @else {
+                  <div class="logs-list">
+                    @for (log of card.logs; track $index) {
+                      <pre class="log-entry">{{ log }}</pre>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  }
+
+  @if (activeTab() === 'languages') {
+    <div class="coming-soon">
+      <i class="pi pi-globe coming-soon-icon"></i>
+      <p>Languages settings — coming soon</p>
+    </div>
+  }
+
+  @if (activeTab() === 'system') {
+    <div class="coming-soon">
+      <i class="pi pi-cog coming-soon-icon"></i>
+      <p>System settings — coming soon</p>
+    </div>
+  }
+</div>

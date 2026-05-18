@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import { WorkbenchStateService } from '../../services/workbench-state.service';
 import { SafeHtml } from '@angular/platform-browser';
 import { SegmentToolbarComponent } from '../segment-toolbar/segment-toolbar.component';
+import { SegmentError } from '../../../core/services/api.service';
 
 @Component({
   selector: 'app-page-content-renderer',
@@ -180,7 +181,7 @@ export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
     activeId: string | null,
     hoveredId: string | null,
     approvedIds: Set<string>,
-    errors: any[],
+    errors: SegmentError[],
   ) {
     const containerEl = this.container?.nativeElement;
     if (!containerEl) return;
@@ -212,7 +213,7 @@ export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
         el.classList.add('has-error');
         const badge = document.createElement('span');
         badge.className = 'error-badge';
-        badge.setAttribute('title', err.message);
+        badge.setAttribute('title', err.issueDescription);
         badge.textContent = err.severity === 'CRITICAL' ? '!' : '?';
         el.appendChild(badge);
       }

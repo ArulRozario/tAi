@@ -2,6 +2,7 @@ import { Component, Input, Output, EventEmitter, signal, computed, inject, OnDes
 import { CommonModule } from '@angular/common';
 import { WorkbenchStateService } from '../../services/workbench-state.service';
 import { ProjectService } from '../../../projects/projects.service';
+import { ApiService } from '../../../core/services/api.service';
 import { MessageService } from 'primeng/api';
 
 @Component({
@@ -11,7 +12,13 @@ import { MessageService } from 'primeng/api';
   template: `
     <div class="seg-toolbar" (click)="$event.stopPropagation()">
       @if (!isEditing()) {
-        <button class="tool-btn" (click)="openChat()">
+        <button class="tool-btn approve-btn" [class.is-approved]="isApproved()"
+                (click)="toggleApproval()" [disabled]="isApproving()">
+          <i class="pi" [class.pi-check-circle]="isApproved()" [class.pi-circle]="!isApproved()"></i>
+          <span>{{ isApproved() ? 'Approved' : 'Approve' }}</span>
+        </button>
+        <div class="tool-sep"></div>
+        <button class="tool-btn ask-ai-btn" (click)="openChat()">
           <i class="pi pi-sparkles"></i>
           <span>Ask AI</span>
         </button>
@@ -55,20 +62,39 @@ export class SegmentToolbarComponent implements OnDestroy {
 
   state = inject(WorkbenchStateService);
   private projectService = inject(ProjectService);
+  private apiService = inject(ApiService);
   private messageService = inject(MessageService);
 
   isEditing = signal(false);
   isSaving = signal(false);
   isDirty = signal(false);
+  isApproving = signal(false);
 
   hasEdit = computed(() => {
     const segId = this.state.activeSegmentId();
     return !!segId && this.state.pageEdits().some(e => e.segmentId === segId);
   });
 
+  isApproved = computed(() => {
+    const segId = this.state.activeSegmentId();
+    return segId ? this.state.approvedSegmentIds().has(segId) : false;
+  });
+
   private editTarget: HTMLElement | null = null;
   private originalText = '';
   private inputListener: (() => void) | null = null;
+
+  private attachInputListener(el: HTMLElement) {
+    this.detachInputListener();
+    const handler = () => this.isDirty.set(true);
+    el.addEventListener('input', handler);
+    this.inputListener = () => el.removeEventListener('input', handler);
+  }
+
+  private detachInputListener() {
+    this.inputListener?.();
+    this.inputListener = null;
+  }
 
   constructor() {
     // When the active segment changes, discard any in-progress edit and reset state.
@@ -79,14 +105,36 @@ export class SegmentToolbarComponent implements OnDestroy {
   }
 
   private resetState() {
+    this.detachInputListener();
     if (this.editTarget) {
       this.editTarget.innerText = this.originalText;
       this.editTarget.contentEditable = 'false';
       this.editTarget = null;
     }
     this.originalText = '';
+    this.isDirty.set(false);
     this.isEditing.set(false);
     this.isSaving.set(false);
+  }
+
+  toggleApproval() {
+    const segId = this.state.activeSegmentId();
+    if (!segId) return;
+    const nowApproved = this.isApproved();
+    this.isApproving.set(true);
+    this.apiService.patchSentence(segId, { isApproved: !nowApproved }).subscribe({
+      next: () => {
+        const updated = new Set(this.state.approvedSegmentIds());
+        if (nowApproved) updated.delete(segId); else updated.add(segId);
+        this.state.approvedSegmentIds.set(updated);
+        this.isApproving.set(false);
+        this.messageService.add({ severity: 'success', summary: nowApproved ? 'Unapproved' : 'Approved', life: 1000 });
+      },
+      error: (err: any) => {
+        this.isApproving.set(false);
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: err?.error?.message || 'Failed to update approval.' });
+      },
+    });
   }
 
   openChat() {
@@ -101,6 +149,7 @@ export class SegmentToolbarComponent implements OnDestroy {
 
     this.editTarget = el;
     this.originalText = el.innerText;
+    this.isDirty.set(false);
     el.contentEditable = 'true';
     el.focus();
 
@@ -111,15 +160,18 @@ export class SegmentToolbarComponent implements OnDestroy {
     sel?.removeAllRanges();
     sel?.addRange(range);
 
+    this.attachInputListener(el);
     this.isEditing.set(true);
   }
 
   cancelEdit() {
+    this.detachInputListener();
     if (this.editTarget) {
       this.editTarget.innerText = this.originalText;
       this.editTarget.contentEditable = 'false';
       this.editTarget = null;
     }
+    this.isDirty.set(false);
     this.isEditing.set(false);
   }
 
@@ -130,6 +182,7 @@ export class SegmentToolbarComponent implements OnDestroy {
     const newText = this.editTarget.innerText.trim();
     if (!newText) return;
 
+    this.detachInputListener();
     this.isSaving.set(true);
     this.projectService.savePageEdit(this.pageId, segId, newText).subscribe({
       next: () => {
@@ -137,6 +190,7 @@ export class SegmentToolbarComponent implements OnDestroy {
         this.editTarget = null;
         this.isSaving.set(false);
         this.isEditing.set(false);
+        this.isDirty.set(false);
         this.messageService.add({ severity: 'success', summary: 'Saved', detail: 'Edit saved.', life: 1500 });
         this.contentChanged.emit();
         this.state.setActiveSegment(null);

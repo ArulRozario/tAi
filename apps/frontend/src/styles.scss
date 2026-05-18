@@ -67,11 +67,13 @@ app-root {
   }
 
   .page-title {
-    @apply text-2xl font-semibold m-0 text-text-1;
+    @apply text-2xl font-semibold m-0;
+    color: var(--text-main);
   }
 
   .page-subtitle {
-    @apply text-sm text-text-2 mt-1 mb-0;
+    @apply text-sm mt-1 mb-0;
+    color: var(--text-muted);
   }
 
   .card {
@@ -267,3 +269,18 @@ app-root {
 .mono { @apply font-mono; }
 .tabnums { font-variant-numeric: tabular-nums; }
 .ellipsis { @apply overflow-hidden whitespace-nowrap text-ellipsis; }
+/* ── Workbench toolbar: p-select height lock ────────────────────
+   Only p-select (status + model picker) uses PrimeNG inside the toolbar.
+   Global rule wins on cascade over PrimeNG's !important. */
+app-workbench-toolbar {
+  .p-select,
+  .p-select.p-select-sm {
+    height: 32px !important;
+
+    .p-select-label {
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      line-height: 30px !important;
+    }
+  }
+}

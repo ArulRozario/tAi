@@ -1,11 +1,11 @@
 # tAI — Build Progress
 
-Last updated: 2026-05-14 (session 29)
+Last updated: 2026-05-18 (session 30)
 
 ## Current Status
 
-**Active phase:** Phase 24 — Admin Screens (Team + Settings)  
-**Next up:** Phase 25 — Polish (themes, toasts, empty states)
+**Active phase:** Phase 25 — Polish (themes, toasts, empty states)  
+**Next up:** Phase 26 — Testing
 
 ---
 
@@ -39,7 +39,7 @@ Last updated: 2026-05-14 (session 29)
 | 21 | Queue Screen | ✅ | 2026-05-07 |
 | 22 | Review Screen | ✅ | 2026-05-07 |
 | 23 | Genres Screen (editor + version drawer) | ✅ | 2026-05-07 |
-| 24 | Admin Screens (Team + Settings) | ☐ | — |
+| 24 | Admin Screens (Team + Settings) | ✅ | 2026-05-18 |
 | 25 | Polish (themes, toasts, empty states) | ☐ | — |
 | 26 | Testing | ☐ | — |
 
@@ -78,6 +78,7 @@ Last updated: 2026-05-14 (session 29)
 | 2026-05-07 | 27 | Brainstormed, validated, and appended Specifications and Implementation Plans for Phase 20b (Workbench Manual Edits + Multi-Sentence Copilot Dialog) to .spec files and progression logs | spec update |
 | 2026-05-07 | 28 | Phase 23: Genre list (cards + search + creation), genre editor (markdown + modes), version drawer (restore/diff), glossary panel (table with CRUD), chat assistant, test translation; fixed lint errors | genres screen |
 | 2026-05-14 | 29 | Reviewer workflow: assign/unassign/reassign (per-page popover + bulk), reviewer avatars on page thumbnails, selection mode for bulk ops, two-stage review (HUMAN_REVIEW+submittedAt → APPROVE), Queue screen (My Queue + Submitted Reviews + Escalations tabs), workbench role-based toolbar (Submit for Review / Approve), REVIEWER-only project list, build fixed | reviewer workflow |
+| 2026-05-18 | 30 | Workbench toolbar refactored into standalone WorkbenchToolbarComponent (native buttons, uniform 32px height, colored reviewer avatars, labeled actions); full-page layout fix for /workbench/ and /review/ routes (sidebar hidden, canvas padding removed); Phase 24: SettingsComponent (Models/Languages/System tabs, 4 agent config cards with test/save/logs, EMBEDDING Anthropic warning); getModelLogs added to ApiService; admin/settings route + sidebar link | workbench toolbar + phase 24 |
 
 ---
 

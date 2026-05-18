@@ -3,6 +3,7 @@ import { faro } from '@grafana/faro-web-sdk';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { switchMap, map } from 'rxjs/operators';
 
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
@@ -26,10 +27,11 @@ import { CardModule } from 'primeng/card';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import * as Diff from 'diff';
 import { ProjectService, Project, Page, PageReviewer } from '../projects/projects.service';
-import { ApiService, User } from '../core/services/api.service';
+import { ApiService, User, SegmentError } from '../core/services/api.service';
 import { AuthService } from '../auth/auth.service';
 import { WorkbenchStateService, WorkbenchPage } from './services/workbench-state.service';
 import { PageContentRendererComponent } from './components/page-content-renderer/page-content-renderer.component';
+import { WorkbenchToolbarComponent } from './components/workbench-toolbar/workbench-toolbar.component';
 
 @Component({
   selector: 'app-workbench',
@@ -53,8 +55,8 @@ import { PageContentRendererComponent } from './components/page-content-renderer
     AiChatComponent,
     CardModule,
     PageThumbnailSidebarComponent,
-    ModelPickerComponent,
     PageContentRendererComponent,
+    WorkbenchToolbarComponent,
   ],
   providers: [
     UnifiedChatService,
@@ -103,6 +105,13 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
 
   isQueueMode = signal(false);
   isMasterOrAdmin = computed(() => this.authService.hasAnyRole(['MASTER', 'ADMIN']));
+
+  userInitials = computed(() => {
+    const name = this.authService.getCurrentUser()?.name ?? '';
+    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
+  });
+
+  errorPanelCollapsed = false;
 
   overflowMenuItems: MenuItem[] = [
     {
@@ -203,56 +212,44 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     this.imageLoadError.set(false);
     this.edits.set([]);
 
-    this.projectService.getPage(pageId).subscribe({
-      next: (page) => {
-        this.projectService.getProject(page.projectId).subscribe({
-          next: (project) => {
-            const baseSourceHtml = page.originalHtml || '';
-            const baseTargetHtml = page.translatedHtml || '';
-            this.baseTargetHtml.set(baseTargetHtml);
+    this.projectService.getPage(pageId).pipe(
+      switchMap((page) =>
+        this.projectService.getProject(page.projectId).pipe(
+          map((project) => ({ page, project }))
+        )
+      )
+    ).subscribe({
+      next: ({ page, project }) => {
+        const baseSourceHtml = page.originalHtml || '';
+        const baseTargetHtml = page.translatedHtml || '';
+        this.baseTargetHtml.set(baseTargetHtml);
 
-            this.pageData.set({
-              id: page.id,
-              projectId: page.projectId,
-              chapterNum: 0,
-              pageNum: page.pageNumber,
-              projectName: project.name,
-              styleGuideName: project.styleGuide?.name,
-              status: page.status,
-              submittedAt: (page as any).submittedAt ?? null,
-              sourceLang: project.sourceLang,
-              targetLang: project.targetLang,
-              assignedTo: 'You',
-              lastAiRun: 'Recently',
-              metrics: {
-                overall: page.quality || 0,
-                accuracy: 0,
-                style: 0,
-                terms: 0,
-              },
-              aiFeedback: 'Processing complete. Visual translation generated.',
-              segments: [],
-              reviewers: page.reviewers || [],
-              sourceHtml: this.sanitizer.bypassSecurityTrustHtml(baseSourceHtml),
-              targetHtml: this.sanitizer.bypassSecurityTrustHtml(baseTargetHtml),
-            });
-
-            this.loadEdits(pageId, baseTargetHtml);
-            this.loadPageErrors(pageId);
-            this.selectedModel.set(project.translationModel || '');
-            this.loading.set(false);
-            this.loadSiblings(page.id);
-          },
-          error: (err) => {
-            faro.api?.pushError(new Error('Failed to load project in workbench'), { context: { error: String(err) } });
-            this.loading.set(false);
-          }
+        this.pageData.set({
+          id: page.id,
+          projectId: page.projectId,
+          pageNum: page.pageNumber,
+          projectName: project.name,
+          styleGuideName: project.styleGuide?.name,
+          status: page.status,
+          submittedAt: (page as any).submittedAt ?? null,
+          sourceLang: project.sourceLang,
+          targetLang: project.targetLang,
+          reviewers: page.reviewers || [],
+          sourceHtml: this.sanitizer.bypassSecurityTrustHtml(baseSourceHtml),
+          targetHtml: this.sanitizer.bypassSecurityTrustHtml(baseTargetHtml),
         });
+
+        this.loadEdits(pageId, baseTargetHtml);
+        this.loadPageErrors(pageId);
+        this.loadSegmentApprovals(pageId);
+        this.selectedModel.set(project.translationModel || '');
+        this.loading.set(false);
+        this.loadSiblings(page.id);
       },
       error: (err) => {
         faro.api?.pushError(new Error('Failed to load page in workbench'), { context: { error: String(err) } });
         this.loading.set(false);
-      }
+      },
     });
   }
 
@@ -273,11 +270,41 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   }
 
   loadPageErrors(pageId: string) {
-    this.projectService.getPageErrors(pageId).subscribe({
+    this.apiService.getPageErrors(pageId).subscribe({
       next: (errors) => {
         this.state.pageErrors.set(errors);
+        this.errorPanelCollapsed = false;
       },
       error: (err) => faro.api?.pushError(new Error('Failed to load page errors'), { context: { pageId, error: String(err) } }),
+    });
+  }
+
+  loadSegmentApprovals(pageId: string) {
+    this.apiService.getPage(pageId).subscribe({
+      next: (detail) => {
+        this.state.totalSegmentCount.set(detail.segments?.length ?? 0);
+        const approvedIds = new Set<string>(
+          (detail.segments ?? []).filter(s => s.isApproved).map(s => s.id)
+        );
+        this.state.approvedSegmentIds.set(approvedIds);
+      },
+      error: () => {},
+    });
+  }
+
+  applyError(err: SegmentError) {
+    this.apiService.applyError(err.id).subscribe({
+      next: () => {
+        this.messageService.add({ severity: 'success', summary: 'Fix applied', life: 1500 });
+        const pageId = this.pageData()?.id;
+        if (pageId) {
+          this.loadPageErrors(pageId);
+          this.loadEdits(pageId);
+        }
+      },
+      error: (e: any) => {
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: e?.error?.message || 'Failed to apply fix.' });
+      },
     });
   }
 
@@ -452,10 +479,6 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit() {}
-
-  setZoom(delta: number) {
-    this.state.zoomLevel.update(z => Math.max(50, Math.min(200, z + delta)));
-  }
 
   toggleRightPanel() {
     this.state.rightPanelCollapsed.update(v => !v);

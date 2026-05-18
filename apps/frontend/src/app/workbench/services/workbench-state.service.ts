@@ -1,10 +1,10 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { SafeHtml } from '@angular/platform-browser';
+import { SegmentError } from '../../core/services/api.service';
 
 export interface WorkbenchPage {
   id: string;
   projectId: string;
-  chapterNum: number;
   pageNum: number;
   projectName: string;
   styleGuideName?: string;
@@ -12,16 +12,6 @@ export interface WorkbenchPage {
   submittedAt?: string | null;
   sourceLang: string;
   targetLang: string;
-  assignedTo: string;
-  lastAiRun: string;
-  metrics: {
-    overall: number;
-    accuracy: number;
-    style: number;
-    terms: number;
-  };
-  aiFeedback: string;
-  segments: any[];
   reviewers: any[];
   sourceHtml: SafeHtml;
   targetHtml: SafeHtml;
@@ -60,7 +50,8 @@ export class WorkbenchStateService {
   
   // --- Page Metadata ---
   approvedSegmentIds = signal<Set<string>>(new Set());
-  pageErrors = signal<{ segmentId: string; severity: string; message: string }[]>([]);
+  totalSegmentCount = signal<number>(0);
+  pageErrors = signal<SegmentError[]>([]);
   pageEdits = signal<{ segmentId: string; editedText: string }[]>([]);
 
   // --- Helpers ---

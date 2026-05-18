@@ -51,7 +51,13 @@ export const routes: Routes = [
         path: 'admin/users',
         loadComponent: () => import('./admin/users/users.component').then(m => m.UsersComponent),
         canActivate: [roleGuard],
-        data: { roles: ['ADMIN'] },
+        data: { roles: ['ADMIN', 'MASTER'] },
+      },
+      {
+        path: 'admin/settings',
+        loadComponent: () => import('./admin/settings/settings.component').then(m => m.SettingsComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ADMIN', 'MASTER'] },
       },
       {
         path: 'workbench/:pageId',

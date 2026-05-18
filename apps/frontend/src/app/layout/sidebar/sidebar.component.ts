@@ -55,7 +55,8 @@ export class SidebarComponent implements OnInit {
 
     const adminItems: MenuItem[] = [
       { label: 'Style Guides', icon: 'pi pi-tags', routerLink: '/style-guides' },
-      { label: 'User Management', icon: 'pi pi-users', routerLink: '/admin/users' },
+      { label: 'Team', icon: 'pi pi-users', routerLink: '/admin/users' },
+      { label: 'Settings', icon: 'pi pi-sliders-h', routerLink: '/admin/settings' },
     ];
 
     const showAdmin = this.user && ['ADMIN', 'MASTER'].includes(this.user.role);
