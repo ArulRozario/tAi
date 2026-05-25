@@ -5,21 +5,31 @@
     <app-workbench-toolbar
       [pageData]="pageData()!"
       [isRetranslating]="isRetranslating()"
-      [isCompleting]="isCompleting()"
+      [isApproving]="isApproving()"
+      [isRevoking]="isRevoking()"
+      [isSubmittingReview]="isSubmittingReview()"
       [isMasterOrAdmin]="isMasterOrAdmin()"
       [pageStatusOptions]="pageStatusOptions"
-      [overflowMenuItems]="overflowMenuItems"
+      [allUsers]="allUsers()"
+      [submissions]="state.submissions()"
+      [hasWorkingEdits]="state.hasWorkingEdits()"
+      [mySubmission]="myPendingSubmission()"
+      [pendingSubmissionCount]="state.pendingSubmissionCount()"
       (prevPage)="goToPrevPage()"
       (nextPage)="goToNextPage()"
+      (goBack)="goBack()"
       (retranslate)="retranslatePage()"
       (modelChange)="selectedModel.set($event)"
       (resetEdits)="resetAllEdits()"
       (statusChange)="onStatusChange($event)"
-      (addReviewer)="openAddReviewer()"
-      (reassignReviewers)="openReassign()"
-      (toggleChat)="toggleRightPanel()"
+      (addReviewer)="submitAddReviewer($event)"
+      (removeReviewer)="removeReviewerFromPage($event)"
       (approve)="completePage()"
-      (submitForReview)="submitForReview()"
+      (revoke)="revokePage()"
+      (submitForReview)="submitReview()"
+      (unsubmitReview)="unsubmitReview($event)"
+      (openSubmissionsPanel)="openSubmissionsPanel()"
+      (openChatPanel)="openChatPanel()"
     />
 
     <div class="workbench-workspace" [class.left-collapsed]="state.leftPanelCollapsed()">
@@ -36,9 +46,15 @@
       <!-- ── Center Workspace (Translation) ──────────────────── -->
       <main class="translation-columns" [class.overlay-mode]="state.viewMode() === 'overlay'">
         <!-- Source Column -->
-        <section class="text-column source-col">
+        <section class="text-column source-col" [class.overlay-hidden]="state.viewMode() === 'overlay' && state.overlayColumn() === 'target'">
           <div class="column-header">
             <span class="lang-label">ORIGINAL · {{ (pageData()?.sourceLang || 'SOURCE') | uppercase }}</span>
+            @if (state.viewMode() === 'overlay') {
+              <div class="overlay-toggle">
+                <button [class.active]="state.overlayColumn() === 'source'" (click)="state.overlayColumn.set('source')">Source</button>
+                <button [class.active]="state.overlayColumn() === 'target'" (click)="state.overlayColumn.set('target')">Translation</button>
+              </div>
+            }
             <div class="source-view-toggle">
               <button
                 [class.active]="state.sourceViewMode() === 'html'"
@@ -52,18 +68,6 @@
                 title="Page image">
                 <i class="pi pi-image"></i>
               </button>
-              <button
-                title="Replace image"
-                [disabled]="isReplacingImage()"
-                (click)="triggerImageReplace(imageInput)">
-                <i class="pi pi-upload"></i>
-              </button>
-              <input
-                #imageInput
-                type="file"
-                accept="image/*"
-                style="display: none"
-                (change)="onImageReplaceSelected($event, pageData()!.id)">
             </div>
             <p-tag [value]="'PAGE ' + pageData()?.pageNum" styleClass="page-tag" />
           </div>
@@ -95,9 +99,36 @@
         </section>
 
         <!-- Target Column -->
-        <section class="text-column target-col">
+        <section class="text-column target-col" [class.overlay-hidden]="state.viewMode() === 'overlay' && state.overlayColumn() === 'source'">
           <div class="column-header">
             <span class="lang-label">TRANSLATION · {{ (pageData()?.targetLang || 'TARGET') | uppercase }}</span>
+            <div class="target-col-controls">
+              @if (state.totalSegmentCount() > 0) {
+                <span class="progress-label" title="Segments approved">
+                  <i class="pi pi-check-circle"></i>
+                  {{ state.approvedSegmentIds().size }}/{{ state.totalSegmentCount() }}
+                </span>
+              }
+              <button
+                class="col-icon-btn"
+                [class.active]="!state.showCleanDiff()"
+                (click)="state.showCleanDiff.set(false)"
+                title="Show diff marks">
+                <i class="pi pi-list"></i>
+              </button>
+              <button
+                class="col-icon-btn"
+                [class.active]="state.showCleanDiff()"
+                (click)="state.showCleanDiff.set(true)"
+                title="Clean view (hide diff marks)">
+                <i class="pi pi-eye"></i>
+              </button>
+              <div class="col-sep"></div>
+              <button class="col-icon-btn" (click)="toggleRightPanel()"
+                      [title]="state.rightPanelCollapsed() ? 'Open AI panel' : 'Close AI panel'">
+                <i class="pi" [class.pi-chevron-right]="!state.rightPanelCollapsed()" [class.pi-chevron-left]="state.rightPanelCollapsed()"></i>
+              </button>
+            </div>
           </div>
           
           <app-page-content-renderer
@@ -107,52 +138,99 @@
               (contentChanged)="loadEdits(pageData()!.id)">
             </app-page-content-renderer>
 
-          @if (state.pageErrors().length > 0) {
-            <div class="error-panel" [class.collapsed]="errorPanelCollapsed">
-              <div class="error-panel-header" (click)="errorPanelCollapsed = !errorPanelCollapsed">
-                <span class="error-panel-title">
-                  <i class="pi pi-exclamation-triangle"></i>
-                  {{ state.pageErrors().length }} issue{{ state.pageErrors().length !== 1 ? 's' : '' }}
-                </span>
-                <i class="pi" [class.pi-chevron-up]="!errorPanelCollapsed" [class.pi-chevron-down]="errorPanelCollapsed"></i>
-              </div>
-              @if (!errorPanelCollapsed) {
-                <div class="error-panel-body">
-                  @for (err of state.pageErrors(); track err.id) {
-                    <div class="error-card" [class.error-card--active]="state.activeSegmentId() === err.segmentId"
-                         (click)="state.setActiveSegment(err.segmentId)">
-                      <div class="error-card-top">
-                        <span class="err-sev" [attr.data-sev]="err.severity">{{ err.severity }}</span>
-                        <span class="err-cat">{{ err.category }}</span>
-                        @if (err.suggestedText) {
-                          <button class="err-apply-btn" (click)="$event.stopPropagation(); applyError(err)">Apply fix</button>
-                        }
-                      </div>
-                      <p class="err-desc">{{ err.issueDescription }}</p>
-                      @if (err.suggestedText) {
-                        <code class="err-suggestion">{{ err.suggestedText }}</code>
-                      }
-                    </div>
-                  }
-                </div>
-              }
-            </div>
-          }
-
         </section>
       </main>
 
-      <!-- ── Right Panel (AI Assistance) ─────────────────────── -->
+      <!-- ── Right Panel ─────────────────────────────────────── -->
       <aside class="side-panel right-panel" [class.collapsed]="state.rightPanelCollapsed()">
-        <app-ai-chat
-          #aiChat
-          [hidden]="state.rightPanelCollapsed()"
-          title="Translation assistant"
-          greeting="Select a segment in the translation to refine it with AI."
-          [showPlanMode]="false"
-          [userInitials]="userInitials()"
-          placeholder="Ask about this segment...">
-        </app-ai-chat>
+        @if (!state.rightPanelCollapsed()) {
+          <!-- Panel tab strip -->
+          <div class="panel-tab-strip">
+            <button class="panel-tab" [class.active]="state.rightPanelMode() === 'chat'"
+                    (click)="state.rightPanelMode.set('chat')" title="AI assistant (Ctrl+/)">
+              <i class="pi pi-sparkles"></i> AI
+            </button>
+            @if (isMasterOrAdmin()) {
+              <button class="panel-tab" [class.active]="state.rightPanelMode() === 'submissions'"
+                      (click)="state.rightPanelMode.set('submissions')" title="Review submissions">
+                <i class="pi pi-users"></i> Reviews
+                @if (state.pendingSubmissionCount() > 0) {
+                  <span class="panel-tab-badge">{{ state.pendingSubmissionCount() }}</span>
+                }
+              </button>
+              <button class="panel-tab" [class.active]="state.rightPanelMode() === 'segment-reviews'"
+                      (click)="state.rightPanelMode.set('segment-reviews')" title="Per-segment corrections">
+                <i class="pi pi-pencil"></i> Segment
+              </button>
+            }
+            @if (state.pageErrors().length > 0) {
+              <button class="panel-tab panel-tab--warn" [class.active]="state.rightPanelMode() === 'issues'"
+                      (click)="state.rightPanelMode.set('issues')" title="Quality issues">
+                <i class="pi pi-exclamation-triangle"></i> Issues
+                <span class="panel-tab-badge panel-tab-badge--warn">{{ state.pageErrors().length }}</span>
+              </button>
+            }
+            <div class="panel-tab-spacer"></div>
+            <button class="panel-tab panel-tab--close" (click)="toggleRightPanel()" title="Close panel">
+              <i class="pi pi-chevron-right"></i>
+            </button>
+          </div>
+
+          @switch (state.rightPanelMode()) {
+            @case ('submissions') {
+              <app-submissions-panel
+                [submissions]="state.submissions()"
+                [currentUserId]="authService.getCurrentUser()?.id ?? null"
+                (preview)="previewSubmission($event)"
+                (approve)="approveSubmission($event)"
+                (reject)="rejectSubmission($event)" />
+            }
+            @case ('segment-reviews') {
+              <app-segment-reviews
+                [corrections]="state.segmentCorrections()"
+                (useText)="onSegmentCorrectionUse($event)" />
+            }
+            @case ('issues') {
+              <div class="issues-panel">
+                @if (state.pageErrors().length === 0) {
+                  <div class="issues-empty">
+                    <i class="pi pi-check-circle"></i>
+                    <p>No quality issues found</p>
+                  </div>
+                } @else {
+                  <div class="issues-list">
+                    @for (err of state.pageErrors(); track err.id) {
+                      <div class="error-card" [class.error-card--active]="state.activeSegmentId() === err.segmentId"
+                           (click)="state.setActiveSegment(err.segmentId)">
+                        <div class="error-card-top">
+                          <span class="err-sev" [attr.data-sev]="err.severity">{{ err.severity }}</span>
+                          <span class="err-cat">{{ err.category }}</span>
+                          @if (err.suggestedText) {
+                            <button class="err-apply-btn" (click)="$event.stopPropagation(); applyError(err)">Apply fix</button>
+                          }
+                        </div>
+                        <p class="err-desc">{{ err.issueDescription }}</p>
+                        @if (err.suggestedText) {
+                          <code class="err-suggestion">{{ err.suggestedText }}</code>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+            @default {
+              <app-ai-chat
+                #aiChat
+                title="Translation assistant"
+                greeting="Select a segment in the translation to refine it with AI."
+                [showPlanMode]="false"
+                [userInitials]="userInitials()"
+                placeholder="Ask about this segment...">
+              </app-ai-chat>
+            }
+          }
+        }
       </aside>
 
     </div>
@@ -185,21 +263,8 @@
     </ng-template>
   </p-dialog>
 
-  <p-dialog header="Add Reviewer" [(visible)]="showAddReviewerDialog"
-    [modal]="true" [style]="{width: '400px'}" [draggable]="false">
-    <div class="dialog-body">
-      <label class="dialog-label">Select user</label>
-      <p-select [options]="allUsers()" [(ngModel)]="selectedNewReviewerUserId"
-        optionLabel="name" optionValue="id" placeholder="Choose reviewer"
-        [filter]="true" filterBy="name,email" style="width:100%" />
-    </div>
-    <ng-template pTemplate="footer">
-      <p-button label="Cancel" severity="secondary" [text]="true" (onClick)="showAddReviewerDialog = false" />
-      <p-button label="Add" icon="pi pi-user-plus" [disabled]="!selectedNewReviewerUserId" (onClick)="submitAddReviewer()" />
-    </ng-template>
-  </p-dialog>
 
-  <p-dialog header="Reassign Reviewers" [(visible)]="showReassignDialog"
+<p-dialog header="Reassign Reviewers" [(visible)]="showReassignDialog"
     [modal]="true" [style]="{width: '420px'}" [draggable]="false">
     <div class="dialog-body">
       <label class="dialog-label">Select reviewers</label>
@@ -218,7 +283,7 @@
   <div class="loading-state-container">
     <div class="spinner-box">
       <p-progressBar mode="indeterminate" [style]="{ height: '4px', width: '300px' }" />
-      <p>Synchronizing with Intelligence Core...</p>
+      <p>Loading page…</p>
     </div>
   </div>
 }

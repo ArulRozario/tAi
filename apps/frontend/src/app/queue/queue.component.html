@@ -3,9 +3,12 @@
     <div>
       <h1 class="page-title">Review Queue</h1>
       <p class="page-subtitle">
-        {{ myQueuePages().length }} pages in your queue
-        @if (isMasterOrAdmin() && submittedPages().length > 0) {
-          · <strong>{{ submittedPages().length }} submitted for your review</strong>
+        @if (activeTab() === 0) {
+          {{ myQueuePages().length }} {{ myQueuePages().length === 1 ? 'page' : 'pages' }} assigned to you
+        } @else if (activeTab() === 1 && isMasterOrAdmin()) {
+          {{ submittedPages().length }} {{ submittedPages().length === 1 ? 'page' : 'pages' }} awaiting your approval
+        } @else {
+          {{ escalations().length }} {{ escalations().length === 1 ? 'escalation' : 'escalations' }} open
         }
       </p>
     </div>

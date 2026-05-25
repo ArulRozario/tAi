@@ -1,143 +1,185 @@
-<!-- Page Title Row -->
+<!-- Page Header -->
 <div class="page-header-row">
   <div class="title-meta">
-    <h1 class="page-title">Good morning, {{ userName }}</h1>
+    <h1 class="page-title">{{ greeting }}, {{ userName }}</h1>
     <p class="page-subtitle">
-      5 pages need your review · 3 escalations open · last sync {{ lastSync }}
+      @if (userQueueCount > 0) {
+        {{ userQueueCount }} {{ userQueueCount === 1 ? 'page' : 'pages' }} need your review
+      } @else {
+        No pages in your queue
+      }
+      @if (escalationCount > 0) {
+        &bull; {{ escalationCount }} {{ escalationCount === 1 ? 'escalation' : 'escalations' }} open
+      }
+      @if (lastSync) {
+        &bull; last sync {{ lastSync }}
+      }
     </p>
   </div>
-  <p-button label="New project" icon="pi pi-plus" size="small" />
+  <p-button label="New project" icon="pi pi-plus" size="small" routerLink="/projects" [queryParams]="{new: true}" />
 </div>
 
-<div class="dashboard-container">
+<div class="dashboard-body">
 
-  <!-- ── Top Stats Row ──────────────────────────────────────── -->
-  <div class="stats-grid">
-    @for (s of stats; track s.label) {
-      <p-card styleClass="tai-stat-card">
-        <span class="tai-eyebrow">{{ s.label }}</span>
-        <div class="stat-main">
-          <span class="stat-value">{{ s.value }}</span>
+  <!-- ── Stat Cards ──────────────────────────────────────────── -->
+  <div class="stats-row">
+    @if (statsLoading()) {
+      @for (i of [1,2,3,4]; track i) {
+        <div class="stat-card stat-card--skeleton">
+          <p-skeleton width="7rem" height="0.75rem" borderRadius="4px" />
+          <p-skeleton width="4rem" height="2rem" borderRadius="6px" styleClass="stat-skel-value" />
+          <p-skeleton width="5rem" height="0.75rem" borderRadius="4px" />
         </div>
-        <div class="stat-delta" [class.up]="s.deltaUp" [class.down]="!s.deltaUp">
-          <i class="pi" [class.pi-arrow-up]="s.deltaUp" [class.pi-arrow-down]="!s.deltaUp"></i>
-          <span class="delta-val">{{ s.delta }}</span>
-          <span class="delta-label">{{ s.deltaLabel }}</span>
+      }
+    } @else {
+      @for (s of stats; track s.label) {
+        <div class="stat-card">
+          <span class="stat-label">{{ s.label }}</span>
+          <div class="stat-value">{{ s.value }}</div>
+          <div class="stat-delta" [class.up]="s.deltaUp" [class.down]="!s.deltaUp">
+            <i class="pi" [class.pi-arrow-up]="s.deltaUp" [class.pi-arrow-down]="!s.deltaUp"></i>
+            <span>{{ s.delta }}</span>
+            @if (s.deltaLabel) {
+              <span class="delta-label">{{ s.deltaLabel }}</span>
+            }
+          </div>
         </div>
-      </p-card>
+      }
     }
   </div>
 
-  <!-- ── Middle Row: Throughput + My Queue ──────────────────── -->
-  <div class="content-grid">
-    
-    <!-- Throughput Chart Card -->
-    <p-card styleClass="tai-chart-card">
-      <div class="card-header">
-        <span class="card-title">Throughput · last 12 weeks</span>
-        <div class="metric-toggle">
-          <button 
-            [class.active]="throughputMetric === 'Pages'" 
-            (click)="setMetric('Pages')">Pages</button>
-          <button 
-            [class.active]="throughputMetric === 'Words'" 
-            (click)="setMetric('Words')">Words</button>
-        </div>
-      </div>
-      
-      <div class="chart-canvas">
-        <div class="bar-container">
-          @for (h of throughputData; track $index) {
-            <div class="bar-wrap">
-              <div class="bar" [style.height.%]="h"></div>
-            </div>
-          }
-        </div>
-      </div>
-      
-      <div class="chart-footer">
-        Total: {{ throughputTotal | number }} pages · 
-        peak {{ throughputPeak }} · 
-        avg {{ throughputAvg }}
-      </div>
-    </p-card>
+  <!-- ── Middle Row ─────────────────────────────────────────── -->
+  <div class="two-col-row">
 
-    <!-- My Queue Card -->
-    <p-card styleClass="tai-list-card">
-      <div class="card-header">
-        <span class="card-title">My queue</span>
-        <a routerLink="/queue" class="view-all">View all →</a>
+    <!-- Throughput -->
+    <div class="dash-card">
+      <div class="dash-card-header">
+        <span class="dash-card-title">Throughput &middot; last 12 weeks</span>
+        <div class="metric-toggle">
+          <button [class.active]="throughputMetric === 'pages'" (click)="setMetric('pages')">Pages</button>
+          <button [class.active]="throughputMetric === 'words'" (click)="setMetric('words')">Words</button>
+        </div>
       </div>
-      
-      <div class="list-content">
+
+      <div class="chart-area">
+        @if (throughputTotal === 0) {
+          <div class="chart-empty">
+            <i class="pi pi-chart-bar"></i>
+            <span>Throughput data will appear after your first translations</span>
+          </div>
+        } @else {
+          <div class="bars">
+            @for (h of throughputData; track $index) {
+              <div class="bar-wrap">
+                <div class="bar" [style.height.%]="h || 2"></div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="chart-footer">
+        Total: <strong>{{ throughputTotal | number }}</strong> {{ throughputMetric }}
+        &nbsp;&middot;&nbsp; peak {{ throughputPeak }}
+        &nbsp;&middot;&nbsp; avg {{ throughputAvg }}
+      </div>
+    </div>
+
+    <!-- My Queue -->
+    <div class="dash-card">
+      <div class="dash-card-header">
+        <span class="dash-card-title">My queue</span>
+        <a routerLink="/queue" class="view-all-link">View all &rarr;</a>
+      </div>
+
+      <div class="list-body">
+        @if (queueItems.length === 0) {
+          <div class="empty-state">
+            <i class="pi pi-inbox"></i>
+            <span>No pages assigned to you</span>
+          </div>
+        }
         @for (item of queueItems; track item.id) {
-          <div class="list-item queue-item" [routerLink]="['/review', item.id]">
-            <div class="queue-main">
-              <p-tag styleClass="tai-dot approved" />
-              <span class="page-num">{{ item.page }}</span>
-              <span class="dot-sep">·</span>
-              <span class="project-name">{{ item.project }}</span>
+          <div class="list-row" [routerLink]="['/review', item.id]">
+            <div class="list-row-left">
+              <span class="status-dot"></span>
+              <span class="page-label">{{ item.page }}</span>
+              <span class="sep">&middot;</span>
+              <span class="proj-name">{{ item.project }}</span>
             </div>
-            <div class="queue-meta">
-              <span class="err-count">{{ item.errors }}err</span>
-              <p-tag [value]="item.priority" [severity]="item.prioritySeverity" styleClass="priority-tag" />
+            <div class="list-row-right">
+              @if (item.errorCount > 0) {
+                <span class="err-count">{{ item.errorCount }}err</span>
+              }
+              <p-tag [value]="item.priority" [severity]="item.prioritySeverity" styleClass="priority-chip" />
             </div>
           </div>
         }
       </div>
-    </p-card>
+    </div>
 
   </div>
 
-  <!-- ── Bottom Row: Recent Projects + Recent Activity ──────── -->
-  <div class="content-grid">
+  <!-- ── Bottom Row ─────────────────────────────────────────── -->
+  <div class="two-col-row">
 
-    <!-- Recent Projects Card -->
-    <p-card styleClass="tai-list-card">
-      <div class="card-header">
-        <span class="card-title">Recent projects</span>
-        <a routerLink="/projects" class="view-all">View all →</a>
+    <!-- Recent Projects -->
+    <div class="dash-card">
+      <div class="dash-card-header">
+        <span class="dash-card-title">Recent projects</span>
+        <a routerLink="/projects" class="view-all-link">View all &rarr;</a>
       </div>
-      
-      <div class="list-content">
+
+      <div class="list-body">
+        @if (recentProjects.length === 0) {
+          <div class="empty-state">
+            <i class="pi pi-folder-open"></i>
+            <span>No projects yet</span>
+          </div>
+        }
         @for (p of recentProjects; track p.id) {
-          <div class="list-item project-row" [routerLink]="['/projects', p.id]">
-            <span class="project-name">{{ p.name }}</span>
-            <div class="progress-wrap">
+          <div class="list-row proj-row" [routerLink]="['/projects', p.id]">
+            <span class="proj-name-main">{{ p.name }}</span>
+            <div class="prog-wrap">
               <p-progressBar [value]="p.progress" [showValue]="false" styleClass="mini-bar" />
-              <span class="progress-pct">{{ p.progress }}%</span>
+              <span class="prog-pct">{{ p.progress }}%</span>
             </div>
           </div>
         }
       </div>
-    </p-card>
+    </div>
 
-    <!-- Recent Activity Card -->
-    <p-card styleClass="tai-list-card">
-      <div class="card-header">
-        <span class="card-title">Recent activity</span>
-        <a class="view-all">View all →</a>
+    <!-- Recent Activity -->
+    <div class="dash-card">
+      <div class="dash-card-header">
+        <span class="dash-card-title">Recent activity</span>
       </div>
-      
-      <div class="list-content">
+
+      <div class="list-body">
+        @if (recentActivity.length === 0) {
+          <div class="empty-state">
+            <i class="pi pi-history"></i>
+            <span>No recent activity</span>
+          </div>
+        }
         @for (act of recentActivity; track $index) {
-          <div class="list-item activity-item">
-            <p-avatar 
-              [label]="act.initials" 
-              shape="circle" 
-              [style]="{'background-color': act.avatarBg, 'color': '#fff'}" 
-              styleClass="activity-avatar"
+          <div class="activity-row" [class.clickable]="!!act.href" (click)="navigateActivity(act)">
+            <p-avatar
+              [label]="act.initials"
+              shape="circle"
+              [style]="{'background-color': act.avatarBg, 'color': '#fff', 'flex-shrink': '0'}"
+              styleClass="act-avatar"
             />
-            <div class="activity-text">
-              <span class="user">{{ act.user }}</span>
-              <span class="action"> {{ act.action }} </span>
-              <span class="target">{{ act.target }}</span>
-              <span class="time">{{ act.time }}</span>
+            <div class="act-text">
+              <span class="act-user">{{ act.user }}</span>
+              <span class="act-action"> {{ act.action }} </span>
+              <span class="act-target">{{ act.target }}</span>
+              <span class="act-time">{{ act.time }}</span>
             </div>
           </div>
         }
       </div>
-    </p-card>
+    </div>
 
   </div>
 </div>

@@ -4,6 +4,8 @@ import { RouterModule, Router } from '@angular/router';
 import { ThemeService } from '../../theme.service';
 import { LayoutService } from '../../layout.service';
 import { AuthService, User } from '../../auth/auth.service';
+import { MessageService } from 'primeng/api';
+import { ToastModule } from 'primeng/toast';
 
 /* Import PrimeNG Modules & types */
 import { MenuModule } from 'primeng/menu';
@@ -20,7 +22,9 @@ import { MenuItem } from 'primeng/api';
     MenuModule,
     ButtonModule,
     TooltipModule,
+    ToastModule,
   ],
+  providers: [MessageService],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.scss',
 })
@@ -30,6 +34,7 @@ export class SidebarComponent implements OnInit {
   public router = inject(Router);
   private authService = inject(AuthService);
   private cdr = inject(ChangeDetectorRef);
+  private messageService = inject(MessageService);
 
   @ViewChild('avatarInput') avatarInput!: ElementRef<HTMLInputElement>;
 
@@ -70,7 +75,11 @@ export class SidebarComponent implements OnInit {
       { label: 'Dashboard', icon: 'pi pi-th-large', routerLink: '/dashboard' },
       { label: 'Projects', icon: 'pi pi-folder', routerLink: '/projects' },
       { label: 'Queue', icon: 'pi pi-list', routerLink: '/queue' },
-      { label: 'Workbench', icon: 'pi pi-desktop', routerLink: '/workbench' },
+      {
+        label: 'Workbench',
+        icon: 'pi pi-desktop',
+        command: () => this.openWorkbench(),
+      },
     ];
 
     const adminItems: MenuItem[] = [
@@ -96,6 +105,16 @@ export class SidebarComponent implements OnInit {
         ],
       },
     ];
+  }
+
+  openWorkbench() {
+    const currentUrl = this.router.url;
+    if (currentUrl.startsWith('/workbench/') || currentUrl.startsWith('/review/')) {
+      return; // already in workbench
+    }
+    // Workbench requires a pageId — send the user to the queue first,
+    // then projects as a fallback if they have no assignments.
+    this.router.navigateByUrl('/queue');
   }
 
   logout() {

@@ -2,272 +2,397 @@
   display: block;
 }
 
-.dashboard-container {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-// ─── Header ─────────────────────────────────────────────────
-.dashboard-header {
+// ─── Page Header ─────────────────────────────────────────────
+.page-header-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 8px;
+  align-items: flex-start;
+  margin-bottom: 28px;
 }
 
-// ─── Stats Grid ─────────────────────────────────────────────
-.stats-grid {
+.title-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+// ─── Dashboard Body ──────────────────────────────────────────
+.dashboard-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+// ─── Stat Cards Row ──────────────────────────────────────────
+.stats-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
 .stat-card {
-  .stat-main {
-    margin: 8px 0;
-    .stat-value {
-      font-size: 24px;
-      font-weight: 800;
-      color: var(--text-main);
-      letter-spacing: -0.03em;
-    }
-  }
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s ease;
 
-  .stat-delta {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    font-weight: 600;
+  &:hover { border-color: var(--accent-primary); }
+}
 
-    .pi { font-size: 10px; }
-    
-    &.up { color: var(--accent-success); }
-    &.down { color: var(--accent-primary); }
+.stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
 
-    .delta-label {
-      color: var(--text-disabled);
-      margin-left: 2px;
-    }
+.stat-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--text-main);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.stat-delta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+
+  .pi { font-size: 10px; }
+
+  &.up   { color: var(--accent-success); }
+  &.down { color: var(--accent-danger); }
+
+  .delta-label {
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-left: 2px;
   }
 }
 
-// ─── Content Grid ───────────────────────────────────────────
-.content-grid {
+// ─── Two-Column Content Rows ─────────────────────────────────
+.two-col-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-
-  .card-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-main);
-  }
-
-  .view-all {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--accent-primary);
-    text-decoration: none;
-    &:hover { text-decoration: underline; }
-  }
-}
-
-// ─── Throughput Chart ───────────────────────────────────────
-.chart-card {
-  .metric-toggle {
-    display: flex;
-    background: var(--bg-hover);
-    padding: 2px;
-    border-radius: 6px;
-
-    button {
-      border: none;
-      background: transparent;
-      padding: 4px 12px;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      cursor: pointer;
-      border-radius: 4px;
-      transition: all 0.15s ease;
-
-      &.active {
-        background: var(--bg-card);
-        color: var(--text-main);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      }
-    }
-  }
-
-  .chart-canvas {
-    height: 160px;
-    display: flex;
-    align-items: flex-end;
-    margin-bottom: 16px;
-    padding: 0 10px;
-  }
-
-  .bar-container {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    width: 100%;
-    height: 100%;
-  }
-
-  .bar-wrap {
-    flex: 1;
-    height: 100%;
-    display: flex;
-    align-items: flex-end;
-  }
-
-  .bar {
-    width: 100%;
-    background: var(--accent-info);
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
-    opacity: 0.8;
-    transition: height 0.4s cubic-bezier(0.17, 0.67, 0.83, 0.67);
-    
-    &:hover { opacity: 1; }
-  }
-
-  .chart-footer {
-    font-size: 12px;
-    color: var(--text-muted);
-    font-weight: 500;
-  }
-}
-
-// ─── List Content ───────────────────────────────────────────
-.list-content {
+// ─── Shared Card Shell ───────────────────────────────────────
+.dash-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
 }
 
-.list-item {
+.dash-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border-color);
-  cursor: pointer;
-  transition: background 0.1s ease;
-
-  &:last-child { border-bottom: none; }
-  &:hover { opacity: 0.8; }
+  margin-bottom: 16px;
 }
 
-// Queue Items
-.queue-item {
-  .queue-main {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    .page-num {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--text-main);
-    }
-
-    .dot-sep { color: var(--text-disabled); }
-
-    .project-name {
-      font-size: 13px;
-      color: var(--text-muted);
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 140px;
-    }
-  }
-
-  .queue-meta {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-
-    .err-count {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--accent-primary);
-    }
-  }
+.dash-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: -0.01em;
 }
 
-:host ::ng-deep .priority-tag .p-tag {
-  font-size: 10px !important;
-  padding: 2px 6px !important;
-  font-weight: 700 !important;
+.view-all-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+
+  &:hover { color: var(--text-main); text-decoration: none; }
 }
 
-// Project Rows
-.project-row {
-  .project-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-main);
-  }
+// ─── Throughput Chart ────────────────────────────────────────
+.metric-toggle {
+  display: flex;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
 
-  .progress-wrap {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 140px;
-  }
-
-  .progress-pct {
+  button {
+    border: none;
+    background: transparent;
+    padding: 3px 10px;
     font-size: 11px;
     font-weight: 700;
     color: var(--text-muted);
-    min-width: 30px;
-    text-align: right;
-  }
-}
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
 
-:host ::ng-deep .mini-bar .p-progressbar {
-  height: 4px !important;
-  border-radius: 2px !important;
-}
-
-// Activity Feed
-.activity-item {
-  justify-content: flex-start;
-  gap: 12px;
-  cursor: default;
-  &:hover { opacity: 1; }
-
-  .activity-text {
-    font-size: 13px;
-    line-height: 1.4;
-
-    .user { font-weight: 700; color: var(--text-main); }
-    .action { color: var(--text-muted); }
-    .target { font-weight: 600; color: var(--text-main); }
-    .time { 
-      display: block; 
-      font-size: 11px; 
-      color: var(--text-disabled); 
-      margin-top: 2px;
+    &.active {
+      background: var(--bg-card);
+      color: var(--text-main);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
     }
   }
 }
 
-:host ::ng-deep .activity-avatar {
+.chart-area {
+  height: 140px;
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+}
+
+.bar-wrap {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bar {
+  width: 100%;
+  background: var(--accent-info);
+  border-radius: 3px 3px 0 0;
+  opacity: 0.75;
+  min-height: 4px;
+  transition: height 0.35s cubic-bezier(0.17, 0.67, 0.83, 0.67), opacity 0.15s ease;
+
+  &:hover { opacity: 1; }
+}
+
+.chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  color: var(--text-disabled);
+
+  .pi {
+    font-size: 28px;
+    opacity: 0.35;
+  }
+
+  span {
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+    max-width: 200px;
+    line-height: 1.5;
+  }
+}
+
+.chart-footer {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+
+  strong { color: var(--text-main); font-weight: 700; }
+}
+
+// ─── Empty State ─────────────────────────────────────────────
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0;
+  color: var(--text-muted);
+
+  .pi {
+    font-size: 20px;
+    opacity: 0.4;
+  }
+
+  span {
+    font-size: 13px;
+    font-weight: 500;
+  }
+}
+
+// ─── List Items ──────────────────────────────────────────────
+.list-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: opacity 0.1s ease;
+
+  &:last-child { border-bottom: none; }
+  &:hover { opacity: 0.75; }
+}
+
+.list-row-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.list-row-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.err-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-danger);
+  font-family: var(--font-mono, monospace);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-info);
+  flex-shrink: 0;
+}
+
+.page-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.sep {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.proj-name {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+:host ::ng-deep .priority-chip .p-tag {
+  font-size: 10px !important;
+  padding: 2px 7px !important;
+  font-weight: 700 !important;
+  border-radius: 4px !important;
+}
+
+// ─── Recent Projects ─────────────────────────────────────────
+.proj-row {
+  gap: 12px;
+}
+
+.proj-name-main {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.prog-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.prog-pct {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 30px;
+  text-align: right;
+  font-family: var(--font-mono, monospace);
+}
+
+:host ::ng-deep .mini-bar .p-progressbar {
+  height: 5px !important;
+  border-radius: 3px !important;
+}
+
+// ─── Activity Feed ───────────────────────────────────────────
+.activity-row.clickable {
+  cursor: pointer;
+  transition: opacity 0.1s ease;
+
+  &:hover { opacity: 0.75; }
+}
+
+.activity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-color);
+
+  &:last-child { border-bottom: none; }
+}
+
+:host ::ng-deep .act-avatar {
   width: 28px !important;
   height: 28px !important;
   font-size: 10px !important;
   font-weight: 700 !important;
+  flex-shrink: 0 !important;
+}
+
+.act-text {
+  font-size: 13px;
+  line-height: 1.45;
+
+  .act-user   { font-weight: 700; color: var(--text-main); }
+  .act-action { color: var(--text-muted); }
+  .act-target { font-weight: 600; color: var(--text-main); }
+  .act-time   {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+}
+
+// ─── Stat Card Skeleton ──────────────────────────────────────
+.stat-card--skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+
+  ::ng-deep .stat-skel-value { margin: 2px 0; }
 }

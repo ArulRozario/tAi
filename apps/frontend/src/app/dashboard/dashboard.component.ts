@@ -1,13 +1,16 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy, ChangeDetectorRef, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
+import { interval, Subject, Subscription, switchMap, startWith } from 'rxjs';
 
 import { ButtonModule } from 'primeng/button';
 import { AvatarModule } from 'primeng/avatar';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TagModule } from 'primeng/tag';
-import { TooltipModule } from 'primeng/tooltip';
-import { CardModule } from 'primeng/card';
+import { SkeletonModule } from 'primeng/skeleton';
+
+import { ApiService, DashboardStats, ActivityLog, Page, Project } from '../core/services/api.service';
+import { AuthService } from '../auth/auth.service';
 
 interface StatCard {
   label: string;
@@ -21,8 +24,8 @@ interface QueueItem {
   id: string;
   page: string;
   project: string;
-  errors: number;
-  priority: 'High' | 'Medium' | 'Low' | 'Crit';
+  errorCount: number;
+  priority: string;
   prioritySeverity: 'danger' | 'warn' | 'info' | 'secondary';
 }
 
@@ -38,12 +41,24 @@ interface ActivityItem {
   avatarBg: string;
   action: string;
   target: string;
+  href: string | null;
   time: string;
 }
+
+const PRIORITY_MAP: Record<string, { label: string; severity: QueueItem['prioritySeverity'] }> = {
+  CRITICAL: { label: 'Crit',   severity: 'danger' },
+  HIGH:     { label: 'High',   severity: 'warn' },
+  MEDIUM:   { label: 'Medium', severity: 'info' },
+  LOW:      { label: 'Low',    severity: 'secondary' },
+  NORMAL:   { label: 'Normal', severity: 'secondary' },
+};
+
+const AVATAR_COLORS = ['#f43f5e', '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#06b6d4'];
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     RouterModule,
@@ -51,54 +66,182 @@ interface ActivityItem {
     AvatarModule,
     ProgressBarModule,
     TagModule,
-    TooltipModule,
-    CardModule,
+    SkeletonModule,
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
-export class DashboardComponent {
-  userName = 'Ravi';
-  lastSync = '2 min ago';
+export class DashboardComponent implements OnInit, OnDestroy {
+  private api = inject(ApiService);
+  private auth = inject(AuthService);
+  private cdr = inject(ChangeDetectorRef);
+  private router = inject(Router);
 
-  stats: StatCard[] = [
-    { label: 'Active projects', value: '12', delta: '+2', deltaUp: true, deltaLabel: 'this month' },
-    { label: 'Pages transl.', value: '1,240', delta: '+132', deltaUp: true, deltaLabel: 'this wk' },
-    { label: 'Pending review', value: '350', delta: '−18', deltaUp: false, deltaLabel: 'since Mo' },
-    { label: 'Avg quality', value: '82%', delta: '+4pts', deltaUp: true, deltaLabel: '' },
-  ];
+  get userName(): string {
+    return this.auth.getCurrentUser()?.name?.split(' ')[0] ?? 'there';
+  }
 
-  throughputMetric = 'Pages'; // or 'Words'
-  throughputPeak = 132;
-  throughputAvg = 88;
-  throughputTotal = 1061;
-  
-  // Mock data for 12 weeks of bars (values 0-100 for height %)
-  throughputData = [65, 78, 45, 92, 85, 70, 95, 88, 92, 60, 85, 100];
+  get greeting(): string {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
 
-  queueItems: QueueItem[] = [
-    { id: '1', page: 'P45', project: "Pilgrim's Progress", errors: 3, priority: 'Medium', prioritySeverity: 'info' },
-    { id: '2', page: 'P46', project: "Pilgrim's Progress", errors: 2, priority: 'Low', prioritySeverity: 'secondary' },
-    { id: '3', page: 'P12', project: 'Don Quixote', errors: 8, priority: 'High', prioritySeverity: 'warn' },
-    { id: '4', page: 'P78', project: '1984', errors: 15, priority: 'Crit', prioritySeverity: 'danger' },
-    { id: '5', page: 'P23', project: 'The Alchemist', errors: 5, priority: 'Medium', prioritySeverity: 'info' },
-  ];
+  lastSync: string | null = null;
+  userQueueCount = 0;
+  escalationCount = 0;
 
-  recentProjects: RecentProject[] = [
-    { id: '1', name: "Pilgrim's Progress", progress: 45 },
-    { id: '2', name: 'Mere Christianity', progress: 100 },
-    { id: '3', name: 'Don Quixote', progress: 25 },
-    { id: '5', name: 'The Cost of Discipleship', progress: 0 },
-  ];
+  stats: StatCard[] = [];
+  statsLoading = signal(true);
 
-  recentActivity: ActivityItem[] = [
-    { user: 'Ravi Kumaran', initials: 'RK', avatarBg: '#f43f5e', action: 'approved', target: 'P12', time: '2m ago' },
-    { user: 'Deepa A.', initials: 'DA', avatarBg: '#10b981', action: 'requested review for', target: 'P45', time: '5m ago' },
-    { user: 'Manoj R.', initials: 'MR', avatarBg: '#3b82f6', action: 'escalated', target: 'P78', time: '12m ago' },
-    { user: 'System', initials: 'AI', avatarBg: '#64748b', action: 'translated', target: 'Chapter 2', time: '1h ago' },
-  ];
+  throughputMetric: 'pages' | 'words' = 'pages';
+  throughputPeak = 0;
+  throughputAvg = 0;
+  throughputTotal = 0;
+  throughputData: number[] = [];
 
-  setMetric(metric: string) {
+  queueItems: QueueItem[] = [];
+  recentProjects: RecentProject[] = [];
+  recentActivity: ActivityItem[] = [];
+
+  private subs = new Subscription();
+  private throughputMetric$ = new Subject<'pages' | 'words'>();
+
+  ngOnInit() {
+    this.subs.add(
+      interval(30_000)
+        .pipe(startWith(0), switchMap(() => this.api.getDashboardStats()))
+        .subscribe(s => { this.applyStats(s); this.cdr.markForCheck(); }),
+    );
+    this.subs.add(
+      this.throughputMetric$.pipe(startWith(this.throughputMetric), switchMap(m => this.api.getDashboardThroughput(m, 12)))
+        .subscribe(data => {
+          const values = data.map(d => d.value);
+          const max = Math.max(...values, 1);
+          this.throughputData  = values.map(v => Math.round((v / max) * 100));
+          this.throughputTotal = values.reduce((a, b) => a + b, 0);
+          this.throughputPeak  = Math.max(...values);
+          this.throughputAvg   = Math.round(this.throughputTotal / (values.length || 1));
+          this.cdr.markForCheck();
+        }),
+    );
+    this.subs.add(this.api.getMyQueue(5).subscribe(p => { this.applyQueue(p); this.cdr.markForCheck(); }));
+    this.subs.add(this.api.getRecentProjects(4).subscribe(p => { this.applyProjects(p); this.cdr.markForCheck(); }));
+    this.subs.add(this.api.getActivityFeed(10).subscribe(l => { this.applyActivity(l); this.cdr.markForCheck(); }));
+  }
+
+  ngOnDestroy() {
+    this.subs.unsubscribe();
+  }
+
+  setMetric(metric: 'pages' | 'words') {
+    if (this.throughputMetric === metric) return;
     this.throughputMetric = metric;
+    this.throughputMetric$.next(metric);
+  }
+
+  private applyStats(s: DashboardStats) {
+    this.statsLoading.set(false);
+    this.userQueueCount  = s.userQueueCount;
+    this.escalationCount = s.escalationCount;
+    this.lastSync        = s.lastSyncAt ? this.relTime(new Date(s.lastSyncAt)) : 'never';
+
+    this.stats = [
+      {
+        label:      'Active projects',
+        value:      String(s.activeProjects),
+        delta:      this.signed(s.activeProjectsDeltaMonth),
+        deltaUp:    s.activeProjectsDeltaMonth >= 0,
+        deltaLabel: 'this month',
+      },
+      {
+        label:      'Pages translated',
+        value:      s.pagesTranslated.toLocaleString(),
+        delta:      this.signed(s.pagesTranslatedDeltaWeek),
+        deltaUp:    s.pagesTranslatedDeltaWeek >= 0,
+        deltaLabel: 'this week',
+      },
+      {
+        label:      'Pending review',
+        value:      String(s.pendingReview),
+        delta:      this.signed(s.pendingReviewDelta),
+        deltaUp:    s.pendingReviewDelta <= 0,
+        deltaLabel: 'vs last month',
+      },
+      {
+        label:      'Avg quality',
+        value:      s.avgQuality ? `${s.avgQuality}%` : '–',
+        delta:      this.signed(s.avgQualityDelta) + 'pts',
+        deltaUp:    s.avgQualityDelta >= 0,
+        deltaLabel: '',
+      },
+    ];
+  }
+
+  private applyQueue(pages: Page[]) {
+    this.queueItems = pages.map(p => {
+      const pm = PRIORITY_MAP[p.priority] ?? { label: p.priority, severity: 'secondary' as const };
+      return {
+        id:               p.id,
+        page:             `P${p.pageNumber}`,
+        project:          p.project?.name ?? '–',
+        errorCount:       p.errorCount ?? 0,
+        priority:         pm.label,
+        prioritySeverity: pm.severity,
+      };
+    });
+  }
+
+  private applyProjects(projects: Project[]) {
+    this.recentProjects = projects.map(p => ({
+      id:       p.id,
+      name:     p.name,
+      progress: p.progress ?? 0,
+    }));
+  }
+
+  private applyActivity(logs: ActivityLog[]) {
+    this.recentActivity = logs.map((log, i) => {
+      const userName = log.user?.name ?? 'System';
+      const initials  = userName === 'System'
+        ? 'AI'
+        : userName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+      const target = log.entityName
+        ? log.entityName
+        : log.entityType
+          ? log.entityType.charAt(0).toUpperCase() + log.entityType.slice(1).toLowerCase()
+          : '';
+      return {
+        user:     userName,
+        initials,
+        avatarBg: userName === 'System' ? '#64748b' : AVATAR_COLORS[i % AVATAR_COLORS.length],
+        action:   this.fmtAction(log.action),
+        target,
+        href:     log.entityHref ?? null,
+        time:     this.relTime(new Date(log.createdAt)),
+      };
+    });
+  }
+
+  navigateActivity(act: ActivityItem) {
+    if (act.href) this.router.navigateByUrl(act.href);
+  }
+
+  private fmtAction(action: string): string {
+    return action.toLowerCase().replace(/_/g, ' ');
+  }
+
+  private relTime(date: Date): string {
+    const mins = Math.floor((Date.now() - date.getTime()) / 60_000);
+    if (mins < 1)   return 'just now';
+    if (mins < 60)  return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24)   return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  private signed(n: number): string {
+    return n >= 0 ? `+${n}` : `${n}`;
   }
 }

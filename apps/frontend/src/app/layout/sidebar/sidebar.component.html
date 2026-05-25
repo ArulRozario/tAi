@@ -1,7 +1,8 @@
+<p-toast position="bottom-left"></p-toast>
 <aside class="sidebar" [class.collapsed]="layout.sidebarCollapsed()">
   <div class="sidebar-header">
     <div class="brand" *ngIf="!layout.sidebarCollapsed()">
-      tAI<span class="brand-dot">.</span>
+      tAI
     </div>
     <button class="collapse-toggle" (click)="layout.toggleSidebar()">
       <i class="pi" [class.pi-angle-left]="!layout.sidebarCollapsed()" [class.pi-angle-right]="layout.sidebarCollapsed()"></i>
