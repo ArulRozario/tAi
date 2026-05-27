@@ -236,7 +236,7 @@
     </div>
   <!-- ── Dialogs ──────────────────────────────────────────── -->
   <p-dialog header="Request Changes" [(visible)]="showRequestChangesDialog"
-    [modal]="true" [style]="{width: '420px'}" [draggable]="false">
+    [modal]="true" [style]="{width: 'min(420px, 92vw)'}" [draggable]="false">
     <div class="dialog-body">
       <label class="dialog-label">Describe what needs to change</label>
       <textarea pTextarea [(ngModel)]="requestChangesNote" rows="4"
@@ -250,7 +250,7 @@
   </p-dialog>
 
   <p-dialog header="Escalate Page" [(visible)]="showEscalateDialog"
-    [modal]="true" [style]="{width: '420px'}" [draggable]="false">
+    [modal]="true" [style]="{width: 'min(420px, 92vw)'}" [draggable]="false">
     <div class="dialog-body">
       <label class="dialog-label">Reason for escalation</label>
       <textarea pTextarea [(ngModel)]="escalateReason" rows="4"
@@ -265,7 +265,7 @@
 
 
 <p-dialog header="Reassign Reviewers" [(visible)]="showReassignDialog"
-    [modal]="true" [style]="{width: '420px'}" [draggable]="false">
+    [modal]="true" [style]="{width: 'min(420px, 92vw)'}" [draggable]="false">
     <div class="dialog-body">
       <label class="dialog-label">Select reviewers</label>
       <p-multiselect [options]="allUsers()" [(ngModel)]="selectedReassignUserIds"

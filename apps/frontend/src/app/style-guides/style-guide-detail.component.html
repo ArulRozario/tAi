@@ -21,9 +21,9 @@
     <div class="toolbar-right">
       <p-select [options]="segmentUnits" [(ngModel)]="selectedSegmentUnit" styleClass="tai-dropdown"></p-select>
       @if (!isNew()) {
-        <p-select [options]="versions" [(ngModel)]="selectedVersion" styleClass="tai-dropdown"></p-select>
-        <p-button label="History" icon="pi pi-history" severity="secondary" [outlined]="true" size="small"></p-button>
-        <p-button label="Test" icon="pi pi-play" severity="secondary" [outlined]="true" size="small"></p-button>
+        <p-select [options]="versions" [(ngModel)]="selectedVersion" (ngModelChange)="onVersionChange($event)" styleClass="tai-dropdown"></p-select>
+        <p-button label="History" icon="pi pi-history" severity="secondary" [outlined]="true" size="small" (onClick)="openHistory()"></p-button>
+        <p-button label="Test" icon="pi pi-play" severity="secondary" [outlined]="true" size="small" (onClick)="openTest()"></p-button>
         <p-button label="Save" icon="pi pi-check" severity="danger" [loading]="isSaving()" [disabled]="isSaving()" loadingIcon="pi pi-spinner pi-spin" (onClick)="saveStyleGuide()"></p-button>
       } @else {
         <p-button label="Create" icon="pi pi-check" severity="danger" [loading]="isSaving()" [disabled]="isSaving()" loadingIcon="pi pi-spinner pi-spin" (onClick)="saveStyleGuide()"></p-button>
@@ -78,3 +78,36 @@
     }
   </div>
 </div>
+
+<!-- History Dialog -->
+<p-dialog header="Version History" [(visible)]="showHistoryDialog" [modal]="true" [style]="{ width: 'min(480px, 92vw)' }" [draggable]="false">
+  @if (versionList.length === 0) {
+    <p class="no-versions">No versions available.</p>
+  } @else {
+    <ul class="version-list">
+      @for (v of versionList; track v.id) {
+        <li class="version-item" [class.current]="v.id === selectedVersion" (click)="onVersionChange(v.id); selectedVersion = v.id; showHistoryDialog = false">
+          <span class="version-label">v{{ v.version }}</span>
+          @if (v.note) { <span class="version-note">{{ v.note }}</span> }
+          <span class="version-date">{{ v.createdAt | date:'medium' }}</span>
+          @if (v.createdBy) { <span class="version-author">{{ v.createdBy.name }}</span> }
+        </li>
+      }
+    </ul>
+  }
+</p-dialog>
+
+<!-- Test Translation Dialog -->
+<p-dialog header="Test Translation" [(visible)]="showTestDialog" [modal]="true" [style]="{ width: 'min(560px, 92vw)' }" [draggable]="false">
+  <div class="test-dialog-body">
+    <label class="test-label">Sample text to translate</label>
+    <textarea pTextarea [(ngModel)]="testSampleText" rows="5" placeholder="Enter text to test against this style guide..." class="test-input"></textarea>
+    <p-button label="Run" icon="pi pi-play" [loading]="isTesting()" [disabled]="!testSampleText.trim() || isTesting()" (onClick)="runTest()"></p-button>
+    @if (testResult()) {
+      <div class="test-result">
+        <label class="test-label">Translation</label>
+        <div class="test-result-text">{{ testResult() }}</div>
+      </div>
+    }
+  </div>
+</p-dialog>

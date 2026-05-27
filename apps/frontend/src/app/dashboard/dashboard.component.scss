@@ -28,6 +28,9 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+
+  @media (max-width: 1023px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 639px)  { grid-template-columns: 1fr; }
 }
 
 .stat-card {
@@ -269,7 +272,7 @@
   font-size: 11px;
   font-weight: 700;
   color: var(--accent-danger);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
 }
 
 .status-dot {
@@ -338,7 +341,7 @@
   color: var(--text-muted);
   min-width: 30px;
   text-align: right;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
 }
 
 :host ::ng-deep .mini-bar .p-progressbar {

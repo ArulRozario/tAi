@@ -159,7 +159,7 @@
   [(visible)]="showAssignDialog"
   [modal]="true"
   [closable]="true"
-  [style]="{ width: '480px' }"
+  [style]="{ width: 'min(480px, 92vw)' }"
   [header]="'Reviewers · Page ' + assignTargetPage()?.pageNumber"
 >
   @if (assignTargetPage()) {
@@ -216,7 +216,7 @@
   [(visible)]="showBulkDialog"
   [modal]="true"
   [closable]="true"
-  [style]="{ width: '440px' }"
+  [style]="{ width: 'min(440px, 92vw)' }"
   [header]="bulkAction() === 'assign' ? 'Assign reviewer · ' + selectedCount + ' pages'
            : bulkAction() === 'unassign' ? 'Unassign reviewer · ' + selectedCount + ' pages'
            : 'Reassign · ' + selectedCount + ' pages'"

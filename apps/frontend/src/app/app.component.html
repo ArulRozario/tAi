@@ -6,7 +6,14 @@
   }
 
   <main class="main-content">
-    <div class="canvas">
+    <!-- Hamburger — mobile only, hidden on ≥ 640px via CSS -->
+    @if (!loginPage()) {
+      <button class="mobile-hamburger" (click)="layout.toggleMobileMenu()" aria-label="Open navigation">
+        <i class="pi pi-bars"></i>
+      </button>
+    }
+
+    <div class="canvas" [class.canvas--full]="fullPage()">
       <router-outlet></router-outlet>
     </div>
   </main>

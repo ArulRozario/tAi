@@ -33,3 +33,35 @@
     padding: 0;
   }
 }
+
+/* Full-bleed routes (workbench, review) — no canvas padding */
+.canvas--full {
+  padding: 0;
+}
+
+/* Hamburger — only visible on mobile (< 640px) */
+.mobile-hamburger {
+  display: none;
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 998;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-sidebar);
+  color: var(--text-main);
+  font-size: 15px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: background 0.15s ease;
+
+  &:hover { background: var(--bg-hover); }
+
+  @media (max-width: 639px) {
+    display: flex;
+  }
+}

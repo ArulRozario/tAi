@@ -5,7 +5,7 @@
   [resizable]="false"
   styleClass="create-project-dialog"
   header="Create new project"
-  [style]="{width: '540px'}"
+  [style]="{width: 'min(540px, 92vw)'}"
   (onHide)="hide()">
   
   <form [formGroup]="projectForm" (ngSubmit)="onSubmit()" class="modal-form">

@@ -3,6 +3,9 @@
   padding: 24px 32px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
+
+  @media (max-width: 1023px) { padding: 20px 24px; }
+  @media (max-width: 639px)  { padding: 16px; }
 }
 
 .queue-header {
@@ -56,6 +59,18 @@
   border: 1px solid var(--border-color);
   border-radius: 10px;
   overflow: hidden;
+
+  // On small screens, allow horizontal scroll — border-radius is sacrificed
+  @media (max-width: 767px) {
+    overflow-x: auto;
+    border-radius: 6px;
+  }
+}
+
+// Keep header and rows from collapsing on small screens
+.queue-table-header,
+.queue-row {
+  @media (max-width: 767px) { min-width: 640px; }
 }
 
 .queue-table-header {

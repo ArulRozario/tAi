@@ -12,6 +12,15 @@
 
 <!-- Table Card -->
 <div class="table-card">
+  @if (loadError()) {
+    <div class="load-error-state">
+      <i class="pi pi-exclamation-circle"></i>
+      <span>Could not load members.</span>
+      <button class="retry-btn" (click)="loadUsers()">
+        <i class="pi pi-refresh"></i> Retry
+      </button>
+    </div>
+  } @else {
   <div class="filters-bar">
     <p-iconField iconPosition="left" class="search-box-wrapper">
       <p-inputIcon class="pi pi-search"></p-inputIcon>
@@ -117,6 +126,7 @@
       />
     </div>
   }
+  } <!-- end @else !loadError -->
 </div>
 
 <!-- Actions Menu -->
@@ -127,7 +137,7 @@
   header="Add member"
   [(visible)]="isInviteDialogOpen"
   [modal]="true"
-  [style]="{ width: '440px' }"
+  [style]="{ width: 'min(440px, 92vw)' }"
   [closable]="true"
   (onHide)="closeInviteDialog()"
 >
@@ -173,7 +183,7 @@
 <p-drawer
   [(visible)]="isPanelOpen"
   position="right"
-  [style]="{ width: '420px' }"
+  [style]="{ width: 'min(420px, 92vw)' }"
   (onHide)="closePanel()"
 >
   <ng-template pTemplate="header">

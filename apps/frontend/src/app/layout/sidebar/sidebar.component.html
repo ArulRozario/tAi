@@ -1,5 +1,15 @@
 <p-toast position="bottom-left"></p-toast>
-<aside class="sidebar" [class.collapsed]="layout.sidebarCollapsed()">
+
+<!-- Mobile backdrop — tap to close drawer -->
+<div
+  class="sidebar-backdrop"
+  *ngIf="layout.mobileMenuOpen()"
+  (click)="layout.closeMobileMenu()"
+></div>
+
+<aside class="sidebar"
+  [class.collapsed]="layout.sidebarCollapsed()"
+  [class.mobile-open]="layout.mobileMenuOpen()">
   <div class="sidebar-header">
     <div class="brand" *ngIf="!layout.sidebarCollapsed()">
       tAI
@@ -22,7 +32,7 @@
           [routerLink]="item.routerLink ?? null"
           [pTooltip]="layout.sidebarCollapsed() ? item.label : ''"
           tooltipPosition="right"
-          (click)="item.command ? item.command() : null"
+          (click)="item.command ? item.command() : null; layout.closeMobileMenu()"
         >
           <i [class]="item.icon + ' icon'"></i>
           <span *ngIf="!layout.sidebarCollapsed()">{{ item.label }}</span>
@@ -38,21 +48,21 @@
   <div class="sidebar-footer">
     <div class="footer-actions">
       <!-- PrimeNG Text Button for Theme Toggle -->
-      <p-button 
-        [icon]="theme.isDarkMode() ? 'pi pi-sun' : 'pi pi-moon'" 
-        [text]="true" 
-        severity="secondary" 
+      <p-button
+        [icon]="theme.isDarkMode() ? 'pi pi-sun' : 'pi pi-moon'"
+        [text]="true"
+        severity="secondary"
         (click)="theme.toggleTheme()"
         [pTooltip]="layout.sidebarCollapsed() ? (theme.isDarkMode() ? 'Light Mode' : 'Dark Mode') : ''"
         tooltipPosition="right"
         styleClass="action-btn">
       </p-button>
-      
+
       <button class="bell-btn" [pTooltip]="layout.sidebarCollapsed() ? 'Notifications' : ''" tooltipPosition="right">
         <i class="pi pi-bell"></i>
       </button>
     </div>
-    
+
     <!-- User profile card with click-to-upload avatar -->
     <div class="profile-card" [pTooltip]="layout.sidebarCollapsed() ? (user?.name || 'User') : ''" tooltipPosition="right">
       <div class="profile-avatar-wrap" (click)="triggerAvatarUpload()" pTooltip="Change photo" tooltipPosition="right">
