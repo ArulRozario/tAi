@@ -323,11 +323,11 @@ Tamil: நம்முடைய பிதாவாகிய தேவனால�
 
   // ModelConfig has @@unique([agentType, isDefault]) — upsert on that key.
   const modelConfigs = [
-    { agentType: 'TRANSLATION' as const, provider: 'OLLAMA' as const, modelName: 'qwen2.5:7b',         isDefault: true  },
-    { agentType: 'REVIEW'      as const, provider: 'OLLAMA' as const, modelName: 'phi4:mini',           isDefault: true  },
-    { agentType: 'CHAT'        as const, provider: 'OLLAMA' as const, modelName: 'qwen2.5:7b',         isDefault: true  },
-    { agentType: 'CHAT'        as const, provider: 'ANTHROPIC' as const, modelName: 'claude-sonnet-4-6', isDefault: false },
-    { agentType: 'EMBEDDING'   as const, provider: 'OLLAMA' as const, modelName: 'nomic-embed-text',   isDefault: true  },
+    { agentType: 'TRANSLATION' as const, provider: 'GOOGLE' as const, modelName: 'gemini-3.1-flash-lite', isDefault: true  },
+    { agentType: 'REVIEW'      as const, provider: 'GOOGLE' as const, modelName: 'gemini-3.1-flash-lite', isDefault: true  },
+    { agentType: 'CHAT'        as const, provider: 'GOOGLE' as const, modelName: 'gemini-3.1-flash-lite', isDefault: true  },
+    { agentType: 'CHAT'        as const, provider: 'ANTHROPIC' as const, modelName: 'claude-sonnet-4-6',  isDefault: false },
+    { agentType: 'EMBEDDING'   as const, provider: 'GOOGLE' as const, modelName: 'gemini-embedding-001',  isDefault: true  },
   ];
 
   for (const cfg of modelConfigs) {

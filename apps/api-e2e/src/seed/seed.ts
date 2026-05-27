@@ -140,10 +140,10 @@ export async function seedTestData(databaseUrl: string): Promise<SeedData> {
 
   await prisma.modelConfig.createMany({
     data: [
-      { agentType: 'TRANSLATION', provider: 'OLLAMA', modelName: 'qwen2.5:7b', isActive: true, isDefault: true },
-      { agentType: 'REVIEW', provider: 'OLLAMA', modelName: 'phi4:mini', isActive: true, isDefault: true },
-      { agentType: 'CHAT', provider: 'OLLAMA', modelName: 'qwen2.5:7b', isActive: true, isDefault: true },
-      { agentType: 'EMBEDDING', provider: 'OLLAMA', modelName: 'nomic-embed-text', isActive: true, isDefault: true },
+      { agentType: 'TRANSLATION', provider: 'GOOGLE', modelName: 'gemini-3.1-flash-lite', isActive: true, isDefault: true },
+      { agentType: 'REVIEW',      provider: 'GOOGLE', modelName: 'gemini-3.1-flash-lite', isActive: true, isDefault: true },
+      { agentType: 'CHAT',        provider: 'GOOGLE', modelName: 'gemini-3.1-flash-lite', isActive: true, isDefault: true },
+      { agentType: 'EMBEDDING',   provider: 'GOOGLE', modelName: 'gemini-embedding-001',  isActive: true, isDefault: true },
     ],
   });
 

@@ -1,32 +1,5 @@
-:host ::ng-deep {
-  .create-project-dialog {
-    .p-dialog-header {
-      padding: 1.5rem;
-      border-bottom: 1px solid var(--border-color);
-      
-      .p-dialog-title {
-        font-size: 1.25rem;
-        font-weight: 800;
-        letter-spacing: -0.02em;
-        color: var(--text-main);
-      }
-
-      .p-dialog-header-actions {
-        .p-dialog-header-close {
-          color: var(--text-disabled);
-          &:hover {
-            color: var(--text-main);
-          }
-        }
-      }
-    }
-
-    .p-dialog-content {
-      padding: 1.5rem;
-      background: var(--bg-sidebar);
-    }
-  }
-}
+// .create-project-dialog p-dialog header/content and .create-btn button
+// are handled globally in primeng-overrides.scss
 
 .modal-form {
   display: flex;
@@ -204,15 +177,3 @@
   margin-top: 0.5rem;
 }
 
-:host ::ng-deep .create-btn {
-  height: 44px;
-  font-weight: 700;
-  font-size: 0.95rem;
-  border-radius: 8px;
-  background: var(--accent-danger) !important;
-  border: none !important;
-
-  &:hover {
-    filter: brightness(1.1);
-  }
-}

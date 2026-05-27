@@ -30,21 +30,21 @@ export class ModelsService implements OnModuleInit {
       {
         agentType: AgentType.TRANSLATION,
         provider: Provider.GOOGLE,
-        modelName: 'gemini-1.5-flash',
+        modelName: 'gemini-3.1-flash-lite',
         isActive: true,
         isDefault: true,
       },
       {
         agentType: AgentType.REVIEW,
         provider: Provider.GOOGLE,
-        modelName: 'gemini-1.5-flash',
+        modelName: 'gemini-3.1-flash-lite',
         isActive: true,
         isDefault: true,
       },
       {
         agentType: AgentType.CHAT,
         provider: Provider.GOOGLE,
-        modelName: 'gemini-1.5-flash',
+        modelName: 'gemini-3.1-flash-lite',
         isActive: true,
         isDefault: true,
       },
@@ -233,7 +233,7 @@ export class ModelsService implements OnModuleInit {
         id: 'fallback-id',
         agentType,
         provider: Provider.GOOGLE,
-        modelName: 'gemini-1.5-flash',
+        modelName: 'gemini-3.1-flash-lite',
         endpoint: null,
         apiKeyEnc: null,
         isActive: true,
@@ -256,7 +256,7 @@ export class ModelsService implements OnModuleInit {
     } else if (config.provider === Provider.OLLAMA) {
       // Ollama is not supported in this deployment; fall back to Gemini
       this.logger.warn(`Agent ${agentType} is configured for Ollama which is not available. Falling back to Gemini.`);
-      const result = await this.gemini.generateContent(prompt, 'gemini-1.5-flash', {
+      const result = await this.gemini.generateContent(prompt, 'gemini-3.1-flash-lite', {
         temperature: options?.temperature,
         maxTokens: options?.max_tokens,
       });
@@ -265,7 +265,7 @@ export class ModelsService implements OnModuleInit {
     } else if (config.provider === Provider.ANTHROPIC) {
       // Anthropic support is not active in this deployment; fall back to Gemini
       this.logger.warn(`Agent ${agentType} is configured for Anthropic which is not active. Falling back to Gemini.`);
-      const result = await this.gemini.generateContent(prompt, 'gemini-1.5-flash', {
+      const result = await this.gemini.generateContent(prompt, 'gemini-3.1-flash-lite', {
         temperature: options?.temperature,
         maxTokens: options?.max_tokens,
       });

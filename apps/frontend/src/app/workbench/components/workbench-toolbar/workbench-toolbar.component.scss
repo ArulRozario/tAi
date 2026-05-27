@@ -346,10 +346,7 @@ $font-size: 12px;
 }
 
 // ── Reviewer overlay panel ───────────────────────────────────
-::ng-deep .tb-reviewer-panel {
-  min-width: 260px;
-  .p-popover-content { padding: 0; }
-}
+// .tb-reviewer-panel popover sizing handled globally in primeng-overrides.scss
 
 .tbr-panel {
   width: 260px;
@@ -360,21 +357,7 @@ $font-size: 12px;
   padding: 10px 10px 8px;
 }
 
-::ng-deep .tbr-user-select {
-  width: 100%;
-
-  .p-select {
-    width: 100%;
-    height: 32px;
-    font-size: 12px;
-  }
-
-  .p-select-label {
-    font-size: 12px;
-    padding: 0 8px;
-    line-height: 30px;
-  }
-}
+// .tbr-user-select p-select sizing handled globally in primeng-overrides.scss
 
 // Divider between add and list
 .tbr-separator {
@@ -503,7 +486,7 @@ $font-size: 12px;
 }
 
 // ── PrimeNG select inside toolbar ────────────────────────────
-::ng-deep .tb-status-select { min-width: 110px; }
+// .tb-status-select min-width handled globally in primeng-overrides.scss
 
 // ── Submission badge on button ───────────────────────────────
 .tb-badge {

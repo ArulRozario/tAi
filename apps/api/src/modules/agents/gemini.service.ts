@@ -29,7 +29,7 @@ function isQuotaError(err: Error): boolean {
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
   private readonly ai: GoogleGenAI;
-  private readonly defaultModel = 'gemini-1.5-flash';
+  private readonly defaultModel = 'gemini-3.1-flash-lite';
 
   constructor(private readonly registry: ModelRegistryService) {
     const apiKey = process.env.GEMINI_API_KEY;

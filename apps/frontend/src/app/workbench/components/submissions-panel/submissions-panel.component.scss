@@ -193,10 +193,8 @@
   gap: 0.25rem;
   flex-wrap: wrap;
 
-  ::ng-deep .p-button {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.75rem;
-  }
+  // .p-button compact sizing handled globally in primeng-overrides.scss
+  // under "app-submissions-panel .submission-actions .p-button"
 }
 
 .approved-badge,

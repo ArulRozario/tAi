@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  UnauthorizedException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,24 +29,33 @@ export class ProjectsService {
       throw new NotFoundException(`StyleGuide with ID '${createProjectDto.styleGuideId}' not found.`);
     }
 
-    const project = await this.prisma.project.create({
-      data: {
-        name: createProjectDto.name,
-        description: createProjectDto.description,
-        sourceLang: createProjectDto.sourceLang,
-        targetLang: createProjectDto.targetLang,
-        styleGuideId: createProjectDto.styleGuideId,
-        ownerId,
-        status: ProjectStatus.DRAFT,
-        sourceFileId: createProjectDto.sourceFileId,
-      },
-      include: {
-        styleGuide: true,
-        owner: {
-          select: { id: true, name: true, email: true, avatarUrl: true },
+    let project;
+    try {
+      project = await this.prisma.project.create({
+        data: {
+          name: createProjectDto.name,
+          description: createProjectDto.description,
+          sourceLang: createProjectDto.sourceLang,
+          targetLang: createProjectDto.targetLang,
+          styleGuideId: createProjectDto.styleGuideId,
+          ownerId,
+          status: ProjectStatus.DRAFT,
+          sourceFileId: createProjectDto.sourceFileId,
         },
+        include: {
+          styleGuide: true,
+          owner: {
+            select: { id: true, name: true, email: true, avatarUrl: true },
+          },
+        }
+      });
+    } catch (err: any) {
+      // P2003 = foreign key violation; most likely the JWT user no longer exists in the DB
+      if (err?.code === 'P2003' && err?.meta?.field_name?.includes('ownerId')) {
+        throw new UnauthorizedException('Your session is invalid or expired. Please log out and log back in.');
       }
-    });
+      throw err;
+    }
 
     // 3. Atomically enqueue SPLIT_DOCUMENT job if sourceFileId is provided
     if (createProjectDto.sourceFileId) {

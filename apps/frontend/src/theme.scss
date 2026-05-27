@@ -16,7 +16,10 @@
   --table-header-bg: #ffffff;
   --table-row-hover: #fafbfc;
 
-  /* Accent & Brand Variables (Light Mode) */
+  /* Accent & Brand Variables (Light Mode)
+     NOTE: --accent-primary (rose) is the brand/UI primary.
+     styles.scss defines a separate --accent (violet #8b5cf6) used by
+     Tailwind utilities and processing-state indicators — intentionally different. */
   --accent-primary: #f43f5e;        /* Rose red brand color */
   --accent-primary-hover: #e11d48;  /* Rose hover state */
   --accent-primary-text: #ffffff;

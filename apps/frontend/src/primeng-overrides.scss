@@ -60,7 +60,7 @@
   }
 
   /* Variant: Secondary (Bordered Neutral - for AI Assist, etc.) */
-  &.p-button-secondary:not(.p-button-text) {
+  &.p-button-secondary:not(.p-button-text):not(.p-button-outlined) {
     background-color: var(--bg-sidebar);
     border-color: var(--border-color);
     color: var(--text-main);
@@ -442,7 +442,9 @@
 .chapter-bar-in-progress .p-progressbar-value { background-color: var(--accent-warning); }
 .chapter-bar-queued .p-progressbar-value      { background-color: var(--text-disabled); }
 
-/* Active/paused state animation (translation job progress) */
+/* Active/paused state animation (translation job progress)
+   --accent  = #8b5cf6 violet  (styles.scss — processing-state indicator, intentionally ≠ brand rose)
+   --warning = #f59e0b amber   (styles.scss — same value as --accent-warning in theme.scss) */
 .tpb-active .p-progressbar-value,
 .progress-active .p-progressbar-value {
   background: var(--accent);
@@ -602,8 +604,9 @@ app-style-guide-detail .toolbar-right .p-button {
   font-size: 13px;
 }
 
-/* ── Submissions Panel Compact Actions ──────────────────────── */
-app-submissions-panel .submission-actions .p-button {
+/* ── Compact Action Buttons (submissions panel + correction actions) ── */
+app-submissions-panel .submission-actions .p-button,
+app-segment-reviews .correction-actions .p-button {
   padding: 0.4rem 0.6rem;
   font-size: 0.75rem;
 }
@@ -648,4 +651,47 @@ app-submissions-panel .submission-actions .p-button {
   flex: 1;
   min-height: 0;
   padding: 0;
+}
+
+/* ── Create-Project Dialog ───────────────────────────────────
+   p-dialog teleports outside the component tree so ::ng-deep
+   is unnecessary; unlayered global rules beat @layer primeng. */
+.create-project-dialog {
+  .p-dialog-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+
+    .p-dialog-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+
+    .p-dialog-header-actions {
+      .p-dialog-header-close {
+        color: var(--text-disabled);
+        &:hover { color: var(--text-main); }
+      }
+    }
+  }
+
+  .p-dialog-content {
+    padding: 1.5rem;
+    background: var(--bg-sidebar);
+  }
+}
+
+/* ── Create-Project Submit Button ───────────────────────────
+   Higher specificity (.create-btn.p-button) beats global .p-button,
+   so no !important needed. */
+.create-btn.p-button {
+  height: 44px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border-radius: 8px;
+  background: var(--accent-danger);
+  border: none;
+
+  &:hover { filter: brightness(1.1); }
 }

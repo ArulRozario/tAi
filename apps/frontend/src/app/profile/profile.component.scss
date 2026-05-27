@@ -229,46 +229,5 @@
   font-size: 0.875rem;
 }
 
-:host ::ng-deep {
-  .sessions-table {
-    &.p-datatable {
-      background: transparent !important;
-    }
-
-    .p-datatable-wrapper,
-    .p-datatable-table {
-      background: transparent !important;
-    }
-
-    .p-datatable-tbody > tr {
-      background: transparent !important;
-      border: none;
-
-      &:hover {
-        background: var(--bg-hover) !important;
-      }
-
-      > td {
-        padding: 10px 20px !important;
-        border-bottom: 1px solid var(--border-color) !important;
-        background: transparent !important;
-        color: var(--text-main);
-      }
-
-      &:last-child > td {
-        border-bottom: none !important;
-      }
-    }
-  }
-
-  .p-password {
-    width: 100%;
-
-    input {
-      width: 100%;
-      background: var(--bg-canvas);
-      border-color: var(--border-color);
-      color: var(--text-main);
-    }
-  }
-}
+// .sessions-table transparent DataTable and .p-password width
+// are handled globally in primeng-overrides.scss

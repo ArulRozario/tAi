@@ -10,12 +10,15 @@
 
 :root {
   /* Intelligence Core Design Tokens — Light Mode (default)
-     Values mirror the theme.scss counterparts so both token
-     namespaces resolve to the same visual result.
-     Mapping: --bg ↔ --bg-canvas  |  --surface-1 ↔ --bg-card
-              --surface-2 ↔ --bg-hover  |  --border ↔ --border-color
-              --text-1 ↔ --text-main  |  --text-2 ↔ --text-muted
-              --text-3 ↔ --text-disabled  */
+     Parallel namespace to theme.scss.  Surface/text tokens resolve to the
+     same values; the accent tokens are intentionally DIFFERENT:
+       --accent  = #8b5cf6 Violet  (Tailwind utility / processing-state colour)
+       --accent-primary in theme.scss = #f43f5e Rose  (brand primary)
+     Token mapping (surfaces/text only):
+       --bg ↔ --bg-canvas  |  --surface-1 ↔ --bg-card
+       --surface-2 ↔ --bg-hover  |  --border ↔ --border-color
+       --text-1 ↔ --text-main  |  --text-2 ↔ --text-muted
+       --text-3 ↔ --text-disabled  */
   --bg: #f8fafc;           /* Slate-50  — page canvas */
   --surface-1: #ffffff;    /* White     — cards / panels */
   --surface-2: #f1f5f9;    /* Slate-100 — hover / raised surfaces */

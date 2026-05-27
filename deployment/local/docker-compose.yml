@@ -55,19 +55,6 @@ services:
       "
     networks:
       - tai-network
-
-  ollama:
-    image: ollama/ollama:latest
-    container_name: tai-ollama
-    ports:
-      - "12005:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      OLLAMA_HOST: 0.0.0.0
-    networks:
-      - tai-network
-
   # Runs migrations + seed on every startup; exits 0 when done.
   db-init:
     build:
@@ -142,4 +129,4 @@ networks:
 volumes:
   postgres_data:
   minio_data:
-  ollama_data:
+

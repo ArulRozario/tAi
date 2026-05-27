@@ -159,9 +159,6 @@
 .correction-actions {
   display: flex;
   justify-content: flex-end;
-
-  ::ng-deep .p-button {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.75rem;
-  }
+  // compact .p-button sizing handled globally in primeng-overrides.scss
+  // under "app-segment-reviews .correction-actions .p-button"
 }

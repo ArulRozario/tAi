@@ -192,19 +192,8 @@ tr:hover .row-actions {
   }
 }
 
-:host ::ng-deep .tpb-active .p-progressbar-value {
-  background: var(--accent) !important;
-  animation: tpb-pulse 2s ease-in-out infinite;
-}
-
-:host ::ng-deep .tpb-paused .p-progressbar-value {
-  background: var(--warning) !important;
-}
-
-@keyframes tpb-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.65; }
-}
+// .tpb-active/.tpb-paused progressbar colours + animation
+// handled globally in primeng-overrides.scss (progressbar-pulse keyframe)
 
 .translating-tag-inner {
   display: flex;
