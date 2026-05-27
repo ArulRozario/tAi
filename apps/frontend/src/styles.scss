@@ -274,17 +274,16 @@ app-root {
 .tabnums { font-variant-numeric: tabular-nums; }
 .ellipsis { @apply overflow-hidden whitespace-nowrap text-ellipsis; }
 /* ── Workbench toolbar: p-select height lock ────────────────────
-   Only p-select (status + model picker) uses PrimeNG inside the toolbar.
-   Global rule wins on cascade over PrimeNG's !important. */
+   Unlayered author rule beats @layer primeng — no !important needed. */
 app-workbench-toolbar {
   .p-select,
   .p-select.p-select-sm {
-    height: 32px !important;
+    height: 32px;
 
     .p-select-label {
-      padding-top: 0 !important;
-      padding-bottom: 0 !important;
-      line-height: 30px !important;
+      padding-top: 0;
+      padding-bottom: 0;
+      line-height: 30px;
     }
   }
 }

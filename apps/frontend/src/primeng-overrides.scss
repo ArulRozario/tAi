@@ -5,54 +5,54 @@
 /* 1. PrimeNG Buttons (.p-button) */
 .p-button {
   /* Base shared structural styles */
-  border-radius: 8px !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-  height: 36px !important;
-  padding: 0 16px !important;
-  gap: 8px !important;
-  transition: all 0.15s ease, transform 0.1s ease !important;
-  border-width: 1px !important;
-  border-style: solid !important;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  height: 36px;
+  padding: 0 16px;
+  gap: 8px;
+  transition: all 0.15s ease, transform 0.1s ease;
+  border-width: 1px;
+  border-style: solid;
 
   &:active {
     transform: scale(0.98);
   }
 
   .p-button-icon {
-    font-size: 11px !important;
-    font-weight: 800 !important;
+    font-size: 11px;
+    font-weight: 800;
   }
 
   /* Icon-only Button Override */
   &.p-button-icon-only {
-    padding: 0 !important;
-    width: 36px !important;
-    justify-content: center !important;
+    padding: 0;
+    width: 36px;
+    justify-content: center;
     
     &.p-button-rounded {
-      border-radius: 50% !important;
+      border-radius: 50%;
     }
   }
 
   /* Variant: Primary (Default Rose Branding) */
   &:not(.p-button-secondary):not(.p-button-text):not(.p-button-outlined):not(.p-button-success):not(.p-button-danger):not(.p-button-warning):not(.p-button-info) {
-    background: var(--accent-primary) !important;
-    border-color: var(--accent-primary) !important;
-    color: var(--accent-primary-text) !important;
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary-text);
 
     &:hover {
-      background: var(--accent-primary-hover) !important;
-      border-color: var(--accent-primary-hover) !important;
+      background: var(--accent-primary-hover);
+      border-color: var(--accent-primary-hover);
     }
   }
 
   /* Variant: Success (Green) */
   &.p-button-success:not(.p-button-text):not(.p-button-outlined) {
-    background: var(--accent-success) !important;
-    border-color: var(--accent-success) !important;
-    color: var(--accent-primary-text) !important;
+    background: var(--accent-success);
+    border-color: var(--accent-success);
+    color: var(--accent-primary-text);
 
     &:hover {
       filter: brightness(0.9);
@@ -61,151 +61,176 @@
 
   /* Variant: Secondary (Bordered Neutral - for AI Assist, etc.) */
   &.p-button-secondary:not(.p-button-text) {
-    background-color: var(--bg-sidebar) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-main) !important;
+    background-color: var(--bg-sidebar);
+    border-color: var(--border-color);
+    color: var(--text-main);
 
     &:hover {
-      background-color: var(--bg-hover) !important;
-      border-color: var(--text-disabled) !important;
+      background-color: var(--bg-hover);
+      border-color: var(--text-disabled);
     }
   }
 
   /* Variant: Text-only (Minimalist - for Theme switch, etc.) */
   &.p-button-text {
-    background-color: transparent !important;
-    border-color: transparent !important;
-    color: var(--text-muted) !important;
-    padding-left: 6px !important;
-    padding-right: 6px !important;
+    background-color: transparent;
+    border-color: transparent;
+    color: var(--text-muted);
+    padding-left: 6px;
+    padding-right: 6px;
 
     &:hover {
-      background-color: var(--bg-hover) !important;
-      color: var(--text-main) !important;
+      background-color: var(--bg-hover);
+      color: var(--text-main);
     }
   }
 }
 
 /* 2. PrimeNG Inputs (.p-inputtext) */
 .p-inputtext {
-  background-color: var(--bg-sidebar) !important;
-  border: 1px solid var(--border-color) !important;
-  border-radius: 8px !important;
-  height: 36px !important;
-  padding: 0 12px !important;
-  font-size: 13px !important;
-  color: var(--text-main) !important;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-  outline: none !important;
-  transition: border-color 0.15s ease, background-color 0.15s ease !important;
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--text-main);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 
   &::placeholder {
-    color: var(--text-disabled) !important;
+    color: var(--text-disabled);
   }
 
   &:focus {
-    border-color: var(--text-disabled) !important;
-    box-shadow: none !important;
-    background-color: var(--bg-sidebar) !important;
+    border-color: var(--text-disabled);
+    box-shadow: none;
+    background-color: var(--bg-sidebar);
   }
 }
 
 .p-iconfield {
   width: 100%;
-  .p-inputtext { padding-left: 34px !important; width: 100% !important; }
-  .p-inputicon { left: 12px !important; font-size: 13px !important; color: var(--text-disabled) !important; }
+  .p-inputtext { padding-left: 34px; width: 100%; }
+  .p-inputicon { left: 12px; font-size: 13px; color: var(--text-disabled); }
 }
 
 /* 3. PrimeNG Progress Bars (.p-progressbar) */
 .p-progressbar {
-  height: 6px !important;
-  background-color: var(--border-color) !important;
-  border-radius: 3px !important;
-  overflow: hidden !important;
-  max-width: 110px !important;
-  width: 100% !important;
-  .p-progressbar-value { background-color: var(--accent-primary) !important; border-radius: 3px !important; transition: width 0.3s ease !important; }
-  &.progress-complete .p-progressbar-value { background-color: var(--accent-success) !important; }
-  .p-progressbar-label { display: none !important; }
+  height: 6px;
+  background-color: var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+  max-width: 110px;
+  width: 100%;
+  .p-progressbar-value { background-color: var(--accent-primary); border-radius: 3px; transition: width 0.3s ease; }
+  &.progress-complete .p-progressbar-value { background-color: var(--accent-success); }
+  .p-progressbar-label { display: none; }
 }
 
 /* 4. PrimeNG Status Tags (.p-tag) */
 .p-tag {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 6px !important;
-  padding: 4px 10px !important;
-  border-radius: 12px !important;
-  font-size: 12px !important;
-  font-weight: 600 !important;
-  line-height: 1 !important;
-  font-family: 'Inter', sans-serif !important;
-  border: none !important;
-  &::before { content: "" !important; width: 6px !important; height: 6px !important; border-radius: 50% !important; display: inline-block !important; }
-  &.p-tag-info { background-color: var(--accent-info-bg) !important; color: var(--accent-info) !important; &::before { background-color: var(--accent-info) !important; } }
-  &.p-tag-success { background-color: var(--accent-success-bg) !important; color: var(--accent-success) !important; &::before { background-color: var(--accent-success) !important; } }
-  &.p-tag-secondary { background-color: var(--border-color) !important; color: var(--text-muted) !important; &::before { background-color: var(--text-muted) !important; } }
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  font-family: 'Inter', sans-serif;
+  border: none;
+  &::before { content: ""; width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+  &.p-tag-info { background-color: var(--accent-info-bg); color: var(--accent-info); &::before { background-color: var(--accent-info); } }
+  &.p-tag-success { background-color: var(--accent-success-bg); color: var(--accent-success); &::before { background-color: var(--accent-success); } }
+  &.p-tag-secondary { background-color: var(--border-color); color: var(--text-muted); &::before { background-color: var(--text-muted); } }
 }
 
 /* 5. PrimeNG Avatars (.p-avatar) */
 .p-avatar {
-  width: 24px !important;
-  height: 24px !important;
-  background-color: var(--accent-primary) !important;
-  color: var(--accent-primary-text) !important;
-  border-radius: 50% !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  .p-avatar-text { font-size: 10px !important; font-weight: 700 !important; letter-spacing: -0.02em !important; }
+  width: 24px;
+  height: 24px;
+  background-color: var(--accent-primary);
+  color: var(--accent-primary-text);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  .p-avatar-text { font-size: 10px; font-weight: 700; letter-spacing: -0.02em; }
 }
 
 /* 6. PrimeNG Tables (.p-datatable) */
 .p-datatable {
-  width: 100% !important;
-  background-color: var(--bg-sidebar) !important;
-  .p-datatable-thead > tr > th { background-color: var(--table-header-bg) !important; border-bottom: 1px solid var(--border-color) !important; padding: 14px 24px !important; font-size: 10.5px !important; font-weight: 700 !important; color: var(--text-disabled) !important; text-transform: uppercase !important; }
+  width: 100%;
+  background-color: var(--bg-sidebar);
+  .p-datatable-thead > tr > th { background-color: var(--table-header-bg); border-bottom: 1px solid var(--border-color); padding: 14px 24px; font-size: 10.5px; font-weight: 700; color: var(--text-disabled); text-transform: uppercase; }
   .p-datatable-tbody > tr {
-    background-color: transparent !important;
-    border-bottom: 1px solid var(--border-color) !important;
-    &:hover { background-color: var(--table-row-hover) !important; }
-    td { padding: 16px 24px !important; font-size: 14px !important; color: var(--text-main) !important; border: none !important; }
+    background-color: transparent;
+    border-bottom: 1px solid var(--border-color);
+    &:hover { background-color: var(--table-row-hover); }
+    td { padding: 16px 24px; font-size: 14px; color: var(--text-main); border: none; }
   }
 }
 
 /* 7. PrimeNG Selects */
 .p-select, .p-dropdown {
-  height: 36px !important; background-color: var(--bg-sidebar) !important; border: 1px solid var(--border-color) !important; border-radius: 8px !important;
-  .p-select-label, .p-dropdown-label { padding: 0 12px !important; font-size: 13px !important; color: var(--text-main) !important; line-height: 36px !important; }
-  &:not(.p-disabled).p-focus { border-color: var(--text-disabled) !important; box-shadow: none !important; }
+  height: 36px; background-color: var(--bg-sidebar); border: 1px solid var(--border-color); border-radius: 8px;
+  .p-select-label, .p-dropdown-label { padding: 0 12px; font-size: 13px; color: var(--text-main); line-height: 36px; }
+  &:not(.p-disabled).p-focus { border-color: var(--text-disabled); box-shadow: none; }
 }
 
 /* 8. PrimeNG Navigation Menu Overrides (.p-menu) */
 .p-menu {
-  background: transparent !important; border: none !important; padding: 0 !important; width: 100% !important;
-  .p-menu-submenu-header { background: transparent !important; font-size: 11px !important; font-weight: 700 !important; color: var(--text-disabled) !important; padding: 12px 12px 6px 12px !important; text-transform: uppercase !important; }
-  .p-menu-list { display: flex !important; flex-direction: column !important; gap: 4px !important; padding: 0 !important; }
+  background: transparent; border: none; padding: 0; width: 100%;
+  .p-menu-submenu-header { background: transparent; font-size: 11px; font-weight: 700; color: var(--text-disabled); padding: 12px 12px 6px 12px; text-transform: uppercase; }
+  .p-menu-list { display: flex; flex-direction: column; gap: 4px; padding: 0; }
   &.menu-collapsed {
     .p-submenu-header, .p-menu-submenu-header, .p-menu-submenu-label {
-      display: none !important;
-      padding: 0 !important;
-      margin: 0 !important;
-      height: 0 !important;
-      overflow: hidden !important;
+      display: none;
+      padding: 0;
+      margin: 0;
+      height: 0;
+      overflow: hidden;
+    }
+  }
+}
+
+/* 9a. PrimeNG Tabs — unify active indicator to brand accent */
+.p-tabs {
+  .p-tablist-active-bar {
+    background: var(--accent-primary);
+  }
+
+  .p-tab {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 10px 16px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s ease;
+
+    &:hover { color: var(--text-main); }
+
+    &[aria-selected="true"],
+    &.p-tab-active {
+      color: var(--accent-primary);
+      border-bottom-color: var(--accent-primary);
     }
   }
 }
 
 /* 9. PrimeNG Breadcrumb Overrides (.p-breadcrumb) */
 .p-breadcrumb {
-  background: transparent !important; border: none !important; padding: 0 !important;
-  .p-breadcrumb-list { display: flex !important; align-items: center !important; gap: 8px !important; }
+  background: transparent; border: none; padding: 0;
+  .p-breadcrumb-list { display: flex; align-items: center; gap: 8px; }
   .p-breadcrumb-item {
-    font-size: 14px !important; color: var(--text-muted) !important;
-    a { color: var(--text-muted) !important; text-decoration: none !important; font-size: 14px !important; &:hover { color: var(--text-main) !important; } }
-    &.p-breadcrumb-current-item { color: var(--text-main) !important; font-weight: 600 !important; }
+    font-size: 14px; color: var(--text-muted);
+    a { color: var(--text-muted); text-decoration: none; font-size: 14px; &:hover { color: var(--text-main); } }
+    &.p-breadcrumb-current-item { color: var(--text-main); font-weight: 600; }
   }
-  .p-breadcrumb-separator { color: var(--text-disabled) !important; font-size: 13px !important; }
+  .p-breadcrumb-separator { color: var(--text-disabled); font-size: 13px; }
 }
 
 /* 10. PrimeNG Password (.p-password) */
@@ -214,7 +239,7 @@
   width: 100%;
 
   .p-password-input {
-    width: 100% !important;
+    width: 100%;
   }
 
   .p-icon-field {
@@ -243,21 +268,21 @@
   }
   
   .p-card-body {
-    padding: 16px !important;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
   }
 
   .p-card-title {
-    margin: 0 !important;
-    font-size: 13px !important;
-    font-weight: 700 !important;
-    color: var(--p-text-color) !important;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--p-text-color);
   }
 
   .p-card-content {
-    padding: 0 !important;
+    padding: 0;
   }
 
   &.hoverable:hover .p-card {
@@ -267,7 +292,7 @@
 }
 
 /* Specific card overrides */
-.tai-stat-card .p-card-body { padding: 20px !important; }
+.tai-stat-card .p-card-body { padding: 20px; }
 
 .tai-panel-section {
   .p-card {
@@ -277,7 +302,7 @@
     box-shadow: none;
     background: transparent;
   }
-  .p-card-body { padding: 12px 16px !important; }
+  .p-card-body { padding: 12px 16px; }
 }
 
 .tai-dot {
@@ -285,55 +310,55 @@
   height: 6px;
   border-radius: 50%;
   display: inline-block;
-  padding: 0 !important;
-  min-width: 6px !important;
-  height: 6px !important;
+  padding: 0;
+  min-width: 6px;
+  height: 6px;
 
   /* Tag overrides to make it a dot */
   .p-tag-label { display: none; }
   
-  &.approved   { background: var(--p-green-500) !important; }
-  &.in-review  { background: var(--p-amber-500) !important; }
-  &.pending    { background: var(--p-surface-400) !important; }
-  &.changes    { background: var(--p-red-500) !important; }
-  &.processing { background: var(--p-blue-500) !important; }
+  &.approved   { background: var(--p-green-500); }
+  &.in-review  { background: var(--p-amber-500); }
+  &.pending    { background: var(--p-surface-400); }
+  &.changes    { background: var(--p-red-500); }
+  &.processing { background: var(--p-blue-500); }
 }
 
 /* ── Login Component Specific Overrides ───────────────────── */
 
 .tai-login-card {
-  border: 1px solid var(--border-color) !important;
-  border-radius: 16px !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
-  width: 100% !important;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  width: 100%;
 
   .p-card-body {
-    padding: 40px !important;
+    padding: 40px;
   }
 }
 
 .tai-login-btn {
-  height: 44px !important;
+  height: 44px;
   margin-top: 8px;
-  font-size: 14px !important;
-  width: 100% !important;
+  font-size: 14px;
+  width: 100%;
 }
 
 .tai-login-card {
   .p-checkbox .p-checkbox-box {
-    border-radius: 4px !important;
-    width: 18px !important;
-    height: 18px !important;
+    border-radius: 4px;
+    width: 18px;
+    height: 18px;
 
     &.p-highlight {
-      background: var(--accent-primary) !important;
-      border-color: var(--accent-primary) !important;
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
     }
   }
 
   .p-checkbox-label {
-    font-size: 13px !important;
-    color: var(--text-muted) !important;
-    font-weight: 500 !important;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
   }
 }
