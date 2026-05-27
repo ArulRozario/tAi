@@ -36,4 +36,12 @@ apps/api/node_modules/@prisma/
 #NX
 .nx/cache
 .nx/workspace-data
-.angular
+
+# Angular
+.angular/
+
+# Playwright
+.playwright/
+.playwright-mcp/
+playwright-report/
+test-results/
