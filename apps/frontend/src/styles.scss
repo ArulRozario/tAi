@@ -1,3 +1,6 @@
+/* Establish cascade layer order: unlayered author CSS beats all of these */
+@layer base, primeng, components, utilities;
+
 @import "primeflex/primeflex.css";
 @import "primeicons/primeicons.css";
 
@@ -6,32 +9,71 @@
 @tailwind utilities;
 
 :root {
-  /* Intelligence Core Design Tokens */
-  --bg: #0f172a;
-  --surface-1: #1e293b;
-  --surface-2: #334155;
-  --border: rgba(255, 255, 255, 0.1);
-  
-  --text-1: #f8fafc;
-  --text-2: #94a3b8;
-  --text-3: #64748b;
-  
-  --accent: #8b5cf6; /* Violet */
-  --accent-soft: rgba(139, 92, 246, 0.15);
-  
-  --success: #10b981; /* Emerald */
-  --success-soft: rgba(16, 185, 129, 0.15);
-  
-  --warning: #f59e0b; /* Amber */
-  --warning-soft: rgba(245, 158, 11, 0.15);
-  
-  --error: #ef4444; /* Red */
-  --error-soft: rgba(239, 68, 68, 0.15);
+  /* Intelligence Core Design Tokens — Light Mode (default)
+     Values mirror the theme.scss counterparts so both token
+     namespaces resolve to the same visual result.
+     Mapping: --bg ↔ --bg-canvas  |  --surface-1 ↔ --bg-card
+              --surface-2 ↔ --bg-hover  |  --border ↔ --border-color
+              --text-1 ↔ --text-main  |  --text-2 ↔ --text-muted
+              --text-3 ↔ --text-disabled  */
+  --bg: #f8fafc;           /* Slate-50  — page canvas */
+  --surface-1: #ffffff;    /* White     — cards / panels */
+  --surface-2: #f1f5f9;    /* Slate-100 — hover / raised surfaces */
+  --border: #e2e8f0;       /* Slate-200 — dividers (solid for light mode) */
+
+  --text-1: #0f172a;       /* Slate-900 — primary text */
+  --text-2: #64748b;       /* Slate-500 — secondary / muted */
+  --text-3: #94a3b8;       /* Slate-400 — disabled / placeholder */
+
+  --accent: #8b5cf6;       /* Violet — Tailwind primary utility colour */
+  --accent-soft: rgba(139, 92, 246, 0.12);
+
+  --success: #10b981;      /* Emerald */
+  --success-soft: rgba(16, 185, 129, 0.12);
+
+  --warning: #f59e0b;      /* Amber */
+  --warning-soft: rgba(245, 158, 11, 0.12);
+
+  --error: #ef4444;        /* Red */
+  --error-soft: rgba(239, 68, 68, 0.12);
+
+  --danger: #f43f5e;       /* Rose — brand danger / primary */
+  --danger-soft: rgba(244, 63, 94, 0.10);
 
   --font-sans: 'Inter', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
 
   --text: var(--text-1);
+}
+
+html.dark {
+  /* Intelligence Core Design Tokens — Dark Mode overrides
+     Surfaces align with theme.scss dark values.             */
+  --bg: #090d16;           /* Slate-950 — deep canvas */
+  --surface-1: #1e293b;    /* Slate-800 — cards / panels */
+  --surface-2: #334155;    /* Slate-700 — hover / raised surfaces */
+  --border: rgba(255, 255, 255, 0.08); /* Subtle white rule */
+
+  --text-1: #f8fafc;       /* Slate-50  — primary text */
+  --text-2: #94a3b8;       /* Slate-400 — secondary / muted */
+  --text-3: #64748b;       /* Slate-500 — disabled / placeholder */
+
+  /* Accent colours don't change hue in dark mode; soft fills
+     get a touch more opacity to remain visible on dark surfaces. */
+  --accent: #8b5cf6;
+  --accent-soft: rgba(139, 92, 246, 0.18);
+
+  --success: #34d399;      /* Pastel emerald (matches --accent-success dark) */
+  --success-soft: rgba(52, 211, 153, 0.15);
+
+  --warning: #fbbf24;      /* Soft amber (matches --accent-warning dark) */
+  --warning-soft: rgba(251, 191, 36, 0.15);
+
+  --error: #ef4444;
+  --error-soft: rgba(239, 68, 68, 0.15);
+
+  --danger: #f43f5e;       /* Rose — brand danger / primary */
+  --danger-soft: rgba(244, 63, 94, 0.15);
 }
 
 html,
@@ -135,44 +177,6 @@ app-root {
 
   .col {
     @apply flex flex-col;
-  }
-
-  /* PrimeNG Component Overrides */
-  .p-button {
-    @apply rounded-md font-medium text-sm transition-all shadow-none py-2 px-4 border border-transparent !important;
-    &.p-button-text {
-      @apply text-text-2 hover:text-text-1 hover:bg-surface-2 bg-transparent !important;
-    }
-    &.p-button-primary {
-      @apply bg-primary text-white hover:brightness-110 !important;
-    }
-    &.p-button-sm {
-      @apply py-1 px-3 text-xs !important;
-    }
-    &.p-button-icon-only {
-      @apply p-2 !important;
-    }
-  }
-
-  .p-tag {
-    @apply rounded-full px-2 py-0.5 text-xs font-medium border border-border bg-surface-2 text-text-1 !important;
-    &.p-tag-success { @apply bg-success-soft text-success border-success !important; }
-    &.p-tag-danger { @apply bg-error-soft text-error border-error !important; }
-    &.p-tag-warning { @apply bg-warning-soft text-warning border-warning !important; }
-  }
-
-  .p-progressbar {
-    @apply h-1.5 bg-surface-2 rounded-full overflow-hidden border-none !important;
-    .p-progressbar-value {
-      @apply bg-primary !important;
-    }
-    &.p-progressbar-success .p-progressbar-value { @apply bg-success !important; }
-    &.p-progressbar-danger .p-progressbar-value { @apply bg-error !important; }
-    &.p-progressbar-warning .p-progressbar-value { @apply bg-warning !important; }
-  }
-
-  .p-avatar {
-    @apply bg-surface-2 text-text-1 border border-border text-xs font-medium !important;
   }
 
   /* ── Workbench ─────────────────────────────────────────────────────────── */

@@ -6,7 +6,7 @@ import { MessageService, ConfirmationService } from 'primeng/api';
 import { providePrimeNG } from 'primeng/config';
 import Lara from '@primeng/themes/lara';
 import { routes } from './app.routes';
-import { authInterceptor } from './core/interceptors/auth.interceptor';
+import { authInterceptor } from './auth/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -17,7 +17,10 @@ export const appConfig: ApplicationConfig = {
     providePrimeNG({
       theme: {
         preset: Lara,
-        options: { darkModeSelector: '.my-app-dark' },
+        options: {
+          darkModeSelector: '.dark',
+          cssLayer: { name: 'primeng', order: 'base, primeng, components, utilities' },
+        },
       },
     }),
     MessageService,
