@@ -115,6 +115,7 @@ export class SegmentToolbarComponent implements OnDestroy {
     this.isDirty.set(false);
     this.isEditing.set(false);
     this.isSaving.set(false);
+    this.state.setEditingSegment(null);
   }
 
   toggleApproval() {
@@ -122,11 +123,11 @@ export class SegmentToolbarComponent implements OnDestroy {
     if (!segId) return;
     const nowApproved = this.isApproved();
     this.isApproving.set(true);
-    this.apiService.patchSentence(segId, { isApproved: !nowApproved }).subscribe({
-      next: () => {
-        const updated = new Set(this.state.approvedSegmentIds());
-        if (nowApproved) updated.delete(segId); else updated.add(segId);
-        this.state.approvedSegmentIds.set(updated);
+    this.apiService.patchSegmentApproval(segId, this.pageId, !nowApproved).subscribe({
+      next: (res) => {
+        this.state.approvedSegmentIds.set(new Set(
+          Object.entries(res.segmentApprovals).filter(([, v]) => v).map(([k]) => k)
+        ));
         this.isApproving.set(false);
         this.messageService.add({ severity: 'success', summary: nowApproved ? 'Unapproved' : 'Approved', life: 1000 });
       },
@@ -139,6 +140,7 @@ export class SegmentToolbarComponent implements OnDestroy {
 
   openChat() {
     this.state.rightPanelCollapsed.set(false);
+    this.state.rightPanelMode.set('chat');
   }
 
   startEdit() {
@@ -152,6 +154,7 @@ export class SegmentToolbarComponent implements OnDestroy {
     this.isDirty.set(false);
     el.contentEditable = 'true';
     el.focus();
+    this.state.setEditingSegment(segId);
 
     const range = document.createRange();
     range.selectNodeContents(el);
@@ -173,14 +176,20 @@ export class SegmentToolbarComponent implements OnDestroy {
     }
     this.isDirty.set(false);
     this.isEditing.set(false);
+    this.state.setEditingSegment(null);
   }
 
   saveEdit() {
     const segId = this.state.activeSegmentId();
     if (!segId || !this.editTarget) return;
 
+    const MAX_SEGMENT_LENGTH = 10_000;
     const newText = this.editTarget.innerText.trim();
     if (!newText) return;
+    if (newText.length > MAX_SEGMENT_LENGTH) {
+      this.messageService.add({ severity: 'error', summary: 'Too long', detail: `Segment text cannot exceed ${MAX_SEGMENT_LENGTH.toLocaleString()} characters.` });
+      return;
+    }
 
     this.detachInputListener();
     this.isSaving.set(true);
@@ -191,6 +200,7 @@ export class SegmentToolbarComponent implements OnDestroy {
         this.isSaving.set(false);
         this.isEditing.set(false);
         this.isDirty.set(false);
+        this.state.setEditingSegment(null);
         this.messageService.add({ severity: 'success', summary: 'Saved', detail: 'Edit saved.', life: 1500 });
         this.contentChanged.emit();
         this.state.setActiveSegment(null);

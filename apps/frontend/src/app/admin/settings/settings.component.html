@@ -20,6 +20,15 @@
         <p-progressSpinner styleClass="sm-spinner" />
         <span>Loading model configurations…</span>
       </div>
+    } @else if (loadError()) {
+      <div class="load-error-state">
+        <i class="pi pi-exclamation-circle"></i>
+        <p>Could not load model configurations.</p>
+        <p class="error-hint">Make sure the API server is reachable.</p>
+        <button class="retry-btn" (click)="retryLoad()">
+          <i class="pi pi-refresh"></i> Retry
+        </button>
+      </div>
     } @else {
       <div class="agent-cards">
         @for (card of agents(); track card.agentType) {
@@ -79,19 +88,19 @@
                   type="text"
                   pInputText
                   [(ngModel)]="card.endpoint"
-                  [placeholder]="card.provider === 'ANTHROPIC' ? '—' : 'http://ollama:11434'"
-                  [disabled]="card.provider === 'ANTHROPIC'"
+                  [placeholder]="'—'"
+                  [disabled]="true"
                   class="field-input"
                 />
               </div>
-              @if (card.provider === 'ANTHROPIC') {
+              @if (card.provider === 'ANTHROPIC' || card.provider === 'GOOGLE') {
                 <div class="field-group">
                   <label>API Key</label>
                   <input
                     type="password"
                     pInputText
                     [(ngModel)]="card.apiKey"
-                    placeholder="sk-ant-…"
+                    [placeholder]="card.provider === 'ANTHROPIC' ? 'sk-ant-…' : 'AIza…'"
                     class="field-input"
                   />
                 </div>

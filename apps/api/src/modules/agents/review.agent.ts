@@ -56,33 +56,18 @@ export class ReviewAgent {
     const targetLang = project.targetLang;
     const styleGuide = project.styleGuide.currentVersion?.content || 'Standard theological formal register.';
 
-    // 2. Fetch top 50 glossary terms for this style guide
-    const glossaryTerms = await this.prisma.glossaryTerm.findMany({
-      where: { styleGuideId: project.styleGuideId },
-      take: 50,
-      orderBy: { sourceTerm: 'asc' },
-    });
-
-    const glossaryBlock = glossaryTerms
-      .map((term) => `${term.sourceTerm} → ${term.targetTerm}`)
-      .join('\n');
-
-    // 3. Construct System Prompt
+    // 2. Construct System Prompt
     const systemPrompt = `You are a professional linguistic and technical quality assurance agent.
 Your task is to review the ${targetLang} HTML-lite translation against the ${sourceLang} original text for a document page.
 
-Apply the register guidelines, grammar, spelling, and glossary rules strictly.
+Apply the register guidelines, grammar, spelling, and style rules strictly.
 
 ## Quality Criteria
-- Terminology accuracy: ensure glossary terms are used correctly.
 - Theology & Register: Verify tone matches Parisutha Vedagamam Tamil style.
 - Formatting & Tags: Verify that HTML tags in translatedHtml match originalHtml perfectly (matching b, i, u, sup, and p paragraph markers). If tags are broken or misaligned, flag it.
 
 ## Style Guide Reference
 ${styleGuide}
-
-## Glossary Reference
-${glossaryBlock || 'No glossary terms defined.'}
 
 ## Output Format (strict JSON array of errors)
 \`\`\`json
@@ -94,7 +79,7 @@ ${glossaryBlock || 'No glossary terms defined.'}
     "currentText": "The wrong translated segment",
     "suggestedText": "Your recommended correction",
     "issueDescription": "Detailed reason why it is flagged",
-    "reference": "Reference to glossary or style guide rule if applicable",
+    "reference": "Reference to style guide rule if applicable",
     "aiNote": "Linguistic reasoning"
   }
 ]

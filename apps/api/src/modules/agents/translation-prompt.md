@@ -67,10 +67,6 @@ Use your judgment. If a piece of content has meaning on its own and could be ind
 {{styleGuideContent}}
 [/GENRE_STYLE_GUIDE]
 
-[GLOSSARY]
-{{glossaryBlock}}
-[/GLOSSARY]
-
 ---
 
 I am providing you with a single PDF containing {{pageCount}} scanned book pages in reading order.

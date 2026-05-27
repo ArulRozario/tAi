@@ -1,11 +1,13 @@
-import { Component, OnInit, AfterViewInit, signal, inject, effect } from '@angular/core';
+import { Component, OnInit, AfterViewInit, signal, inject, effect, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { SelectModule } from 'primeng/select';
 import { InputTextModule } from 'primeng/inputtext';
-import { StyleGuideService } from '../projects/style-guide.service';
+import { TextareaModule } from 'primeng/textarea';
+import { DialogModule } from 'primeng/dialog';
+import { StyleGuideService, StyleGuideVersion } from '../projects/style-guide.service';
 import { MessageService } from 'primeng/api';
 import { AiChatComponent } from '../shared/components/ai-chat/ai-chat.component';
 import { AiChatService } from '../shared/components/ai-chat/ai-chat.service';
@@ -22,6 +24,8 @@ import { MarkdownEditorComponent } from '../shared/components/markdown-editor/ma
     ButtonModule,
     SelectModule,
     InputTextModule,
+    TextareaModule,
+    DialogModule,
     AiChatComponent,
     MarkdownEditorComponent,
   ],
@@ -38,15 +42,24 @@ export class StyleGuideDetailComponent implements OnInit, AfterViewInit {
   private messageService = inject(MessageService);
   private chatService = inject(AiChatService);
   private unifiedChat = inject(UnifiedChatService);
+  private cdr = inject(ChangeDetectorRef);
 
   segmentUnits = [
-    { label: 'Verse', value: 'verse' },
-    { label: 'Paragraph', value: 'paragraph' }
+    { label: 'Verse', value: 'VERSE' },
+    { label: 'Paragraph', value: 'PARAGRAPH' },
+    { label: 'Page', value: 'PAGE' },
   ];
-  selectedSegmentUnit = 'verse';
+  selectedSegmentUnit = 'VERSE';
 
   versions: { label: string; value: string }[] = [];
   selectedVersion = '';
+  versionList: StyleGuideVersion[] = [];
+
+  showHistoryDialog = false;
+  showTestDialog = false;
+  testSampleText = '';
+  testResult = signal<string | null>(null);
+  isTesting = signal<boolean>(false);
 
   isNew = signal<boolean>(false);
   styleGuideName = signal<string>('');
@@ -62,14 +75,11 @@ export class StyleGuideDetailComponent implements OnInit, AfterViewInit {
 
   constructor(private route: ActivatedRoute) {
     effect(() => {
-      const id = this.styleGuideId();
-      if (id) {
-        this.unifiedChat.configure({
-          context: 'styleGuide',
-          entityId: id,
-          currentContent: this.editorContent(),
-        });
-      }
+      this.unifiedChat.configure({
+        context: 'styleGuide',
+        entityId: this.styleGuideId() ?? undefined,
+        currentContent: this.editorContent(),
+      });
     });
 
     this.chatService.contentAccepted$.subscribe((content) => {
@@ -125,21 +135,25 @@ export class StyleGuideDetailComponent implements OnInit, AfterViewInit {
     this.styleGuideService.getStyleGuide(id).subscribe({
       next: (styleGuide) => {
         this.styleGuideName.set(styleGuide.name);
-        this.selectedSegmentUnit = styleGuide.segmentUnit || 'verse';
+        this.selectedSegmentUnit = styleGuide.segmentUnit || 'VERSE';
         this.editorContent.set(styleGuide.currentVersion?.content || '');
         this.isLoading.set(false);
 
         // Load versions list
         this.styleGuideService.getStyleGuideVersions(id).subscribe({
-          next: (versionList: any[]) => {
+          next: (versionList: StyleGuideVersion[]) => {
+            this.versionList = versionList;
             this.versions = versionList.map(v => ({
-              label: `v${v.version}${v.id === styleGuide.currentVersion?.id ? ' - current' : ''}`,
-              value: v.version
+              label: `v${v.version}${v.id === styleGuide.currentVersion?.id ? ' (current)' : ''}`,
+              value: v.id,
             }));
-            this.selectedVersion = styleGuide.currentVersion?.version || '';
+            this.selectedVersion = styleGuide.currentVersion?.id || '';
+            this.cdr.detectChanges();
           },
           error: () => {
+            this.versionList = [];
             this.versions = [];
+            this.cdr.detectChanges();
           }
         });
       },
@@ -153,19 +167,68 @@ export class StyleGuideDetailComponent implements OnInit, AfterViewInit {
   private defaultTemplate(): string {
     return `# New Style Guide
 
-## Overview
-Describe the purpose and audience of this styleGuide.
+## Purpose
+Describe the purpose and target audience of this style guide.
 
 ## Core Rules
 1. Rule one
 2. Rule two
 3. Rule three
 
-## Terminology
-| English | Target Language |
-|---------|----------------|
-| Example | Example        |
+## Terminology — Non-Negotiable Terms
+| Source Term | Target Term | Notes |
+|-------------|-------------|-------|
+| Example     | Example     |       |
+
+## Register
+Describe the formality level and tone (e.g. formal, liturgical, conversational).
+
+## Sentence Structure
+Describe preferred sentence patterns, word order, and structural conventions.
+
+## Proper Nouns
+List proper nouns and their required translations or transliterations.
+
+## Common Pitfalls
+List frequent mistakes to avoid during translation.
+
+## Examples
+Provide before/after translation examples demonstrating the rules above.
 `;
+  }
+
+  onVersionChange(versionId: string) {
+    const version = this.versionList.find(v => v.id === versionId);
+    if (version) {
+      this.editorContent.set(version.content);
+    }
+  }
+
+  openHistory() {
+    this.showHistoryDialog = true;
+  }
+
+  openTest() {
+    this.testSampleText = '';
+    this.testResult.set(null);
+    this.showTestDialog = true;
+  }
+
+  runTest() {
+    const id = this.styleGuideId();
+    if (!id || !this.testSampleText.trim()) return;
+    this.isTesting.set(true);
+    this.testResult.set(null);
+    this.styleGuideService.testStyleGuide(id, this.testSampleText).subscribe({
+      next: (result) => {
+        this.testResult.set(result.translation);
+        this.isTesting.set(false);
+      },
+      error: () => {
+        this.isTesting.set(false);
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Translation test failed.' });
+      }
+    });
   }
 
   saveStyleGuide() {
@@ -173,12 +236,14 @@ Describe the purpose and audience of this styleGuide.
     this.isSaving.set(true);
 
     if (this.isNew()) {
-      if (!this.styleGuideName() || this.styleGuideName() === 'New Style Guide') {
+      const name = this.styleGuideName().trim();
+      if (!name || name === 'New Style Guide') {
+        this.messageService.add({ severity: 'warn', summary: 'Name required', detail: 'Enter a name before saving.' });
         this.isSaving.set(false);
         return;
       }
       this.styleGuideService.createStyleGuide({
-        name: this.styleGuideName(),
+        name: name,
         segmentUnit: this.selectedSegmentUnit,
         content: content
       }).subscribe({
@@ -196,6 +261,9 @@ Describe the purpose and audience of this styleGuide.
         this.isSaving.set(false);
         return;
       }
+      this.styleGuideService.patchStyleGuide(id, {
+        segmentUnit: this.selectedSegmentUnit,
+      }).subscribe();
       this.styleGuideService.createStyleGuideVersion(id, { content: content }).subscribe({
         next: () => {
           this.isSaving.set(false);

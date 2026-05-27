@@ -16,15 +16,16 @@ export class HealthController {
 
   @Get()
   async check() {
-    const [db, minio, ollama, anthropic] = await Promise.all([
+    const [db, storage, anthropic] = await Promise.all([
       this.checkDb(),
-      this.checkMinio(),
-      this.checkOllama(),
+      this.checkStorage(),
       this.checkAnthropic(),
     ]);
 
-    const status = [db, minio, ollama].every((s) => s === 'ok') ? 'ok' : 'degraded';
-    return { status, db, minio, ollama, anthropic };
+    // System is healthy when core services (DB + storage) are up.
+    // Anthropic is optional; its absence doesn't degrade overall status.
+    const status = [db, storage].every((s) => s === 'ok') ? 'ok' : 'degraded';
+    return { status, db, storage, anthropic };
   }
 
   private async checkDb(): Promise<string> {
@@ -37,23 +38,12 @@ export class HealthController {
     }
   }
 
-  private async checkMinio(): Promise<string> {
+  private async checkStorage(): Promise<string> {
     try {
       await this.minio.listFiles('health-check-probe');
       return 'ok';
     } catch (err) {
-      this.logger.error(`MinIO health check failed: ${(err as Error).message}`);
-      return 'error';
-    }
-  }
-
-  private async checkOllama(): Promise<string> {
-    try {
-      const url = process.env.OLLAMA_API_URL || 'http://localhost:11434';
-      await firstValueFrom(this.http.get(`${url}/api/tags`, { timeout: 3000 }));
-      return 'ok';
-    } catch (err) {
-      this.logger.warn(`Ollama health check failed: ${(err as Error).message}`);
+      this.logger.error(`Storage health check failed: ${(err as Error).message}`);
       return 'error';
     }
   }

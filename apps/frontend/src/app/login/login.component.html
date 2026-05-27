@@ -19,14 +19,15 @@
       <form (ngSubmit)="onLogin()" class="login-form">
         <div class="form-field">
           <label for="email">Email</label>
-          <input 
-            type="text" 
-            pInputText 
-            id="email" 
+          <input
+            type="email"
+            pInputText
+            id="email"
             name="email"
-            [(ngModel)]="email" 
-            placeholder="ravi@tai.ws" 
+            [(ngModel)]="email"
+            placeholder="ravi@tai.ws"
             class="w-full"
+            autocomplete="email"
           />
         </div>
 

@@ -1,3 +1,10 @@
+/**
+ * Local dev seed — safe to run on every `docker compose up` via the db-init container.
+ * Uses upserts throughout so existing data is never overwritten.
+ *
+ * Set SEED_RESET=true to wipe all tables first (destructive — dev only).
+ */
+
 import { PrismaClient } from '@prisma/client';
 import { hashPassword } from '../src/modules/auth/password.util';
 
@@ -6,30 +13,36 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('--- Database Seeding Started ---');
 
-  // 1. Clean Database
-  console.log('Cleaning existing records...');
-  await prisma.activityLog.deleteMany({});
-  await prisma.modelConfig.deleteMany({});
-  await prisma.glossaryTerm.deleteMany({});
-  await prisma.translationMemory.deleteMany({});
-  await prisma.chatMessage.deleteMany({});
-  await prisma.chatSession.deleteMany({});
-  await prisma.error.deleteMany({});
-  await prisma.pageEdit.deleteMany({});
-  await prisma.pageReviewer.deleteMany({});
-  await prisma.page.deleteMany({});
-  await prisma.chapter.deleteMany({});
-  await prisma.job.deleteMany({});
-  await prisma.project.deleteMany({});
-  await prisma.styleGuideVersion.deleteMany({});
-  await prisma.styleGuide.deleteMany({});
-  await prisma.refreshToken.deleteMany({});
-  await prisma.user.deleteMany({});
+  // ── Optional destructive reset (SEED_RESET=true) ──────────────────────────
+  if (process.env.SEED_RESET === 'true') {
+    console.log('⚠️  SEED_RESET=true — wiping all tables...');
+    await prisma.activityLog.deleteMany({});
+    await prisma.modelConfig.deleteMany({});
+    await prisma.glossaryTerm.deleteMany({});
+    await prisma.translationMemory.deleteMany({});
+    await prisma.chatMessage.deleteMany({});
+    await prisma.chatSession.deleteMany({});
+    await prisma.error.deleteMany({});
+    await prisma.pageEdit.deleteMany({});
+    await prisma.pageReviewer.deleteMany({});
+    await prisma.page.deleteMany({});
+    await prisma.chapter.deleteMany({});
+    await prisma.job.deleteMany({});
+    await prisma.project.deleteMany({});
+    await prisma.styleGuideVersion.deleteMany({});
+    await prisma.styleGuide.deleteMany({});
+    await prisma.refreshToken.deleteMany({});
+    await prisma.user.deleteMany({});
+    console.log('All tables wiped.');
+  }
 
-  // 2. Users Seeding
-  console.log('Seeding initial users...');
-  const admin = await prisma.user.create({
-    data: {
+  // ── 1. Users ──────────────────────────────────────────────────────────────
+  console.log('Seeding users...');
+
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@tai.local' },
+    update: {},
+    create: {
       email: 'admin@tai.local',
       passwordHash: hashPassword('admin123'),
       name: 'System Admin',
@@ -37,8 +50,10 @@ async function main() {
     },
   });
 
-  const master = await prisma.user.create({
-    data: {
+  const master = await prisma.user.upsert({
+    where: { email: 'master@tai.local' },
+    update: {},
+    create: {
       email: 'master@tai.local',
       passwordHash: hashPassword('master123'),
       name: 'Master Reviewer',
@@ -46,8 +61,10 @@ async function main() {
     },
   });
 
-  const reviewer = await prisma.user.create({
-    data: {
+  await prisma.user.upsert({
+    where: { email: 'reviewer@tai.local' },
+    update: {},
+    create: {
       email: 'reviewer@tai.local',
       passwordHash: hashPassword('reviewer123'),
       name: 'Tamil Bible Reviewer',
@@ -55,11 +72,11 @@ async function main() {
     },
   });
 
-  console.log('Users seeded successfully!');
+  console.log('Users seeded.');
 
-  // 3. Seeding Bible Style Guide
-  console.log('Seeding "Tamil Bible (Parisutha Vedagamam)" Style Guide...');
-  
+  // ── 2. Style guide ────────────────────────────────────────────────────────
+  console.log('Seeding style guide...');
+
   const pdfTemplate = {
     pageSize: 'A5',
     columns: 2,
@@ -77,17 +94,24 @@ async function main() {
     chapterDropCap: false
   };
 
-  const styleGuide = await prisma.styleGuide.create({
-    data: {
-      name: 'Tamil Bible (Parisutha Vedagamam)',
-      description: 'Authoritative register and style guide for translating Christian theological and scripture texts into the traditional Protestant Tamil Bible style.',
-      icon: '📖',
-      color: '#7c3aed',
-      segmentUnit: 'VERSE',
-      pdfTemplate,
-      createdById: admin.id,
-    }
+  // StyleGuide has no unique constraint on name — use findFirst + conditional create.
+  let styleGuide = await prisma.styleGuide.findFirst({
+    where: { name: 'Tamil Bible (Parisutha Vedagamam)' },
   });
+
+  if (!styleGuide) {
+    styleGuide = await prisma.styleGuide.create({
+      data: {
+        name: 'Tamil Bible (Parisutha Vedagamam)',
+        description: 'Authoritative register and style guide for translating Christian theological and scripture texts into the traditional Protestant Tamil Bible style.',
+        icon: '📖',
+        color: '#7c3aed',
+        segmentUnit: 'VERSE',
+        pdfTemplate,
+        createdById: admin.id,
+      },
+    });
+  }
 
   const styleGuideContent = `# Tamil Bible (Parisutha Vedagamam) Translation Style Guide
 English → Tamil (Parisutha Vedagamam Protestant Tamil Bible style)
@@ -191,26 +215,36 @@ English: Grace and peace to you from God our Father and the Lord Jesus Christ.
 Tamil: நம்முடைய பிதாவாகிய தேவனாலும் கர்த்தராகிய இயேசுகிறிஸ்துவினாலும் உங்களுக்கு கிருபையும் சமாதானமும் உண்டாவதாக.
 `;
 
-  const styleGuideVersion = await prisma.styleGuideVersion.create({
-    data: {
-      styleGuideId: styleGuide.id,
-      version: '1.0',
-      content: styleGuideContent,
-      note: 'Initial import of the Protestant Tamil Bible translation standard rules and guidelines.',
-      createdById: admin.id,
-    }
+  // StyleGuideVersion has no unique constraint — use findFirst + conditional create.
+  let styleGuideVersion = await prisma.styleGuideVersion.findFirst({
+    where: { styleGuideId: styleGuide.id, version: '1.0' },
   });
 
-  await prisma.styleGuide.update({
-    where: { id: styleGuide.id },
-    data: { currentVersionId: styleGuideVersion.id }
-  });
+  if (!styleGuideVersion) {
+    styleGuideVersion = await prisma.styleGuideVersion.create({
+      data: {
+        styleGuideId: styleGuide.id,
+        version: '1.0',
+        content: styleGuideContent,
+        note: 'Initial import of the Protestant Tamil Bible translation standard rules and guidelines.',
+        createdById: admin.id,
+      },
+    });
+  }
 
-  console.log('Style guide and initial StyleGuideVersion seeded successfully!');
+  // Wire currentVersionId only if not already set.
+  if (!styleGuide.currentVersionId) {
+    await prisma.styleGuide.update({
+      where: { id: styleGuide.id },
+      data: { currentVersionId: styleGuideVersion.id },
+    });
+  }
 
-  // 4. Seeding Glossary Terms (50 items)
-  console.log('Seeding glossary terms linked to Bible style guide...');
-  
+  console.log('Style guide seeded.');
+
+  // ── 3. Glossary terms ─────────────────────────────────────────────────────
+  console.log('Seeding glossary terms...');
+
   const glossaryTerms = [
     { sourceTerm: 'God', targetTerm: 'தேவன்', context: 'theological — never கடவுள்' },
     { sourceTerm: 'Lord', targetTerm: 'கர்த்தர்', context: 'Protestant term — never ஆண்டவர் (Catholic)' },
@@ -260,77 +294,63 @@ Tamil: நம்முடைய பிதாவாகிய தேவனால�
     { sourceTerm: 'Blood', targetTerm: 'இரத்தம்', context: 'sacrificial/covenantal' },
     { sourceTerm: 'Cross', targetTerm: 'சிலுவை', context: 'instrument of crucifixion' },
     { sourceTerm: 'Resurrection', targetTerm: 'உயிர்த்தெழுதல்', context: 'rising from death' },
-    { sourceTerm: 'Baptism', targetTerm: 'ஞானஸ்நானம்', context: 'sacrament of initiation' }
+    { sourceTerm: 'Baptism', targetTerm: 'ஞானஸ்நானம்', context: 'sacrament of initiation' },
   ];
 
+  // GlossaryTerm has @@unique([styleGuideId, sourceTerm]) — upsert directly.
   for (const term of glossaryTerms) {
-    await prisma.glossaryTerm.create({
-      data: {
+    await prisma.glossaryTerm.upsert({
+      where: {
+        styleGuideId_sourceTerm: {
+          styleGuideId: styleGuide.id,
+          sourceTerm: term.sourceTerm,
+        },
+      },
+      update: {},
+      create: {
         styleGuideId: styleGuide.id,
         sourceTerm: term.sourceTerm,
         targetTerm: term.targetTerm,
         context: term.context,
-      }
+      },
     });
   }
 
-  console.log(`Successfully seeded ${glossaryTerms.length} glossary terms!`);
+  console.log(`${glossaryTerms.length} glossary terms seeded.`);
 
-  // 5. Seeding Default Model Configurations
-  console.log('Seeding model configurations...');
-  
-  await prisma.modelConfig.create({
-    data: {
-      agentType: 'TRANSLATION',
-      provider: 'OLLAMA',
-      modelName: 'qwen2.5:7b',
-      isActive: true,
-      isDefault: true,
-    }
-  });
+  // ── 4. Model configs ──────────────────────────────────────────────────────
+  console.log('Seeding model configs...');
 
-  await prisma.modelConfig.create({
-    data: {
-      agentType: 'REVIEW',
-      provider: 'OLLAMA',
-      modelName: 'phi4:mini',
-      isActive: true,
-      isDefault: true,
-    }
-  });
+  // ModelConfig has @@unique([agentType, isDefault]) — upsert on that key.
+  const modelConfigs = [
+    { agentType: 'TRANSLATION' as const, provider: 'OLLAMA' as const, modelName: 'qwen2.5:7b',         isDefault: true  },
+    { agentType: 'REVIEW'      as const, provider: 'OLLAMA' as const, modelName: 'phi4:mini',           isDefault: true  },
+    { agentType: 'CHAT'        as const, provider: 'OLLAMA' as const, modelName: 'qwen2.5:7b',         isDefault: true  },
+    { agentType: 'CHAT'        as const, provider: 'ANTHROPIC' as const, modelName: 'claude-sonnet-4-6', isDefault: false },
+    { agentType: 'EMBEDDING'   as const, provider: 'OLLAMA' as const, modelName: 'nomic-embed-text',   isDefault: true  },
+  ];
 
-  await prisma.modelConfig.create({
-    data: {
-      agentType: 'CHAT',
-      provider: 'OLLAMA',
-      modelName: 'qwen2.5:7b',
-      isActive: true,
-      isDefault: true,
-    }
-  });
+  for (const cfg of modelConfigs) {
+    await prisma.modelConfig.upsert({
+      where: {
+        agentType_isDefault: {
+          agentType: cfg.agentType,
+          isDefault: cfg.isDefault,
+        },
+      },
+      update: {},
+      create: {
+        agentType: cfg.agentType,
+        provider: cfg.provider,
+        modelName: cfg.modelName,
+        isActive: true,
+        isDefault: cfg.isDefault,
+      },
+    });
+  }
 
-  await prisma.modelConfig.create({
-    data: {
-      agentType: 'CHAT',
-      provider: 'ANTHROPIC',
-      modelName: 'claude-sonnet-4-6',
-      isActive: true,
-      isDefault: false,
-    }
-  });
-
-  await prisma.modelConfig.create({
-    data: {
-      agentType: 'EMBEDDING',
-      provider: 'OLLAMA',
-      modelName: 'nomic-embed-text',
-      isActive: true,
-      isDefault: true,
-    }
-  });
-
-  console.log('Successfully seeded Model configurations!');
-  console.log('--- Database Seeding Completed Successfully ---');
+  console.log('Model configs seeded.');
+  console.log('--- Database Seeding Completed ---');
 }
 
 main()

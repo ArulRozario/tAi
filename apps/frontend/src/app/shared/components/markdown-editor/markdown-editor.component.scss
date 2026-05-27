@@ -8,182 +8,126 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
-  background: var(--bg-sidebar);
-}
 
-// ── Toolbar ──────────────────────────────────────────────────────
-.md-toolbar {
-  height: 40px;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-sidebar);
-  flex-shrink: 0;
-  gap: 12px;
-}
+  // EasyMDE root wrapper
+  ::ng-deep .EasyMDEContainer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 
-.md-toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
+    .editor-toolbar {
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-sidebar);
+      padding: 4px 10px;
+      flex-shrink: 0;
 
-.md-toolbar-sep {
-  width: 1px;
-  height: 20px;
-  background: var(--border-color);
-  margin: 0 6px;
-}
+      button, a {
+        color: var(--text-muted) !important;
+        border-radius: 4px;
 
-.md-toolbtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 6px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+        &:hover, &.active {
+          background: var(--bg-hover) !important;
+          color: var(--text-main) !important;
+          border-color: transparent !important;
+        }
+      }
 
-  &:hover {
-    background: var(--bg-hover);
-    color: var(--text-main);
-  }
-
-  &:active {
-    background: var(--bg-hover);
-  }
-
-  b {
-    font-weight: 700;
-  }
-
-  i {
-    font-style: italic;
-  }
-}
-
-.md-icon {
-  font-size: 14px;
-  line-height: 1;
-}
-
-// ── Mode Toggles (Workbench Standard) ────────────────────────────
-.md-mode-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  background: var(--bg-hover);
-  border-radius: 6px;
-  padding: 2px;
-  border: 1px solid var(--border-color);
-}
-
-.md-modebtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border: none;
-  background: transparent;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-disabled);
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    color: var(--text-main);
-  }
-
-  &.active {
-    background: var(--bg-sidebar);
-    color: var(--text-main);
-    border: 1px solid var(--border-color);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-}
-
-// ── Editor Area ──────────────────────────────────────────────────
-.md-editor-area {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-
-  &.mode-wysiwyg {
-    .md-wysiwyg-pane {
-      flex: 1;
-      width: 100%;
+      i.separator {
+        border-left-color: var(--border-color) !important;
+      }
     }
-  }
 
-  &.mode-markdown {
-    .md-markdown-pane {
+    .CodeMirror {
       flex: 1;
-      width: 100%;
+      height: auto;
+      background: var(--bg-sidebar);
+      color: var(--text-main);
+      border: none;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      line-height: 1.65;
+
+      .CodeMirror-cursor { border-left-color: var(--text-main); }
+      .CodeMirror-selected { background: var(--bg-hover); }
+      .CodeMirror-scroll { padding-bottom: 0; }
     }
-  }
 
-  &.mode-split {
-    .md-wysiwyg-pane,
-    .md-markdown-pane {
-      flex: 1;
-      width: 50%;
+    .editor-preview-side,
+    .editor-preview {
+      background: var(--bg-canvas);
+      border: none;
+      border-left: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.7;
+      padding: 20px 24px;
+
+      h1, h2, h3, h4, h5, h6 {
+        color: var(--text-main);
+        font-weight: 700;
+        margin: 1.2em 0 0.4em;
+        line-height: 1.3;
+        &:first-child { margin-top: 0; }
+      }
+      h1 { font-size: 1.5em; }
+      h2 { font-size: 1.25em; }
+      h3 { font-size: 1.1em; }
+
+      p { margin: 0 0 0.85em; &:last-child { margin-bottom: 0; } }
+      ul, ol { padding-left: 1.5em; margin: 0.5em 0 0.85em; }
+      li { margin: 0.25em 0; }
+
+      blockquote {
+        border-left: 3px solid var(--accent-primary);
+        margin: 0.8em 0;
+        padding: 4px 14px;
+        color: var(--text-disabled);
+        font-style: italic;
+      }
+
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.88em;
+        background: var(--bg-hover);
+        border-radius: 4px;
+        padding: 1px 5px;
+        color: var(--text-main);
+      }
+
+      pre {
+        background: var(--bg-sidebar);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        padding: 12px 16px;
+        overflow-x: auto;
+        margin: 0.8em 0;
+        code { background: none; padding: 0; }
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 0.8em 0;
+        font-size: 13px;
+        th, td { border: 1px solid var(--border-color); padding: 6px 12px; text-align: left; }
+        th { background: var(--bg-hover); color: var(--text-main); font-weight: 600; }
+      }
+
+      a { color: var(--accent-primary); text-decoration: none; &:hover { text-decoration: underline; } }
+      hr { border: none; border-top: 1px solid var(--border-color); margin: 1em 0; }
+      strong { color: var(--text-main); font-weight: 700; }
     }
-  }
-}
 
-.md-pane {
-  display: flex;
-  flex-direction: column;
-  overflow: auto;
-  height: 100%;
-  min-height: 0;
-  padding: 20px;
-  outline-style: 1px solid var(--border-color);
-}
+    // Side-by-side layout
+    &.sided--no-fullscreen {
+      .editor-preview-side { border-top: none; }
+    }
 
-.md-split-divider {
-  width: 1px;
-  background: var(--border-color);
-  flex-shrink: 0;
-}
-
-// ── Milkdown Container ───────────────────────────────────────────
-.milkdown-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 20px;
- 
-}
-
-// ── Markdown Textarea ────────────────────────────────────────────
-.md-textarea {
-  flex: 1;
-  width: 100%;
-  padding: 20px;
-  border: none;
-  outline: none;
-  resize: none;
-  font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text-main);
-  background: var(--bg-sidebar);
-  tab-size: 2;
-
-  &::placeholder {
-    color: var(--text-disabled);
+    .editor-statusbar {
+      display: none;
+    }
   }
 }

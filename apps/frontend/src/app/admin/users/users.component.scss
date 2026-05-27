@@ -72,7 +72,7 @@
   letter-spacing: 0.02em;
 
   &.pill--accent {
-    background: rgba(244, 63, 94, 0.12);
+    background: var(--danger-soft);
     color: var(--accent-primary);
     border: 1px solid rgba(244, 63, 94, 0.3);
   }
@@ -142,6 +142,49 @@
   &:hover {
     background: var(--bg-hover);
     color: var(--text-main);
+  }
+}
+
+// ─── Error State ───────────────────────────────────────────
+.load-error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 56px 0;
+  color: var(--text-disabled);
+  font-size: 13px;
+
+  .pi-exclamation-circle {
+    font-size: 2rem;
+    color: var(--accent-danger);
+    opacity: 0.7;
+  }
+
+  span {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+}
+
+.retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+
+  &:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
   }
 }
 
@@ -219,7 +262,7 @@
 
     &.selected {
       border-color: var(--accent-primary);
-      background: rgba(244, 63, 94, 0.05);
+      background: var(--danger-soft);
       color: var(--text-main);
     }
 
@@ -335,47 +378,5 @@
 }
 
 // ─── PrimeNG Overrides ─────────────────────────────────────
-:host ::ng-deep {
-  .p-drawer-content {
-    padding: 0;
-  }
-
-  .members-table {
-    .p-datatable-header-row > th {
-      background: transparent;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      color: var(--text-disabled);
-      padding: 10px 16px;
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .p-datatable-tbody > tr > td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border-color);
-      font-size: 13px;
-    }
-
-    .p-datatable-tbody > tr:last-child > td {
-      border-bottom: none;
-    }
-  }
-
-  .detail-avatar {
-    background: var(--accent-primary) !important;
-    color: #fff !important;
-    font-size: 1.2rem !important;
-    font-weight: 700 !important;
-  }
-
-  .member-avatar {
-    background: var(--bg-hover) !important;
-    color: var(--text-muted) !important;
-    font-size: 11px !important;
-    font-weight: 700 !important;
-    width: 28px !important;
-    height: 28px !important;
-    font-size: 10px !important;
-  }
-}
+// .p-drawer-content, .members-table, .detail-avatar, .member-avatar
+// are all handled globally in primeng-overrides.scss

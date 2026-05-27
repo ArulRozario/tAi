@@ -19,8 +19,12 @@ export default {
           3: 'var(--text-3)',
         },
         primary: {
-          DEFAULT: 'var(--accent)',
-          soft: 'var(--accent-soft)',
+          DEFAULT: 'var(--accent-primary)',
+          soft: 'var(--accent-primary-bg)',
+        },
+        danger: {
+          DEFAULT: 'var(--danger)',
+          soft: 'var(--danger-soft)',
         },
         success: {
           DEFAULT: 'var(--success)',

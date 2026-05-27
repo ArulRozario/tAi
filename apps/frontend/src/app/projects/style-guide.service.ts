@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface StyleGuide {
@@ -11,11 +11,21 @@ export interface StyleGuide {
   segmentUnit: string;
   createdAt: string;
   updatedAt: string;
+  createdBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
   currentVersion?: {
     id: string;
     version: string;
     createdAt: string;
     content?: string;
+    createdBy?: {
+      id: string;
+      name: string;
+      email: string;
+    };
   };
   _count?: {
     projects: number;
@@ -44,13 +54,10 @@ export class StyleGuideService {
   constructor(private http: HttpClient) {}
 
   getStyleGuides(q?: string, limit?: number): Observable<StyleGuide[]> {
-    let url = this.apiUrl;
-    const params: string[] = [];
-    if (q) params.push(`q=${q}`);
-    if (limit) params.push(`limit=${limit}`);
-    if (params.length > 0) url += `?${params.join('&')}`;
-    
-    return this.http.get<StyleGuide[]>(url);
+    let params = new HttpParams();
+    if (q) params = params.set('q', q);
+    if (limit) params = params.set('limit', limit);
+    return this.http.get<StyleGuide[]>(this.apiUrl, { params });
   }
 
   getStyleGuide(id: string): Observable<StyleGuide> {
@@ -67,5 +74,13 @@ export class StyleGuideService {
 
   createStyleGuideVersion(id: string, dto: { content: string; note?: string }): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/${id}/versions`, dto);
+  }
+
+  patchStyleGuide(id: string, dto: { name?: string; description?: string; icon?: string; color?: string; segmentUnit?: string }): Observable<StyleGuide> {
+    return this.http.patch<StyleGuide>(`${this.apiUrl}/${id}`, dto);
+  }
+
+  testStyleGuide(id: string, sampleText: string): Observable<{ translation: string; model: string }> {
+    return this.http.post<{ translation: string; model: string }>(`${this.apiUrl}/${id}/test`, { sampleText });
   }
 }

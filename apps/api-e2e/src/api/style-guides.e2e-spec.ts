@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 const request = require('supertest');
 
-describe('Genres API (e2e)', () => {
+describe('Style Guides API (e2e)', () => {
   let app: INestApplication;
   let adminToken: string;
   let masterToken: string;
@@ -29,7 +29,7 @@ describe('Genres API (e2e)', () => {
   });
 
   describe('GET /style-guides', () => {
-    it('should list genres for ADMIN', async () => {
+    it('should list style guides for ADMIN', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/v1/style-guides')
         .set('Authorization', `Bearer ${adminToken}`);
@@ -38,7 +38,7 @@ describe('Genres API (e2e)', () => {
       expect(Array.isArray(res.body)).toBe(true);
     });
 
-    it('should list genres for REVIEWER', async () => {
+    it('should list style guides for REVIEWER', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/v1/style-guides')
         .set('Authorization', `Bearer ${reviewerToken}`);
@@ -64,7 +64,7 @@ describe('Genres API (e2e)', () => {
   });
 
   describe('POST /style-guides', () => {
-    it('should create genre as MASTER', async () => {
+    it('should create style guide as MASTER', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/style-guides')
         .set('Authorization', `Bearer ${masterToken}`)
@@ -79,7 +79,7 @@ describe('Genres API (e2e)', () => {
       expect(res.body.name).toBe('New StyleGuide');
     });
 
-    it('should deny as REVIEWER', async () => {
+    it('should deny create as REVIEWER', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/style-guides')
         .set('Authorization', `Bearer ${reviewerToken}`)
@@ -90,7 +90,7 @@ describe('Genres API (e2e)', () => {
   });
 
   describe('GET /style-guides/:id', () => {
-    it('should get genre by id', async () => {
+    it('should get style guide by id', async () => {
       const res = await request(app.getHttpServer())
         .get(`/api/v1/style-guides/${styleGuideId}`)
         .set('Authorization', `Bearer ${adminToken}`);
@@ -102,7 +102,7 @@ describe('Genres API (e2e)', () => {
   });
 
   describe('PATCH /style-guides/:id', () => {
-    it('should update genre as MASTER', async () => {
+    it('should update style guide as MASTER', async () => {
       const res = await request(app.getHttpServer())
         .patch(`/api/v1/style-guides/${styleGuideId}`)
         .set('Authorization', `Bearer ${masterToken}`)
@@ -126,7 +126,7 @@ describe('Genres API (e2e)', () => {
   describe('DELETE /style-guides/:id', () => {
     let testGenreId: string;
 
-    it('should create genre for deletion test', async () => {
+    it('should create style guide for deletion test', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/style-guides')
         .set('Authorization', `Bearer ${masterToken}`)
@@ -134,7 +134,7 @@ describe('Genres API (e2e)', () => {
       testGenreId = res.body.id;
     });
 
-    it('should delete genre as ADMIN', async () => {
+    it('should delete style guide as ADMIN', async () => {
       const res = await request(app.getHttpServer())
         .delete(`/api/v1/style-guides/${testGenreId}`)
         .set('Authorization', `Bearer ${adminToken}`);
@@ -142,7 +142,7 @@ describe('Genres API (e2e)', () => {
       expect(res.status).toBe(204);
     });
 
-    it('should deny delete as MASTER', async () => {
+    it('should deny delete as MASTER (ADMIN only)', async () => {
       const createRes = await request(app.getHttpServer())
         .post('/api/v1/style-guides')
         .set('Authorization', `Bearer ${masterToken}`)

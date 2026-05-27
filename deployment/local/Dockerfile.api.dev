@@ -1,0 +1,26 @@
+FROM node:24-bookworm-slim
+
+WORKDIR /app
+
+# Install system deps needed by Prisma
+RUN apt-get update && apt-get install -y libssl3 && rm -rf /var/lib/apt/lists/*
+
+# Install pnpm
+RUN npm install -g pnpm@10
+
+# Copy workspace config and manifests first (layer-cache friendly)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
+
+# Copy app source so pnpm can resolve workspace packages
+COPY apps/ ./apps/
+
+# Install all dependencies (node_modules baked into the image layer)
+RUN pnpm install --frozen-lockfile
+
+# Generate Prisma client for the container platform
+RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
+
+EXPOSE 3001
+
+# db-init container handles migrations + seeding before this starts
+CMD ["pnpm", "nx", "serve", "api"]

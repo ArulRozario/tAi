@@ -5,13 +5,17 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { SegmentUnit } from '@prisma/client';
+import { ModelsService } from '../models/models.service';
+import { AgentType, SegmentUnit } from '@prisma/client';
 
 @Injectable()
 export class StyleGuidesService {
   private readonly logger = new Logger(StyleGuidesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly modelsService: ModelsService,
+  ) {}
 
   async findAll(q?: string, limit?: number) {
     return this.prisma.styleGuide.findMany({
@@ -19,7 +23,9 @@ export class StyleGuidesService {
       take: limit,
       include: {
         createdBy: { select: { id: true, name: true, email: true } },
-        currentVersion: { select: { id: true, version: true, createdAt: true } },
+        currentVersion: {
+          include: { createdBy: { select: { id: true, name: true, email: true } } },
+        },
         _count: { select: { projects: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -49,6 +55,7 @@ export class StyleGuidesService {
       description?: string;
       icon?: string;
       color?: string;
+      segmentUnit?: SegmentUnit;
       content?: string;
     },
   ) {
@@ -59,6 +66,7 @@ export class StyleGuidesService {
           description: data.description,
           icon: data.icon,
           color: data.color,
+          ...(data.segmentUnit !== undefined && { segmentUnit: data.segmentUnit }),
           createdById: userId,
         },
       });
@@ -179,25 +187,32 @@ export class StyleGuidesService {
   }
 
   private computeLineDiff(oldLines: string[], newLines: string[]): string {
-    const oldSet = new Set(oldLines);
-    const newSet = new Set(newLines);
+    const m = oldLines.length;
+    const n = newLines.length;
+    // LCS-based diff; fall back to naive for very large inputs
+    if (m * n > 500_000) {
+      return oldLines.map(l => `-${l}`).concat(newLines.map(l => `+${l}`)).join('\n');
+    }
+    const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        dp[i][j] = oldLines[i - 1] === newLines[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
     const result: string[] = [];
-    let oi = 0, ni = 0;
-    while (oi < oldLines.length || ni < newLines.length) {
-      const ol = oldLines[oi];
-      const nl = newLines[ni];
-      if (ol === nl) {
-        result.push(` ${ol}`);
-        oi++; ni++;
-      } else if (ol !== undefined && !newSet.has(ol)) {
-        result.push(`-${ol}`);
-        oi++;
-      } else if (nl !== undefined && !oldSet.has(nl)) {
-        result.push(`+${nl}`);
-        ni++;
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+        result.unshift(` ${oldLines[i - 1]}`);
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+        result.unshift(`+${newLines[j - 1]}`);
+        j--;
       } else {
-        if (ol !== undefined) { result.push(`-${ol}`); oi++; }
-        if (nl !== undefined) { result.push(`+${nl}`); ni++; }
+        result.unshift(`-${oldLines[i - 1]}`);
+        i--;
       }
     }
     return result.join('\n');
@@ -215,10 +230,29 @@ export class StyleGuidesService {
       include: { currentVersion: true },
     });
     if (!styleGuide) throw new NotFoundException(`StyleGuide '${styleGuideId}' not found.`);
-    // Stub: return input with note. Real implementation would call translation agent.
+
+    const styleGuideContent = styleGuide.currentVersion?.content ?? '';
+    const prompt = [
+      'You are a translation AI. Translate the following text according to the style guide below.',
+      '',
+      '--- STYLE GUIDE ---',
+      styleGuideContent,
+      '',
+      '--- TEXT TO TRANSLATE ---',
+      sampleText,
+      '',
+      'Return only the translated text, nothing else.',
+    ].join('\n');
+
+    const result = await this.modelsService.executePrompt(
+      AgentType.TRANSLATION,
+      prompt,
+      { temperature: 0.3, max_tokens: 4096 },
+    );
+
     return {
-      translation: `[Test output for "${styleGuide.name}" styleGuide]\n\n${sampleText}`,
-      tokensUsed: 0,
+      translation: result.text,
+      model: result.model,
     };
   }
 }

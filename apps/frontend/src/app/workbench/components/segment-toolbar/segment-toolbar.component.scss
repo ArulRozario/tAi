@@ -1,12 +1,18 @@
-// Positioned absolutely inside .scroll-content (position: relative).
-// The parent sets [style.top.px] to anchor it just above the active segment.
+// Sticky inside .scroll-content — sticks to the top of the column viewport
+// whenever a segment is active, always within reach regardless of scroll position.
 :host {
-  position: absolute;
-  left: 20px;
-  right: 20px;
+  position: sticky;
+  top: 8px;
+  left: 0;
+  right: 0;
   z-index: 50;
   display: flex;
   justify-content: center;
+  pointer-events: none; // let clicks pass through to content below the toolbar
+
+  .seg-toolbar {
+    pointer-events: all; // re-enable on the toolbar itself
+  }
 
   --toolbar-bg: #374151;        /* gray-700 — neutral on light canvas */
   --toolbar-text: #f9fafb;

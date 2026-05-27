@@ -26,11 +26,11 @@
     <div class="meta-row">
       <div class="meta-item">
         <span class="meta-label">Updated</span>
-        <span class="meta-value">2 days ago</span> <!-- Hardcoded for now based on image, ideally use a relative time pipe -->
+        <span class="meta-value">{{ timeAgo(styleGuide.currentVersion?.createdAt) }}</span>
       </div>
       <div class="meta-item">
         <span class="meta-label">by</span>
-        <span class="meta-value">Ravi</span> <!-- Hardcoded based on image, would come from styleGuide object -->
+        <span class="meta-value">{{ styleGuide.currentVersion?.createdBy?.name || styleGuide.createdBy?.name || '-' }}</span>
       </div>
     </div>
   </div>

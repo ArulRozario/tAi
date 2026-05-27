@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { PagesService } from './pages.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -64,6 +65,16 @@ export class PagesController {
     @CurrentUser() user: any,
   ) {
     return this.pagesService.approve(id, body, user);
+  }
+
+  @Post(':id/revoke')
+  @Roles('ADMIN', 'MASTER')
+  @HttpCode(HttpStatus.OK)
+  revoke(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.pagesService.revoke(id, user);
   }
 
   @Post('bulk/assign')
@@ -253,6 +264,21 @@ export class PagesController {
   @HttpCode(HttpStatus.OK)
   async resetAllEdits(@Param('id', ParseUUIDPipe) id: string) {
     return this.pagesService.resetAllEdits(id);
+  }
+
+  // ── Segment approval ─────────────────────────────────────────────────
+
+  @Patch('segments/:segmentId/approval')
+  @Roles('ADMIN', 'MASTER', 'REVIEWER')
+  @HttpCode(HttpStatus.OK)
+  patchSegmentApproval(
+    @Param('segmentId') segmentId: string,
+    @Body('pageId') pageId: string,
+    @Body('isApproved') isApproved: boolean,
+    @CurrentUser() user: any,
+  ) {
+    if (!pageId) throw new BadRequestException('pageId is required');
+    return this.pagesService.patchSegmentApproval(pageId, segmentId, isApproved, user);
   }
 
   // ── Segment retranslation ────────────────────────────────────────────

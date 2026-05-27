@@ -21,7 +21,7 @@ export class ChatService {
     const where: any = { userId };
 
     if (filters.context) {
-      where.context = filters.context.toUpperCase() as ChatContext;
+      where.context = this.normalizeChatContext(filters.context);
     }
 
     if (filters.entityId) {
@@ -60,7 +60,7 @@ export class ChatService {
       modelName?: string;
     }
   ) {
-    const context = (data.context?.toUpperCase() as ChatContext) || ChatContext.GENERAL;
+    const context = this.normalizeChatContext(data.context);
 
     return this.prisma.chatSession.create({
       data: {
@@ -82,7 +82,7 @@ export class ChatService {
   }
 
   async getQuickPrompts(context: string, mode?: string) {
-    const ctx = (context?.toUpperCase() as ChatContext) || ChatContext.GENERAL;
+    const ctx = this.normalizeChatContext(context);
     const md = (mode?.toUpperCase() as ChatMode) || ChatMode.PLAN;
 
     if (ctx === ChatContext.STYLE_GUIDE) {
@@ -141,6 +141,19 @@ export class ChatService {
       'How do I trigger page indexing?',
       'How does translation memory retrieve suggestions?'
     ];
+  }
+
+  private normalizeChatContext(context?: string): ChatContext {
+    const raw = (context ?? '').toUpperCase();
+    // Map kebab-case / camelCase input strings to ChatContext enum values
+    const mapping: Record<string, ChatContext> = {
+      STYLEGUIDE: ChatContext.STYLE_GUIDE,
+      STYLE_GUIDE: ChatContext.STYLE_GUIDE,
+      REVIEW: ChatContext.REVIEW,
+      GLOSSARY: ChatContext.GLOSSARY,
+      GENERAL: ChatContext.GENERAL,
+    };
+    return mapping[raw] ?? ChatContext.GENERAL;
   }
 
   /**
@@ -338,14 +351,14 @@ export class ChatService {
       );
 
       for await (const chunk of stream) {
-        res.write(`data: ${chunk}\n\n`);
+        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
       }
     } catch (err: any) {
       this.logger.error(`streamDirect failed: ${err.message}`);
-      res.write(`data: [Error: ${err.message}]\n\n`);
+      res.write(`data: ${JSON.stringify(`[Error: ${err.message}]`)}\n\n`);
     }
 
-    res.write('data: [DONE]\n\n');
+    res.write('data: "[DONE]"\n\n');
     res.end();
   }
 

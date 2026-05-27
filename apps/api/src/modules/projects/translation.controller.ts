@@ -154,12 +154,9 @@ export class TranslationController {
   async getExtractionProgress(
     @Param('id', ParseUUIDPipe) projectId: string,
   ): Promise<{ phase: string; pagesFound: number; pagesRendered: number; isActive: boolean }> {
-    const [splitJob, renderCount, pages] = await Promise.all([
+    const [splitJob, pages] = await Promise.all([
       this.prisma.job.findFirst({
         where: { projectId, type: JobType.SPLIT_DOCUMENT, status: { in: [JobStatus.QUEUED, JobStatus.RUNNING] } },
-      }),
-      this.prisma.job.count({
-        where: { projectId, type: JobType.RENDER_PAGE, status: { in: [JobStatus.QUEUED, JobStatus.RUNNING] } },
       }),
       this.prisma.page.findMany({ where: { projectId }, select: { status: true } }),
     ]);
@@ -169,22 +166,19 @@ export class TranslationController {
       (p) => p.status !== 'PENDING' && p.status !== 'RENDERING',
     ).length;
 
-    const isActive = !!(splitJob || renderCount > 0);
+    // RENDER_PAGE jobs are no longer created; rendering happens inside SPLIT_DOCUMENT
+    const isActive = !!splitJob;
 
     let phase: string;
     if (!isActive) {
       const failedCount = await this.prisma.job.count({
-        where: {
-          projectId,
-          type: { in: [JobType.SPLIT_DOCUMENT, JobType.RENDER_PAGE] },
-          status: JobStatus.FAILED,
-        },
+        where: { projectId, type: JobType.SPLIT_DOCUMENT, status: JobStatus.FAILED },
       });
       phase = failedCount > 0 && pagesFound === 0 ? 'failed' : 'done';
-    } else if (splitJob) {
-      phase = 'splitting';
-    } else {
+    } else if (pagesRendered > 0) {
       phase = 'rendering';
+    } else {
+      phase = 'splitting';
     }
 
     return { phase, pagesFound, pagesRendered, isActive };

@@ -15,6 +15,7 @@ export class CreateStyleGuideDto {
   @IsString() @IsOptional() description?: string;
   @IsString() @IsOptional() icon?: string;
   @IsString() @IsOptional() color?: string;
+  @IsString() @IsOptional() segmentUnit?: string;
   @IsString() @IsOptional() content?: string;
 }
 
@@ -58,7 +59,7 @@ export class StyleGuidesController {
   @Roles('ADMIN', 'MASTER')
   @HttpCode(HttpStatus.CREATED)
   create(@CurrentUser() user: { id: string }, @Body() dto: CreateStyleGuideDto) {
-    return this.styleGuidesService.create(user.id, dto);
+    return this.styleGuidesService.create(user.id, dto as any);
   }
 
   @Patch(':id')

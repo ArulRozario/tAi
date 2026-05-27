@@ -187,7 +187,9 @@ export class AgentOrchestrator {
 
   /**
    * Run REVIEW_PAGE job.
-   * Supports both single page review and batch review from POST /projects/:id/review.
+   * Batch jobs (isBatchReview: true) dispatch one individual REVIEW_PAGE job per page
+   * so failures are isolated and the concurrent pool in JobWorker can parallelise them.
+   * Single-page jobs process the page directly.
    */
   async runReviewPage(jobId: string): Promise<void> {
     const job = await this.prisma.job.findUnique({ where: { id: jobId } });
@@ -205,6 +207,37 @@ export class AgentOrchestrator {
         where: { id: jobId },
         data: { status: JobStatus.FAILED, errorMessage: 'No pages to review', completedAt: new Date() },
       });
+      return;
+    }
+
+    if (isBatchReview) {
+      // Dispatch one individual REVIEW_PAGE job per page. This gives:
+      //  - Checkpointing: a failed page retries independently, not the whole book.
+      //  - Parallelism: JobWorker runs up to REVIEW_CONCURRENCY of these simultaneously.
+      await this.prisma.job.update({
+        where: { id: jobId },
+        data: { status: JobStatus.RUNNING, startedAt: new Date() },
+      });
+
+      for (const pageId of pageIds) {
+        await this.prisma.job.create({
+          data: {
+            type: JobType.REVIEW_PAGE,
+            status: JobStatus.QUEUED,
+            projectId: job.projectId,
+            pageId,
+            parentJobId: jobId,
+            payload: { pageIds: [pageId], ...(modelOverride ? { modelOverride } : {}) },
+          },
+        });
+      }
+
+      await this.prisma.job.update({
+        where: { id: jobId },
+        data: { status: JobStatus.DONE, completedAt: new Date() },
+      });
+
+      this.logger.log(`Batch review ${jobId}: dispatched ${pageIds.length} individual REVIEW_PAGE jobs`);
       return;
     }
 

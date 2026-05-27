@@ -216,7 +216,7 @@ export class AuthService {
       role: user.role,
       isActive: user.isActive,
       mustChangePassword: user.mustChangePassword,
-      avatarUrl: user.avatarUrl ? `/api/v1/files/avatars/${user.id}` : null,
+      avatarUrl: user.avatarUrl ?? null,
     };
   }
 
@@ -375,26 +375,27 @@ export class AuthService {
     const key = `avatars/${userId}.jpg`;
     await this.minioService.uploadBuffer(resized, key, 'image/jpeg');
 
+    // Store the proxy URL directly — nested Prisma selects return it as-is without any transformation
+    const proxyUrl = `/api/v1/files/avatars/${userId}`;
     await this.prisma.user.update({
       where: { id: userId },
-      data: { avatarUrl: key },
+      data: { avatarUrl: proxyUrl },
     });
 
     this.logger.log(`Avatar uploaded for user ${userId}`);
-    return { avatarUrl: `/api/v1/files/avatars/${userId}` };
+    return { avatarUrl: proxyUrl };
   }
 
   async deleteAvatar(userId: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } });
-    if (user?.avatarUrl) {
-      await this.minioService.deleteFile(user.avatarUrl).catch(() => {});
-      await this.prisma.user.update({ where: { id: userId }, data: { avatarUrl: null } });
-    }
+    const key = `avatars/${userId}.jpg`;
+    await this.minioService.deleteFile(key).catch(() => {});
+    await this.prisma.user.update({ where: { id: userId }, data: { avatarUrl: null } });
     this.logger.log(`Avatar deleted for user ${userId}`);
   }
 
   async getAvatarKey(userId: string): Promise<string | null> {
+    // Derive the MinIO key from userId — always avatars/<userId>.jpg
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { avatarUrl: true } });
-    return user?.avatarUrl ?? null;
+    return user?.avatarUrl ? `avatars/${userId}.jpg` : null;
   }
 }

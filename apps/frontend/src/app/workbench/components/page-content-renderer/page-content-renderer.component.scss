@@ -44,7 +44,7 @@
 
 :host ::ng-deep .segment.approved {
   border-left-color: var(--accent-success) !important;
-  background-color: rgba(16, 185, 129, 0.05);
+  background-color: var(--success-soft);
 }
 
 :host ::ng-deep .segment.edited {
@@ -58,7 +58,7 @@
 
 :host ::ng-deep .segment.has-error {
   border-left-color: var(--accent-warning) !important;
-  background-color: rgba(245, 158, 11, 0.08) !important;
+  background-color: var(--warning-soft) !important;
 }
 
 :host ::ng-deep .segment .error-badge {
@@ -133,3 +133,73 @@
     padding: 0 2px;
   }
 }
+
+/* Working edit indicator */
+:host ::ng-deep .segment.has-working-edit {
+  border-left-color: var(--accent-warning) !important;
+}
+
+:host ::ng-deep .segment .edit-badge {
+  position: absolute;
+  bottom: -3px;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-warning);
+  border: 2px solid var(--bg-sidebar);
+}
+
+/* Preview correction indicator */
+:host ::ng-deep .segment.has-preview-correction {
+  border-top: 2px solid var(--accent-primary) !important;
+}
+
+/* Approved from submission indicator */
+:host ::ng-deep .segment.approved-from-submission {
+  border-left-color: var(--accent-success) !important;
+  background-color: var(--success-soft);
+}
+
+/* Correction badge (for multiple corrections on same segment) */
+:host ::ng-deep .segment .correction-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--accent-primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-sidebar);
+  padding: 0 4px;
+}
+
+/* Clean diff view — hide markup, show only final edited text */
+.scroll-content.hide-diff ::ng-deep .segment ins.diff-added {
+  background: none;
+  color: inherit;
+  text-decoration: none;
+}
+
+.scroll-content.hide-diff ::ng-deep .segment del.diff-removed {
+  display: none;
+}
+
+.scroll-content.hide-diff ::ng-deep .segment .diff-stacked-original {
+  display: none;
+}
+
+.scroll-content.hide-diff ::ng-deep .segment .diff-stacked-edited {
+  display: inline;
+  background: none;
+  color: inherit;
+  border-radius: 0;
+  padding: 0;
+}
+

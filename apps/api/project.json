@@ -56,6 +56,12 @@
       "options": {
         "command": "node -r @swc-node/register apps/api/prisma/seed.ts"
       }
+    },
+    "prisma-seed-prod": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node -r @swc-node/register apps/api/prisma/seed.prod.ts"
+      }
     }
   }
 }

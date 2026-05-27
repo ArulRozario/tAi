@@ -47,18 +47,36 @@ $font-size: 12px;
   min-width: 0;
 }
 
-// ── Context label ────────────────────────────────────────────
-.tb-context {
-  font-size: 13px;
-  color: var(--text-main);
-  display: flex;
+// ── Back button (project name + back arrow) ──────────────────
+.tb-back-btn {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  height: $h;
+  padding: 0 8px;
+  background: none;
+  border: none;
+  border-radius: $radius;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
   white-space: nowrap;
+  max-width: 200px;
+
+  .pi-arrow-left { font-size: 11px; flex-shrink: 0; }
+
+  &:hover {
+    background: var(--bg-hover);
+    color: var(--text-main);
+  }
+}
+
+.tb-context-name {
+  font-size: 13px;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
-
-  strong { font-weight: 700; }
+  white-space: nowrap;
 }
 
 // ── Page navigation ──────────────────────────────────────────
@@ -231,6 +249,41 @@ $font-size: 12px;
   flex-shrink: 0;
 }
 
+// ── Reset inline confirmation ─────────────────────────────────
+.tb-reset-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+  background: var(--accent-danger-bg);
+  border: 1px solid var(--accent-danger);
+  border-radius: $radius;
+  height: $h;
+}
+
+.tb-reset-label {
+  font-size: $font-size;
+  font-weight: 600;
+  color: var(--accent-danger);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+// ── Submit hint ───────────────────────────────────────────────
+.tb-submit-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.tb-submit-hint {
+  font-size: 10px;
+  color: var(--text-disabled);
+  white-space: nowrap;
+  padding: 0 2px;
+}
+
 // ── Reviewer badge ───────────────────────────────────────────
 .tb-reviewer-badge {
   display: inline-flex;
@@ -282,6 +335,13 @@ $font-size: 12px;
   .tb-reviewer-badge-label {
     font-size: $font-size;
     color: var(--text-muted);
+  }
+
+  .tb-reviewer-badge-chevron {
+    font-size: 9px;
+    color: var(--text-disabled);
+    margin-left: 2px;
+    flex-shrink: 0;
   }
 }
 

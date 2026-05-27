@@ -11,7 +11,7 @@ import { MessageService } from 'primeng/api';
 import { ApiService } from '../../core/services/api.service';
 
 export type AgentType = 'TRANSLATION' | 'REVIEW' | 'CHAT' | 'EMBEDDING';
-export type Provider = 'OLLAMA' | 'ANTHROPIC';
+export type Provider = 'GOOGLE' | 'ANTHROPIC';
 
 export interface ModelConfig {
   id: string;
@@ -72,9 +72,10 @@ export class SettingsComponent implements OnInit {
 
   activeTab = signal('models');
   loading = signal(true);
+  loadError = signal(false);
 
   providerOptions = [
-    { label: 'Ollama', value: 'OLLAMA' },
+    { label: 'Google (Gemini)', value: 'GOOGLE' },
     { label: 'Anthropic', value: 'ANTHROPIC' },
   ];
 
@@ -89,7 +90,7 @@ export class SettingsComponent implements OnInit {
             agentType: type,
             label: AGENT_META[type].label,
             description: AGENT_META[type].description,
-            provider: cfg?.provider ?? 'OLLAMA',
+            provider: cfg?.provider ?? 'GOOGLE',
             modelName: cfg?.modelName ?? '',
             endpoint: cfg?.endpoint ?? '',
             apiKey: '',
@@ -109,14 +110,20 @@ export class SettingsComponent implements OnInit {
       },
       error: () => {
         this.loading.set(false);
-        this.toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load model configurations' });
+        this.loadError.set(true);
       },
     });
   }
 
+  retryLoad() {
+    this.loadError.set(false);
+    this.loading.set(true);
+    this.ngOnInit();
+  }
+
   onProviderChange(card: AgentCard) {
     if (card.agentType === 'EMBEDDING' && card.provider === 'ANTHROPIC') {
-      card.providerWarning = 'Anthropic does not support embeddings. Only Ollama is supported.';
+      card.providerWarning = 'Anthropic does not support embeddings. Use Google (Gemini) instead.';
     } else {
       card.providerWarning = null;
     }

@@ -304,12 +304,7 @@
   max-width: 180px;
 }
 
-:host ::ng-deep .priority-chip .p-tag {
-  font-size: 10px !important;
-  padding: 2px 7px !important;
-  font-weight: 700 !important;
-  border-radius: 4px !important;
-}
+// .priority-chip .p-tag styles handled globally in primeng-overrides.scss
 
 // ─── Recent Projects ─────────────────────────────────────────
 .proj-row {
@@ -344,10 +339,7 @@
   font-family: var(--font-mono);
 }
 
-:host ::ng-deep .mini-bar .p-progressbar {
-  height: 5px !important;
-  border-radius: 3px !important;
-}
+// .mini-bar .p-progressbar styles handled globally in primeng-overrides.scss
 
 // ─── Activity Feed ───────────────────────────────────────────
 .activity-row.clickable {
@@ -367,13 +359,7 @@
   &:last-child { border-bottom: none; }
 }
 
-:host ::ng-deep .act-avatar {
-  width: 28px !important;
-  height: 28px !important;
-  font-size: 10px !important;
-  font-weight: 700 !important;
-  flex-shrink: 0 !important;
-}
+// .act-avatar sizing handled globally in primeng-overrides.scss
 
 .act-text {
   font-size: 13px;
@@ -397,5 +383,5 @@
   gap: 12px;
   justify-content: center;
 
-  ::ng-deep .stat-skel-value { margin: 2px 0; }
+  .stat-skel-value { margin: 2px 0; }
 }

@@ -8,6 +8,9 @@ import { Job, JobStatus, JobType } from '@prisma/client';
 // Sentinel key used for jobs that have no projectId (e.g. admin exports)
 const GLOBAL_QUEUE_KEY = '__global__';
 
+// REVIEW_PAGE jobs are independent — run this many concurrently per project
+const REVIEW_CONCURRENCY = 4;
+
 @Injectable()
 export class JobWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(JobWorker.name);
@@ -85,39 +88,89 @@ export class JobWorker implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  // ── Per-project serial queue ───────────────────────────────────────────────
+  // ── Per-project queue (serial, with concurrent pool for REVIEW_PAGE) ────────
 
   private async runProjectQueue(projectId: string | null) {
     while (!this.shuttingDown) {
       const job = await this.claimNextJob(projectId);
       if (!job) break; // queue drained
 
-      this.activeJobs.add(job.id);
-      this.logger.log(`[${projectId ?? 'global'}] Running job ${job.id} (${job.type})`);
-
-      try {
-        await this.executeJob(job);
-
-        // Only mark DONE if the executor left the job RUNNING.
-        // Executors like runTranslateBatch manage their own terminal states
-        // (CANCELLED for splits, FAILED for exhausted retries, QUEUED for retry).
-        // Overwriting those would break retry logic and mask failures.
-        const latest = await this.prisma.job.findUnique({ where: { id: job.id } });
-        if (latest?.status === JobStatus.RUNNING) {
-          await this.prisma.job.update({
-            where: { id: job.id },
-            data: { status: JobStatus.DONE, progress: 100, completedAt: new Date() },
-          });
-          this.logger.log(`Job ${job.id} completed (DONE).`);
-        } else {
-          this.logger.log(`Job ${job.id} status already set to ${latest?.status} by executor — not overwriting.`);
-        }
-      } catch (err: any) {
-        await this.handleJobFailure(job, err);
-      } finally {
-        this.activeJobs.delete(job.id);
+      if (job.type === JobType.REVIEW_PAGE) {
+        // REVIEW_PAGE jobs have no ordering dependency — run up to REVIEW_CONCURRENCY at once
+        await this.runReviewConcurrentPool(projectId, job);
+      } else {
+        await this.runSingleJob(job);
       }
     }
+  }
+
+  private async runSingleJob(job: Job): Promise<void> {
+    this.activeJobs.add(job.id);
+    this.logger.log(`[${job.projectId ?? 'global'}] Running job ${job.id} (${job.type})`);
+    try {
+      await this.executeJob(job);
+
+      // Only mark DONE if the executor left the job RUNNING.
+      // Executors like runTranslateBatch manage their own terminal states
+      // (CANCELLED for splits, FAILED for exhausted retries, QUEUED for retry).
+      // Overwriting those would break retry logic and mask failures.
+      const latest = await this.prisma.job.findUnique({ where: { id: job.id } });
+      if (latest?.status === JobStatus.RUNNING) {
+        await this.prisma.job.update({
+          where: { id: job.id },
+          data: { status: JobStatus.DONE, progress: 100, completedAt: new Date() },
+        });
+        this.logger.log(`Job ${job.id} completed (DONE).`);
+      } else {
+        this.logger.log(`Job ${job.id} status already set to ${latest?.status} by executor — not overwriting.`);
+      }
+    } catch (err: any) {
+      await this.handleJobFailure(job, err);
+    } finally {
+      this.activeJobs.delete(job.id);
+    }
+  }
+
+  private async runReviewConcurrentPool(projectId: string | null, firstJob: Job) {
+    const inFlight = new Set<Promise<void>>();
+
+    const dispatch = (j: Job) => {
+      this.activeJobs.add(j.id);
+      this.logger.log(`[${j.projectId ?? 'global'}] Running review job ${j.id} (concurrent pool)`);
+      const promise: Promise<void> = this.executeJob(j)
+        .then(async () => {
+          const latest = await this.prisma.job.findUnique({ where: { id: j.id } });
+          if (latest?.status === JobStatus.RUNNING) {
+            await this.prisma.job.update({
+              where: { id: j.id },
+              data: { status: JobStatus.DONE, progress: 100, completedAt: new Date() },
+            });
+            this.logger.log(`Review job ${j.id} completed (DONE).`);
+          }
+        })
+        .catch(async (err: any) => {
+          await this.handleJobFailure(j, err);
+        })
+        .finally(() => {
+          this.activeJobs.delete(j.id);
+          inFlight.delete(promise);
+        });
+      inFlight.add(promise);
+    };
+
+    dispatch(firstJob);
+
+    while (!this.shuttingDown) {
+      if (inFlight.size >= REVIEW_CONCURRENCY) {
+        await Promise.race(inFlight);
+        continue;
+      }
+      const next = await this.claimNextReviewJob(projectId);
+      if (!next) break;
+      dispatch(next);
+    }
+
+    await Promise.all(inFlight);
   }
 
   /**
@@ -138,6 +191,36 @@ export class JobWorker implements OnModuleInit, OnModuleDestroy {
             : await tx.$queryRaw`
                 SELECT id FROM "Job"
                 WHERE status = 'QUEUED' AND "projectId" IS NULL
+                ORDER BY "createdAt" ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED`;
+
+        if (!rows.length) return null;
+
+        return tx.job.update({
+          where: { id: rows[0].id },
+          data: { status: JobStatus.RUNNING, startedAt: new Date() },
+        });
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  private async claimNextReviewJob(projectId: string | null): Promise<Job | null> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const rows: { id: string }[] =
+          projectId !== null
+            ? await tx.$queryRaw`
+                SELECT id FROM "Job"
+                WHERE status = 'QUEUED' AND "projectId" = ${projectId} AND type = 'REVIEW_PAGE'
+                ORDER BY "createdAt" ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED`
+            : await tx.$queryRaw`
+                SELECT id FROM "Job"
+                WHERE status = 'QUEUED' AND "projectId" IS NULL AND type = 'REVIEW_PAGE'
                 ORDER BY "createdAt" ASC
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED`;

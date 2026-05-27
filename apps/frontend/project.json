@@ -23,7 +23,8 @@
         "styles": [
           "apps/frontend/src/styles.scss",
           "apps/frontend/src/theme.scss",
-          "apps/frontend/src/primeng-overrides.scss"
+          "apps/frontend/src/primeng-overrides.scss",
+          "node_modules/easymde/dist/easymde.min.css"
         ]
       },
       "configurations": {

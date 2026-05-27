@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MinIOService } from '../files/minio.service';
-import { PageStatus, Priority, JobType, JobStatus } from '@prisma/client';
+import { PageStatus, Priority } from '@prisma/client';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs/promises';
@@ -20,9 +20,9 @@ export class ExtractionService {
   ) {}
 
   /**
-   * SPLIT_DOCUMENT job: downloads the PDF, counts pages via pdfinfo,
-   * creates one Page row per page (status PENDING), and enqueues one
-   * RENDER_PAGE child job per page.
+   * SPLIT_DOCUMENT job: downloads the PDF once, renders every page to PNG
+   * using pdftoppm (reusing the single download), uploads each PNG to MinIO,
+   * and marks pages READY — no separate RENDER_PAGE jobs needed.
    */
   async splitDocument(jobId: string): Promise<void> {
     this.logger.log(`Executing SPLIT_DOCUMENT job: ${jobId}`);
@@ -62,12 +62,15 @@ export class ExtractionService {
     const pdfPath = path.join(tmpDir, 'source.pdf');
 
     try {
+      // Download the PDF exactly once for the entire job
       const buffer = await this.minio.downloadFile(project.sourceFileId);
       await fs.writeFile(pdfPath, buffer);
 
       const totalPages = await this.getPageCount(pdfPath);
-      this.logger.log(`PDF has ${totalPages} pages`);
+      this.logger.log(`PDF has ${totalPages} pages — rendering inline (no RENDER_PAGE jobs)`);
 
+      // Create all page rows as PENDING so the UI shows them immediately
+      const pageRows: { id: string; pageNumber: number }[] = [];
       for (let i = 1; i <= totalPages; i++) {
         const page = await this.prisma.page.create({
           data: {
@@ -77,25 +80,34 @@ export class ExtractionService {
             priority: Priority.MEDIUM,
           },
         });
+        pageRows.push({ id: page.id, pageNumber: i });
+      }
 
-        await this.prisma.job.create({
-          data: {
-            type: JobType.RENDER_PAGE,
-            status: JobStatus.QUEUED,
-            projectId: project.id,
-            pageId: page.id,
-            parentJobId: jobId,
-            payload: { pageId: page.id },
-          },
+      // Render and upload each page, reusing the single PDF already on disk
+      for (let i = 0; i < pageRows.length; i++) {
+        const { id, pageNumber } = pageRows[i];
+
+        await this.prisma.page.update({
+          where: { id },
+          data: { status: PageStatus.RENDERING },
+        });
+
+        const pngBuffer = await this.renderPageToPng(pdfPath, pageNumber);
+        const objectKey = `projects/${project.id}/pages/${pageNumber}.png`;
+        await this.minio.uploadBuffer(pngBuffer, objectKey, 'image/png');
+
+        await this.prisma.page.update({
+          where: { id },
+          data: { status: PageStatus.READY },
         });
 
         await this.prisma.job.update({
           where: { id: jobId },
-          data: { progress: Math.round((i / totalPages) * 100) },
+          data: { progress: Math.round(((i + 1) / totalPages) * 100) },
         });
       }
 
-      this.logger.log(`SPLIT_DOCUMENT job ${jobId} complete — ${totalPages} pages queued for rendering`);
+      this.logger.log(`SPLIT_DOCUMENT job ${jobId} complete — ${totalPages} pages extracted and uploaded`);
     } finally {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }

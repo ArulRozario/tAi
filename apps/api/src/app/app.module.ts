@@ -18,6 +18,7 @@ import { DashboardModule } from '../modules/dashboard/dashboard.module';
 import { QueueModule } from '../modules/queue/queue.module';
 import { AdminModule } from '../modules/admin/admin.module';
 import { HealthModule } from '../modules/health/health.module';
+import { ReviewSubmissionsModule } from '../modules/review-submissions/review-submissions.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -50,6 +51,7 @@ import { AppService } from './app.service';
     QueueModule,
     AdminModule,
     HealthModule,
+    ReviewSubmissionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

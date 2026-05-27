@@ -87,7 +87,7 @@ export class UsersService {
       name: user.name,
       role: user.role,
       isActive: user.isActive,
-      avatarUrl: user.avatarUrl ? `/api/v1/files/avatars/${user.id}` : null,
+      avatarUrl: user.avatarUrl ?? null,
       sessionCount: user._count.refreshTokens,
       lastActiveAt: user.refreshTokens[0]?.createdAt || null,
       createdAt: user.createdAt,
@@ -135,7 +135,7 @@ export class UsersService {
 
     return {
       ...user,
-      avatarUrl: user.avatarUrl ? `/api/v1/files/avatars/${user.id}` : null,
+      avatarUrl: user.avatarUrl ?? null,
       sessionCount: user.refreshTokens.length,
     };
   }

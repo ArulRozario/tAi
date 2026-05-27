@@ -52,3 +52,51 @@
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 24px;
 }
+
+.styleGuides-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 80px 24px;
+  text-align: center;
+
+  .pi-bookmark {
+    font-size: 2.5rem;
+    color: var(--text-disabled);
+    opacity: 0.5;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 400px;
+  }
+}
+
+.empty-cta {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent-primary, #f43f5e);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+
+  &:hover { opacity: 0.88; }
+}

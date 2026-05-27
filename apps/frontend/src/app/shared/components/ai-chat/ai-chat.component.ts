@@ -38,13 +38,13 @@ export class AiChatComponent {
   @Input() showDiff: boolean = false;
 
   messages = signal<ChatMessage[]>([]);
-  isPlanMode = signal<boolean>(false);
+  isPlanMode: boolean = false;
   newMessage = signal<string>('');
   isTyping = signal<boolean>(false);
   selectedModel = signal<string>('');
 
   get planMode() {
-    return this.isPlanMode();
+    return this.isPlanMode;
   }
 
   constructor() {
@@ -116,7 +116,7 @@ export class AiChatComponent {
   finishAssistantMessage(id: string, content?: string) {
     if (content !== undefined) {
       this.messages.update(msgs =>
-        msgs.map(m => m.id === id ? { ...m, content: this.formatMarkdown(content) } : m)
+        msgs.map(m => m.id === id ? { ...m, content } : m)
       );
     }
     this.isTyping.set(false);
@@ -133,7 +133,7 @@ export class AiChatComponent {
       if (updated.length > 0 && updated[0].role === 'assistant') {
         updated[0] = {
           ...updated[0],
-          content: this.isPlanMode()
+          content: this.isPlanMode
             ? "I'm in **Plan** mode — I'll discuss proposed changes before writing anything. Toggle off to have me edit the document directly. What would you like to work on?"
             : this.greeting
         };

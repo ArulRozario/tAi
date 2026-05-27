@@ -210,9 +210,8 @@ export class GeminiService {
   async getEmbedding768(text: string): Promise<number[]> {
     try {
       const response = await this.ai.models.embedContent({
-        model: 'text-embedding-004',
+        model: 'gemini-embedding-001',
         contents: text,
-        config: { outputDimensionality: 768 },
       });
 
       if (!response.embeddings || response.embeddings.length === 0 || !response.embeddings[0].values) {

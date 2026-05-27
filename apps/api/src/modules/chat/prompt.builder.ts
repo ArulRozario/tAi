@@ -40,13 +40,15 @@ export class PromptBuilder {
     prompt: string,
     options: { entityId?: string; currentContent?: string; mode?: string }
   ): Promise<PromptContext> {
+    let dbContent: string | undefined;
     if (options.entityId) {
-      await this.prisma.styleGuide.findUnique({
+      const styleGuide = await this.prisma.styleGuide.findUnique({
         where: { id: options.entityId },
         include: {
           versions: { orderBy: { version: 'desc' }, take: 1 },
         },
       });
+      dbContent = styleGuide?.versions[0]?.content;
     }
 
     const promptPath = [
@@ -69,6 +71,8 @@ export class PromptBuilder {
 
     const currentContentBlock = options.currentContent?.trim()
       ? options.currentContent.trim()
+      : dbContent?.trim()
+      ? dbContent.trim()
       : '# New Style Guide\nEnglish → [Target Language] ([tradition/style])\n\n## Purpose\nDescribe the purpose of this style guide.\n\n## Core Rules\n1. Rule one\n2. Rule two\n\n## Terminology — Non-Negotiable Terms\n\nThese terms are fixed.\n\n| Source | Target | Incorrect (never use) |\n|--------|--------|----------------------|\n| Example | Example | — |\n\n## Register\n- Formal register throughout\n\n## Sentence Structure\n- Preserve source sentence weight\n\n## Proper Nouns\nUse established transliterations:\n- Example → Example\n\n## Common Pitfalls\n- Using informal register — maintain formal style\n\n## Examples\n\nSource: Example sentence.\nTarget: Translated sentence.';
 
     const planModeInstruction =
@@ -77,15 +81,15 @@ export class PromptBuilder {
         : 'You are in DIRECT MODE. Output the COMPLETE updated style guide document with the requested changes applied. Start directly with the `# ` title line.';
 
     const fullUserPrompt = promptTemplate
-      .replace('{{currentContentBlock}}', currentContentBlock)
-      .replace('{{planModeInstruction}}', planModeInstruction)
-      .replace('{{userRequest}}', prompt);
+      .replace('{{currentContentBlock}}', () => currentContentBlock)
+      .replace('{{planModeInstruction}}', () => planModeInstruction)
+      .replace('{{userRequest}}', () => prompt);
 
     return {
       systemPrompt: '',
       userPrompt: fullUserPrompt,
       systemInstruction:
-        'You are a style guide editor for a translation platform. In DIRECT mode your entire response is the raw markdown document — no preamble, no code fences, starting with `# `. In PLAN mode you discuss changes conversationally.',
+        'You are a strict and precise style guide editor. In DIRECT mode, your ONLY output must be the raw markdown document starting with `# `. You must strictly follow the 8-section structure defined in the prompt template. DO NOT include any conversational preamble or postamble. DO NOT wrap your output in markdown code fences (```). In PLAN mode, discuss the changes conversationally.',
     };
   }
 

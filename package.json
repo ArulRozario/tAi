@@ -2,6 +2,7 @@
   "name": "@org/source",
   "version": "0.0.0",
   "license": "MIT",
+  "packageManager": "pnpm@10.33.2",
   "scripts": {},
   "private": true,
   "devDependencies": {
@@ -52,9 +53,6 @@
     "webpack": "^5.106.2",
     "webpack-cli": "^5.1.4"
   },
-  "workspaces": [
-    "packages/*"
-  ],
   "dependencies": {
     "@angular/animations": "^21.2.11",
     "@angular/common": "^21.2.11",
@@ -65,14 +63,6 @@
     "@aws-sdk/lib-storage": "^3.1041.0",
     "@google/genai": "^1.52.0",
     "@grafana/faro-web-sdk": "^1.13.4",
-    "@milkdown/core": "^7.21.0",
-    "@milkdown/ctx": "^7.21.0",
-    "@milkdown/plugin-clipboard": "^7.21.0",
-    "@milkdown/plugin-history": "^7.21.0",
-    "@milkdown/plugin-listener": "^7.21.0",
-    "@milkdown/preset-commonmark": "^7.21.0",
-    "@milkdown/preset-gfm": "^7.21.0",
-    "@milkdown/theme-nord": "^7.21.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/jwt": "^11.0.2",
     "@primeng/themes": "^21.0.4",
@@ -83,6 +73,7 @@
     "class-validator": "^0.15.1",
     "diff": "^9.0.0",
     "docx": "^9.6.1",
+    "easymde": "^2.21.0",
     "marked": "^18.0.3",
     "nestjs-pino": "^4.3.0",
     "pdfkit": "^0.18.0",

@@ -155,12 +155,7 @@
     &.q-secondary { color: var(--text-muted); }
   }
 
-  ::ng-deep .quality-bar {
-    height: 4px !important;
-    border-radius: 2px !important;
-    width: 60px;
-    margin-top: 0 !important;
-  }
+  // .quality-bar .p-progressbar styles handled globally in primeng-overrides.scss
 }
 
 .error-count {
@@ -181,13 +176,7 @@
   font-weight: 500;
 }
 
-.priority-tag {
-  ::ng-deep .p-tag {
-    font-size: 10px !important;
-    padding: 2px 8px !important;
-    border-radius: 4px !important;
-  }
-}
+// .priority-tag .p-tag styles handled globally in primeng-overrides.scss
 
 // ── Reviewer chips ──────────────────────────────────────────
 .reviewer-chips {

@@ -47,6 +47,7 @@ export class ProfileComponent implements OnInit {
   private confirmationService = inject(ConfirmationService);
 
   user = signal<any>(null);
+  profileLoadError = signal(false);
   isEditing = signal(false);
   isChangingPassword = signal(false);
 
@@ -65,10 +66,14 @@ export class ProfileComponent implements OnInit {
   }
 
   loadProfile() {
+    this.profileLoadError.set(false);
     this.authService.fetchMe().subscribe({
       next: (user) => {
         this.user.set(user);
         this.editForm.set({ name: user.name, email: user.email });
+      },
+      error: () => {
+        this.profileLoadError.set(true);
       },
     });
   }

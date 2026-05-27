@@ -29,9 +29,13 @@ export class UnifiedChatService extends AiChatService {
 
     const history = chat
       .messages()
-      .filter((m) => m.role === 'user')
-      .slice(-2)
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .slice(-6)
       .map((m) => ({ role: m.role, content: m.content }));
+
+    // Read currentContent from the chat component's live @Input,
+    // falling back to the configured value
+    const liveContent = chat.currentContent || this.currentContent;
 
     const body = {
       context: this.context,
@@ -40,7 +44,7 @@ export class UnifiedChatService extends AiChatService {
       prompt,
       model,
       mode: chat.planMode ? 'plan' : 'direct',
-      currentContent: this.currentContent,
+      currentContent: liveContent,
       history,
     };
 
@@ -63,7 +67,12 @@ export class UnifiedChatService extends AiChatService {
             const lines = newData.split('\n');
             for (const line of lines) {
               if (!line.startsWith('data: ')) continue;
-              const chunk = line.slice(6);
+              let chunk: string;
+              try {
+                chunk = JSON.parse(line.slice(6));
+              } catch {
+                continue;
+              }
               if (chunk === '[DONE]') continue;
               rawContent += chunk;
               chat.updateAssistantMessage(assistantId, rawContent);

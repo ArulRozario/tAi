@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: tai-api
+    runtime: docker
+    dockerfilePath: deployment/prod/Dockerfile.api
+    plan: free
+    healthCheckPath: /api/v1/health
+    autoDeploy: false          # GHA triggers deploys via deploy hook
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # All secrets below are set manually in the Render dashboard
+      # (sync: false = Render won't overwrite them on blueprint sync)
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_REGION
+        sync: false
+      - key: STORAGE_ACCESS_KEY
+        sync: false
+      - key: STORAGE_SECRET_KEY
+        sync: false
+      - key: STORAGE_BUCKET
+        sync: false
+      - key: STORAGE_PUBLIC_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # Set to a hosted Ollama endpoint if you run Ollama in prod.
+      # Leave unset (or set to empty) to disable Ollama-backed features.
+      - key: OLLAMA_ENDPOINT
+        sync: false

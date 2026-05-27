@@ -1,0 +1,37 @@
+name: Seed Production DB
+
+# Manual trigger only — run once after first deploy, never on push.
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why are you running this? (e.g. "first deploy", "new admin user")'
+        required: false
+        default: 'first deploy'
+
+jobs:
+  seed:
+    name: Run prod seed (upsert, non-destructive)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=apps/api/prisma/schema.prisma
+
+      - name: Run prod seed
+        run: pnpm nx run api:prisma-seed-prod
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

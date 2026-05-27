@@ -94,35 +94,7 @@
     letter-spacing: 0.04em;
   }
 
-  .style-guide-select-custom {
-    ::ng-deep .p-select {
-      height: 32px;
-      background: var(--bg-sidebar);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      padding: 0 4px;
-      display: inline-flex;
-      align-items: center;
-      transition: border-color 0.15s ease, background 0.15s ease;
-
-      &:not(.p-disabled):hover {
-        border-color: var(--text-disabled);
-        background: var(--bg-hover);
-      }
-
-      .p-select-label {
-        padding: 0 8px;
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--text-main);
-      }
-
-      .p-select-dropdown {
-        width: 24px;
-        color: var(--text-disabled);
-      }
-    }
-  }
+  // .style-guide-select-custom pill-select rules live in primeng-overrides.scss
 
   .style-guide-pill-inner, .style-guide-option-item {
     display: flex;
@@ -173,36 +145,7 @@
     letter-spacing: 0.04em;
   }
 
-  .model-select-custom {
-    ::ng-deep .p-select {
-      height: 32px;
-      background: var(--bg-sidebar);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      padding: 0 4px;
-      display: inline-flex;
-      align-items: center;
-      transition: border-color 0.15s ease, background 0.15s ease;
-      min-width: 160px;
-
-      &:not(.p-disabled):hover {
-        border-color: var(--text-disabled);
-        background: var(--bg-hover);
-      }
-
-      .p-select-label {
-        padding: 0 8px;
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--text-main);
-      }
-
-      .p-select-dropdown {
-        width: 24px;
-        color: var(--text-disabled);
-      }
-    }
-  }
+  // .model-select-custom pill-select rules live in primeng-overrides.scss
 
   .model-pill-inner {
     display: flex;
@@ -283,23 +226,7 @@
 }
 
 // ─── Main Content ───────────────────────────────────────────
-:host ::ng-deep {
-  .p-progressbar {
-    height: 4px !important;
-    border-radius: 2px !important;
-    max-width: none !important;
-    margin-top: 4px !important;
-  }
-  .bar-success .p-progressbar-value { background-color: var(--accent-success) !important; }
-  .bar-warn    .p-progressbar-value { background-color: var(--accent-warning) !important; }
-  .bar-danger  .p-progressbar-value { background-color: #f43f5e !important; }
-
-  // Chapter progress bars
-  .chapter-bar        .p-progressbar { height: 5px !important; border-radius: 3px !important; max-width: none !important; width: 100% !important; }
-  .chapter-bar-done   .p-progressbar-value { background-color: var(--accent-success) !important; }
-  .chapter-bar-in-progress .p-progressbar-value { background-color: var(--accent-warning) !important; }
-  .chapter-bar-queued .p-progressbar-value { background-color: var(--text-disabled) !important; }
-}
+// Progress bar dimensions and colour variants are handled globally in primeng-overrides.scss
 
 // ─── Quality Card ───────────────────────────────────────────
 .quality-card {
@@ -358,15 +285,7 @@
   }
 }
 
-:host ::ng-deep .reviewer-avatar {
-  width: 26px !important;
-  height: 26px !important;
-  font-size: 9px !important;
-  font-weight: 700 !important;
-  border: 2px solid var(--bg-card) !important;
-  margin-right: -6px;
-  border-radius: 50% !important;
-}
+// .reviewer-avatar sizing is handled globally in primeng-overrides.scss
 
 // ─── Content Row ────────────────────────────────────────────
 .content-row {
@@ -382,21 +301,8 @@
     flex: 1;
     min-height: 0;
 
-    ::ng-deep .p-card-body {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
-      padding: 0;
-    }
-
-    ::ng-deep .p-card-content {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
-      padding: 0;
-    }
+    // flex-stretch layout for .p-card-body / .p-card-content handled globally in
+    // primeng-overrides.scss under .page-grid-card
   }
 }
 
@@ -488,11 +394,7 @@
   }
 }
 
-:host ::ng-deep .chapter-tag .p-tag {
-  font-size: 11px !important;
-  padding: 3px 8px !important;
-  border-radius: 6px !important;
-}
+// .chapter-tag .p-tag styling is handled globally in primeng-overrides.scss
 
 // ─── Page Grid ──────────────────────────────────────────────
 .page-grid-card {
@@ -823,16 +725,4 @@
   }
 }
 
-:host ::ng-deep .progress-active .p-progressbar-value {
-  background: var(--accent) !important;
-  animation: progress-pulse 2s ease-in-out infinite;
-}
-
-:host ::ng-deep .progress-paused .p-progressbar-value {
-  background: var(--warning) !important;
-}
-
-@keyframes progress-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
+// .progress-active / .progress-paused animations handled globally in primeng-overrides.scss

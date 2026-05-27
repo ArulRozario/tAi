@@ -20,17 +20,17 @@ import { SegmentError } from '../../../core/services/api.service';
          (scroll)="onScroll($event)"
          (mousemove)="onMouseMove($event)"
          (click)="onClick($event)">
+
+      @if (mode === 'target' && pageId && state.activeSegmentId()) {
+        <app-segment-toolbar
+          [pageId]="pageId"
+          (contentChanged)="contentChanged.emit()" />
+      }
+
       <div #paper
            class="page-paper"
            [style.min-height.px]="state.maxPageHeight() > 0 ? state.maxPageHeight() : null"
            [innerHTML]="content()"></div>
-
-      @if (mode === 'target' && pageId && toolbarTop() !== null) {
-        <app-segment-toolbar
-          [pageId]="pageId"
-          [style.top.px]="toolbarTop()"
-          (contentChanged)="contentChanged.emit()" />
-      }
     </div>
   `,
   styleUrls: ['./page-content-renderer.component.scss'],
@@ -48,32 +48,31 @@ export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
   private resizeObserver: ResizeObserver | null = null;
   private lastSyncAt = 0;
 
-  toolbarTop = signal<number | null>(null);
-
   constructor() {
     effect(() => {
       const activeId = this.state.activeSegmentId();
       const hoveredId = this.state.hoveredSegmentId();
       const approvedIds = this.state.approvedSegmentIds();
       const errors = this.state.pageErrors();
-      this.updateDomStyles(activeId, hoveredId, approvedIds, errors);
+      const edits = this.state.pageEdits();
+      const activeSubmissionId = this.state.activeSubmissionId();
+      const submissions = this.state.submissions();
+      this.updateDomStyles(activeId, hoveredId, approvedIds, errors, edits, activeSubmissionId, submissions);
     });
 
-    // Scroll to the active segment and position the toolbar above it.
+    // Apply/remove clean-diff class on the scroll container
+    effect(() => {
+      const clean = this.state.showCleanDiff();
+      const el = this.container?.nativeElement;
+      if (!el) return;
+      el.classList.toggle('hide-diff', clean);
+    });
+
+    // Scroll to the active segment
     effect(() => {
       const activeId = this.state.activeSegmentId();
-
-      if (!activeId) {
-        this.toolbarTop.set(null);
-        return;
-      }
-
-      setTimeout(() => {
-        this.scrollToSegment(activeId);
-        if (this.mode === 'target') {
-          this.positionToolbar(activeId);
-        }
-      }, 0);
+      if (!activeId) return;
+      setTimeout(() => this.scrollToSegment(activeId), 0);
     });
 
     // Mirror free-scroll from the other column.
@@ -116,26 +115,6 @@ export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
     const el = containerEl.querySelector(`#${CSS.escape(segId)}`) as HTMLElement | null;
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-  // Position the toolbar just above the active segment using content-relative coordinates.
-  private positionToolbar(segId: string) {
-    const containerEl = this.container?.nativeElement;
-    if (!containerEl) return;
-    const segEl = containerEl.querySelector(`#${CSS.escape(segId)}`) as HTMLElement | null;
-    if (!segEl) {
-      this.toolbarTop.set(null);
-      return;
-    }
-
-    const containerRect = containerEl.getBoundingClientRect();
-    const segRect = segEl.getBoundingClientRect();
-    // Convert viewport-relative position to scroll-content-relative.
-    const contentTop = segRect.top - containerRect.top + containerEl.scrollTop;
-
-    const TOOLBAR_HEIGHT = 32;
-    const GAP = 4;
-    this.toolbarTop.set(Math.max(0, contentTop - TOOLBAR_HEIGHT - GAP));
   }
 
   onScroll(event: Event) {
@@ -182,14 +161,19 @@ export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
     hoveredId: string | null,
     approvedIds: Set<string>,
     errors: SegmentError[],
+    edits: { segmentId: string; editedText: string }[],
+    activeSubmissionId: string | null,
+    submissions: any[],
   ) {
     const containerEl = this.container?.nativeElement;
     if (!containerEl) return;
 
     const segments = containerEl.querySelectorAll('.segment');
     segments.forEach((el: Element) => {
-      el.classList.remove('active', 'hovered', 'approved', 'has-error');
+      el.classList.remove('active', 'hovered', 'approved', 'has-error', 'has-working-edit', 'has-preview-correction', 'approved-from-submission');
       el.querySelector('.error-badge')?.remove();
+      el.querySelector('.edit-badge')?.remove();
+      el.querySelector('.correction-badge')?.remove();
     });
 
     if (hoveredId && hoveredId === activeId) {
@@ -201,6 +185,11 @@ export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
       if (activeId) {
         containerEl.querySelector(`#${CSS.escape(activeId)}`)?.classList.add('active');
       }
+    }
+
+    // Update total segment count once per render (target column only)
+    if (this.mode === 'target') {
+      this.state.totalSegmentCount.set(segments.length);
     }
 
     approvedIds.forEach(id => {
@@ -216,6 +205,41 @@ export class PageContentRendererComponent implements OnDestroy, AfterViewInit {
         badge.setAttribute('title', err.issueDescription);
         badge.textContent = err.severity === 'CRITICAL' ? '!' : '?';
         el.appendChild(badge);
+      }
+    });
+
+    // Working edits indicator
+    edits.forEach((edit) => {
+      const el = containerEl.querySelector(`#${CSS.escape(edit.segmentId)}`);
+      if (el) {
+        el.classList.add('has-working-edit');
+        if (!el.querySelector('.edit-badge')) {
+          const badge = document.createElement('span');
+          badge.className = 'edit-badge';
+          badge.setAttribute('title', 'You have a working edit on this segment');
+          badge.textContent = '';
+          el.appendChild(badge);
+        }
+      }
+    });
+
+    // Preview submission corrections
+    if (activeSubmissionId) {
+      const activeSub = submissions.find((s) => s.id === activeSubmissionId);
+      activeSub?.items?.forEach((item: any) => {
+        const el = containerEl.querySelector(`#${CSS.escape(item.segmentId)}`);
+        if (el) {
+          el.classList.add('has-preview-correction');
+        }
+      });
+    }
+
+    // Approved submission corrections
+    const approvedSub = submissions.find((s) => s.status === 'APPROVED');
+    approvedSub?.items?.forEach((item: any) => {
+      const el = containerEl.querySelector(`#${CSS.escape(item.segmentId)}`);
+      if (el) {
+        el.classList.add('approved-from-submission');
       }
     });
   }

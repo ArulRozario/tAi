@@ -92,13 +92,13 @@
 
   &.drop-active {
     border-color: var(--accent-primary);
-    background: rgba(var(--accent-primary-rgb), 0.08);
+    background: var(--accent-primary-bg);
     border-style: solid;
   }
 
   &.drop-error {
     border-color: var(--accent-danger);
-    background: rgba(var(--accent-danger-rgb), 0.05);
+    background: var(--danger-soft);
   }
 
   .drop-content {
@@ -176,7 +176,7 @@
     transition: background 0.15s ease;
 
     &:hover {
-      background: rgba(var(--accent-danger-rgb), 0.1);
+      background: var(--danger-soft);
     }
 
     i {

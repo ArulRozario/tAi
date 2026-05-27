@@ -29,29 +29,29 @@ export class ModelsService implements OnModuleInit {
     const defaultSeedData = [
       {
         agentType: AgentType.TRANSLATION,
-        provider: Provider.OLLAMA,
-        modelName: 'qwen2.5:7b',
+        provider: Provider.GOOGLE,
+        modelName: 'gemini-1.5-flash',
         isActive: true,
         isDefault: true,
       },
       {
         agentType: AgentType.REVIEW,
-        provider: Provider.OLLAMA,
-        modelName: 'qwen2.5:7b',
+        provider: Provider.GOOGLE,
+        modelName: 'gemini-1.5-flash',
         isActive: true,
         isDefault: true,
       },
       {
         agentType: AgentType.CHAT,
-        provider: Provider.OLLAMA,
-        modelName: 'qwen2.5:7b',
+        provider: Provider.GOOGLE,
+        modelName: 'gemini-1.5-flash',
         isActive: true,
         isDefault: true,
       },
       {
         agentType: AgentType.EMBEDDING,
-        provider: Provider.OLLAMA,
-        modelName: 'nomic-embed-text',
+        provider: Provider.GOOGLE,
+        modelName: 'gemini-embedding-001',
         isActive: true,
         isDefault: true,
       },
@@ -135,27 +135,11 @@ export class ModelsService implements OnModuleInit {
     const startTime = Date.now();
 
     if (dto.provider === Provider.OLLAMA) {
-      try {
-        // Resolve target endpoint (defaults to process.env.OLLAMA_API_URL / 12005)
-        const targetUrl = dto.endpoint || process.env.OLLAMA_API_URL || 'http://localhost:12005';
-        
-        // Brief request check
-        await firstValueFrom(
-          this.httpService.get(`${targetUrl}/api/tags`, { timeout: 3000 }),
-        );
-
-        return {
-          online: true,
-          latencyMs: Date.now() - startTime,
-        };
-      } catch (err: any) {
-        this.logger.warn(`Ollama connection test failed at ${dto.endpoint || 'default'}: ${err.message}`);
-        return {
-          online: false,
-          latencyMs: Date.now() - startTime,
-          error: `Ollama connection failed at ${dto.endpoint || 'default'}: ${err.message}`,
-        };
-      }
+      return {
+        online: false,
+        latencyMs: 0,
+        error: 'Ollama is not supported in this deployment. Use Google (Gemini) instead.',
+      };
     } else if (dto.provider === Provider.ANTHROPIC) {
       if (!dto.apiKey) {
         return { online: false, latencyMs: 0, error: 'API key is required to test Anthropic.' };
@@ -248,8 +232,8 @@ export class ModelsService implements OnModuleInit {
       config = {
         id: 'fallback-id',
         agentType,
-        provider: Provider.OLLAMA,
-        modelName: 'qwen2.5:7b',
+        provider: Provider.GOOGLE,
+        modelName: 'gemini-1.5-flash',
         endpoint: null,
         apiKeyEnc: null,
         isActive: true,
@@ -270,17 +254,23 @@ export class ModelsService implements OnModuleInit {
       responseText = result.text;
       executionModel = result.modelUsed;
     } else if (config.provider === Provider.OLLAMA) {
-      const ollamaResult = await this.ollama.generate(prompt, config.modelName, {
+      // Ollama is not supported in this deployment; fall back to Gemini
+      this.logger.warn(`Agent ${agentType} is configured for Ollama which is not available. Falling back to Gemini.`);
+      const result = await this.gemini.generateContent(prompt, 'gemini-1.5-flash', {
         temperature: options?.temperature,
-        max_tokens: options?.max_tokens,
+        maxTokens: options?.max_tokens,
       });
-      responseText = ollamaResult.response;
+      responseText = result.text;
+      executionModel = result.modelUsed;
     } else if (config.provider === Provider.ANTHROPIC) {
-      const localResult = await this.ollama.generate(prompt, 'qwen2.5:7b', {
+      // Anthropic support is not active in this deployment; fall back to Gemini
+      this.logger.warn(`Agent ${agentType} is configured for Anthropic which is not active. Falling back to Gemini.`);
+      const result = await this.gemini.generateContent(prompt, 'gemini-1.5-flash', {
         temperature: options?.temperature,
-        max_tokens: options?.max_tokens,
+        maxTokens: options?.max_tokens,
       });
-      responseText = localResult.response;
+      responseText = result.text;
+      executionModel = result.modelUsed;
     }
 
     const durationMs = Date.now() - startTime;

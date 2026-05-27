@@ -1,23 +1,24 @@
 <header class="tb">
 
-  <!-- ── Left: project name + page navigation ─────────────── -->
+  <!-- ── Left: back + project name + page navigation ──────────── -->
   <div class="tb-left">
-    <span class="tb-context">
-      <strong>{{ pageData().projectName }}</strong>
-    </span>
+    <button class="tb-back-btn" (click)="goBack.emit()" title="Back to project">
+      <i class="pi pi-arrow-left"></i>
+      <span class="tb-context-name">{{ pageData().projectName }}</span>
+    </button>
     <div class="tb-left-sep"></div>
     <div class="tb-nav">
-      <button class="tb-icon-btn" [disabled]="!state.prevPageId()" (click)="prevPage.emit()" title="Previous page">
+      <button class="tb-icon-btn" [disabled]="!state.prevPageId()" (click)="prevPage.emit()" title="Previous page (K)">
         <i class="pi pi-chevron-left"></i>
       </button>
       <span class="tb-nav-num">{{ pageData().pageNum }}</span>
-      <button class="tb-icon-btn" [disabled]="!state.nextPageId()" (click)="nextPage.emit()" title="Next page">
+      <button class="tb-icon-btn" [disabled]="!state.nextPageId()" (click)="nextPage.emit()" title="Next page (J)">
         <i class="pi pi-chevron-right"></i>
       </button>
     </div>
   </div>
 
-  <!-- ── Right: all actions ───────────────────────────────── -->
+  <!-- ── Right: all actions ───────────────────────────────────── -->
   <div class="tb-right">
 
     <!-- View mode toggle -->
@@ -33,7 +34,7 @@
         class="tb-toggle-btn"
         [class.active]="state.viewMode() === 'overlay'"
         (click)="state.viewMode.set('overlay')"
-        title="Overlay">
+        title="Overlay (focus mode)">
         <i class="pi pi-clone"></i>
       </button>
     </div>
@@ -51,14 +52,25 @@
         [disabled]="isRetranslating()"
         (modelChange)="modelChange.emit($event)"
       />
-      <button class="tb-filled-btn tb-filled-warning" (click)="resetEdits.emit()">
-        <i class="pi pi-undo"></i>
-        Reset
-      </button>
+
+      <!-- Reset with inline confirmation -->
+      @if (!confirmingReset()) {
+        <button class="tb-action-btn tb-outlined" (click)="requestReset()" title="Reset all edits on this page">
+          <i class="pi pi-undo"></i>
+          Reset
+        </button>
+      } @else {
+        <div class="tb-reset-confirm">
+          <span class="tb-reset-label">Reset all edits?</span>
+          <button class="tb-filled-btn tb-filled-danger" (click)="doReset()">Yes, reset</button>
+          <button class="tb-action-btn" (click)="cancelReset()">Cancel</button>
+        </div>
+      }
+
       @if (isMasterOrAdmin()) {
         <p-select
           [options]="pageStatusOptions()"
-          [(ngModel)]="pageData().status"
+          [ngModel]="selectedStatus()"
           optionLabel="label"
           optionValue="value"
           (onChange)="statusChange.emit($event.value)"
@@ -80,36 +92,41 @@
         </button>
       }
       @if (pageData().status === 'APPROVED') {
-        <button class="tb-filled-btn tb-filled-danger" [class.loading]="isCompleting()" [disabled]="isCompleting()" (click)="revoke.emit()">
-          <i class="pi" [class.pi-times-circle]="!isCompleting()" [class.pi-spin]="isCompleting()" [class.pi-spinner]="isCompleting()"></i>
+        <button class="tb-filled-btn tb-filled-danger" [class.loading]="isRevoking()" [disabled]="isRevoking()" (click)="revoke.emit()">
+          <i class="pi" [class.pi-times-circle]="!isRevoking()" [class.pi-spin]="isRevoking()" [class.pi-spinner]="isRevoking()"></i>
           Revoke
         </button>
       } @else {
-        <button class="tb-filled-btn tb-filled-success" [class.loading]="isCompleting()" [disabled]="isCompleting()" (click)="approve.emit()">
-          <i class="pi" [class.pi-check]="!isCompleting()" [class.pi-spin]="isCompleting()" [class.pi-spinner]="isCompleting()"></i>
+        <button class="tb-filled-btn tb-filled-success" [class.loading]="isApproving()" [disabled]="isApproving()" (click)="approve.emit()">
+          <i class="pi" [class.pi-check]="!isApproving()" [class.pi-spin]="isApproving()" [class.pi-spinner]="isApproving()"></i>
           Approve
         </button>
       }
     } @else {
       @if (mySubmission()) {
         <div class="tb-submitted-group">
-          <button class="tb-action-btn" disabled>
-            <i class="pi pi-check-circle"></i> Submitted
+          <button class="tb-action-btn tb-outlined" disabled>
+            <i class="pi pi-check-circle" style="color: var(--accent-success)"></i> Submitted
           </button>
-          <button class="tb-icon-btn" title="Unsubmit" (click)="unsubmitReview.emit(mySubmission()!.id)">
+          <button class="tb-icon-btn" title="Withdraw submission" (click)="unsubmitReview.emit(mySubmission()!.id)">
             <i class="pi pi-undo"></i>
           </button>
         </div>
       } @else {
-        <button
-          class="tb-filled-btn tb-filled-success"
-          [class.loading]="isCompleting()"
-          [disabled]="isCompleting() || !hasWorkingEdits()"
-          (click)="submitForReview.emit()"
-          [pTooltip]="!hasWorkingEdits() ? 'Make some segment edits first' : 'Submit your corrections for master review'">
-          <i class="pi" [class.pi-send]="!isCompleting()" [class.pi-spin]="isCompleting()" [class.pi-spinner]="isCompleting()"></i>
-          Submit Review
-        </button>
+        <div class="tb-submit-wrap">
+          <button
+            class="tb-filled-btn tb-filled-success"
+            [class.loading]="isSubmittingReview()"
+            [disabled]="isSubmittingReview() || !hasWorkingEdits()"
+            (click)="submitForReview.emit()"
+            [pTooltip]="!hasWorkingEdits() ? 'Edit segments in the right column first' : 'Submit your corrections for master review'">
+            <i class="pi" [class.pi-send]="!isSubmittingReview()" [class.pi-spin]="isSubmittingReview()" [class.pi-spinner]="isSubmittingReview()"></i>
+            Submit Review
+          </button>
+          @if (!hasWorkingEdits()) {
+            <span class="tb-submit-hint">Click a segment to edit it first</span>
+          }
+        </div>
       }
     }
 
@@ -124,6 +141,7 @@
       } @else {
         <span class="tb-reviewer-badge-label">No reviewers</span>
       }
+      <i class="pi pi-chevron-down tb-reviewer-badge-chevron"></i>
     </button>
 
     <p-popover #reviewerPanel styleClass="tb-reviewer-panel">

@@ -1,0 +1,27 @@
+FROM node:24-bookworm-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y libssl3 curl && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g pnpm@10
+
+# Copy manifests first — Docker caches this layer until they change
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
+COPY apps/ ./apps/
+
+RUN pnpm install --frozen-lockfile
+
+# Generate Prisma client for this platform's OpenSSL version
+RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
+
+# Compile TypeScript → dist/apps/api/
+RUN pnpm nx build api --configuration=production
+
+# Render injects PORT at runtime (typically 10000). Fall back to 3000 locally.
+EXPOSE ${PORT:-3000}
+
+# Apply pending migrations then start the compiled binary
+CMD ["sh", "-c", \
+  "npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma && \
+   node dist/apps/api/main.js"]

@@ -21,10 +21,21 @@
       </div>
     </div>
 
-    <div class="styleGuides-grid">
-      @for (styleGuide of styleGuides(); track styleGuide.id) {
-        <app-style-guide-card [styleGuide]="styleGuide" (click)="navigateToStyleGuide(styleGuide.id)"></app-style-guide-card>
-      }
-    </div>
+    @if (styleGuides().length === 0) {
+      <div class="styleGuides-empty">
+        <i class="pi pi-bookmark"></i>
+        <h3>No style guides yet</h3>
+        <p>Style guides define translation rules and terminology that the AI agents follow.<br>Create your first one to get consistent, high-quality translations.</p>
+        <button class="empty-cta" (click)="navigateToCreate()">
+          <i class="pi pi-plus"></i> New Style Guide
+        </button>
+      </div>
+    } @else {
+      <div class="styleGuides-grid">
+        @for (styleGuide of styleGuides(); track styleGuide.id) {
+          <app-style-guide-card [styleGuide]="styleGuide" (cardClick)="navigateToStyleGuide(styleGuide.id)"></app-style-guide-card>
+        }
+      </div>
+    }
   </div>
 </div>

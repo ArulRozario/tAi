@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { map, tap } from 'rxjs/operators';
 import { MessageService } from 'primeng/api';
 
 export interface User {
@@ -66,7 +66,9 @@ export class AdminUsersService {
   }
 
   getUser(id: string): Observable<UserDetail> {
-    return this.http.get<UserDetail>(`${this.API_URL}/${id}`);
+    return this.http.get<any>(`${this.API_URL}/${id}`).pipe(
+      map(u => ({ ...u, activeSessions: u.refreshTokens ?? [] }))
+    );
   }
 
   createUser(data: { name: string; email: string; role: string }): Observable<{ id: string; email: string; name: string; role: string; isActive: boolean; mustChangePassword: boolean; createdAt: string; temporaryPassword: string }> {

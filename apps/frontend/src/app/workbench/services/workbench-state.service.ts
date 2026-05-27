@@ -1,6 +1,9 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { SafeHtml } from '@angular/platform-browser';
 import { SegmentError } from '../../core/services/api.service';
+import { ReviewSubmission, SegmentReviewCorrection } from './submissions.service';
+
+export type RightPanelMode = 'chat' | 'submissions' | 'segment-reviews' | 'issues';
 
 export interface WorkbenchPage {
   id: string;
@@ -24,8 +27,9 @@ export class WorkbenchStateService {
   // --- Layout State ---
   zoomLevel = signal<number>(100);
   viewMode = signal<'side-by-side' | 'overlay'>('side-by-side');
+  overlayColumn = signal<'source' | 'target'>('target');
   sourceViewMode = signal<'html' | 'image'>('html');
-  rightPanelCollapsed = signal<boolean>(true);
+  rightPanelCollapsed = signal<boolean>(false);
   leftPanelCollapsed = signal<boolean>(false);
 
   // --- Page State ---
@@ -53,6 +57,18 @@ export class WorkbenchStateService {
   totalSegmentCount = signal<number>(0);
   pageErrors = signal<SegmentError[]>([]);
   pageEdits = signal<{ segmentId: string; editedText: string }[]>([]);
+
+  // --- Review Submissions ---
+  submissions = signal<ReviewSubmission[]>([]);
+  activeSubmissionId = signal<string | null>(null);
+  segmentCorrections = signal<SegmentReviewCorrection[]>([]);
+  isLoadingSegmentCorrections = signal(false);
+  rightPanelMode = signal<RightPanelMode>('chat');
+  showCleanDiff = signal<boolean>(false);
+  hasWorkingEdits = computed(() => this.pageEdits().length > 0);
+  pendingSubmissionCount = computed(() =>
+    this.submissions().filter((s) => s.status === 'PENDING').length
+  );
 
   // --- Helpers ---
   setPageData(data: WorkbenchPage | null) {

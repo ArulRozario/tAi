@@ -66,6 +66,7 @@ export class UsersComponent implements OnInit {
   loading = signal(false);
   loadingMore = signal(false);
   loadingUserDetail = signal(false);
+  loadError = signal(false);
 
   pagination = signal({ page: 1, limit: 20, total: 0, totalPages: 0 });
 
@@ -124,10 +125,11 @@ export class UsersComponent implements OnInit {
         this.users.set(res.users);
         this.pagination.set({ page: 1, limit: res.limit, total: res.total, totalPages: res.totalPages });
         this.loading.set(false);
+        this.loadError.set(false);
       },
       error: () => {
         this.loading.set(false);
-        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Could not load members.' });
+        this.loadError.set(true);
       },
     });
   }

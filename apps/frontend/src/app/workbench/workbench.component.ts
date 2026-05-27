@@ -1,37 +1,38 @@
-import { Component, signal, computed, ViewChild, ElementRef, AfterViewInit, effect, untracked, inject, OnInit } from '@angular/core';
+import { Component, signal, computed, ViewChild, effect, untracked, inject, OnInit, DestroyRef, HostListener } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { faro } from '@grafana/faro-web-sdk';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { switchMap, map } from 'rxjs/operators';
+import { forkJoin } from 'rxjs';
 
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { TooltipModule } from 'primeng/tooltip';
 import { AvatarModule } from 'primeng/avatar';
-import { AvatarGroupModule } from 'primeng/avatargroup';
-import { SelectModule } from 'primeng/select';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { InputTextModule } from 'primeng/inputtext';
 import { TextareaModule } from 'primeng/textarea';
 import { DialogModule } from 'primeng/dialog';
-import { MenuModule } from 'primeng/menu';
-import { MessageService, MenuItem } from 'primeng/api';
+import { MessageService } from 'primeng/api';
 import { AiChatComponent } from '../shared/components/ai-chat/ai-chat.component';
 import { AiChatService } from '../shared/components/ai-chat/ai-chat.service';
 import { UnifiedChatService } from '../shared/components/ai-chat/unified-chat.service';
 import { PageThumbnailSidebarComponent } from '../shared/components/page-thumbnail-sidebar/page-thumbnail-sidebar.component';
-import { ModelPickerComponent } from '../shared/components/model-picker/model-picker.component';
 import { CardModule } from 'primeng/card';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer } from '@angular/platform-browser';
 import * as Diff from 'diff';
-import { ProjectService, Project, Page, PageReviewer } from '../projects/projects.service';
+import { ProjectService } from '../projects/projects.service';
 import { ApiService, User, SegmentError } from '../core/services/api.service';
 import { AuthService } from '../auth/auth.service';
 import { WorkbenchStateService, WorkbenchPage } from './services/workbench-state.service';
+import { SubmissionsService, SegmentReviewCorrection } from './services/submissions.service';
 import { PageContentRendererComponent } from './components/page-content-renderer/page-content-renderer.component';
 import { WorkbenchToolbarComponent } from './components/workbench-toolbar/workbench-toolbar.component';
+import { SubmissionsPanelComponent } from './components/submissions-panel/submissions-panel.component';
+import { SegmentReviewsComponent } from './components/segment-reviews/segment-reviews.component';
 
 @Component({
   selector: 'app-workbench',
@@ -45,18 +46,17 @@ import { WorkbenchToolbarComponent } from './components/workbench-toolbar/workbe
     ProgressBarModule,
     TooltipModule,
     AvatarModule,
-    AvatarGroupModule,
-    SelectModule,
     MultiSelectModule,
     InputTextModule,
     TextareaModule,
     DialogModule,
-    MenuModule,
     AiChatComponent,
     CardModule,
     PageThumbnailSidebarComponent,
     PageContentRendererComponent,
     WorkbenchToolbarComponent,
+    SubmissionsPanelComponent,
+    SegmentReviewsComponent,
   ],
   providers: [
     UnifiedChatService,
@@ -65,17 +65,19 @@ import { WorkbenchToolbarComponent } from './components/workbench-toolbar/workbe
   templateUrl: './workbench.component.html',
   styleUrl: './workbench.component.scss',
 })
-export class WorkbenchComponent implements OnInit, AfterViewInit {
+export class WorkbenchComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private projectService = inject(ProjectService);
   private apiService = inject(ApiService);
-  private authService = inject(AuthService);
+  authService = inject(AuthService);
   private sanitizer = inject(DomSanitizer);
   private messageService = inject(MessageService);
   private chatService = inject(AiChatService);
   private unifiedChat = inject(UnifiedChatService);
   public state = inject(WorkbenchStateService);
+  private submissionsService = inject(SubmissionsService);
+  private destroyRef = inject(DestroyRef);
 
   @ViewChild('aiChat') aiChat!: AiChatComponent;
 
@@ -83,7 +85,10 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   baseTargetHtml = signal<string>('');
   pageErrors = signal<{ segmentId: string; severity: string; message: string }[]>([]);
 
-  // ─── Page Data (Managed in component as it's local to the page load) ───
+  private loadingPageId = '';
+  private currentPageId = signal<string | null>(null);
+
+  // ─── Page Data ───
   pageData = signal<WorkbenchPage | null>(null);
   loading = signal(true);
 
@@ -100,44 +105,46 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   isRetranslating = signal(false);
   isReplacingImage = signal(false);
   isReviewing = signal(false);
-  isCompleting = signal(false);
+
+  isApproving = signal(false);
+  isRevoking = signal(false);
+  isSubmittingPage = signal(false);
+  isSubmittingReview = signal(false);
+  isUnsubmitting = signal(false);
+  isApprovingSubmission = signal(false);
+  isRejectingSubmission = signal(false);
+
   selectedModel = signal<string>('');
 
   isQueueMode = signal(false);
   isMasterOrAdmin = computed(() => this.authService.hasAnyRole(['MASTER', 'ADMIN']));
+
+  // Fixed: filter by current user's ID, not just any pending submission
+  myPendingSubmission = computed(() => {
+    const currentUserId = this.authService.getCurrentUser()?.id;
+    if (!currentUserId) return undefined;
+    return this.state.submissions().find(
+      s => s.status === 'PENDING' && s.submittedById === currentUserId
+    );
+  });
 
   userInitials = computed(() => {
     const name = this.authService.getCurrentUser()?.name ?? '';
     return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
   });
 
-  errorPanelCollapsed = false;
-
-  overflowMenuItems: MenuItem[] = [
-    {
-      label: 'Request changes',
-      icon: 'pi pi-undo',
-      command: () => { this.showRequestChangesDialog = true; },
-    },
-    {
-      label: 'Escalate',
-      icon: 'pi pi-exclamation-triangle',
-      command: () => { this.showEscalateDialog = true; },
-    },
-  ];
+  errorPanelCollapsed = signal(false);
 
   showRequestChangesDialog = false;
   showEscalateDialog = false;
-  showAddReviewerDialog = false;
   showReassignDialog = false;
   requestChangesNote = '';
   escalateReason = '';
 
   allUsers = signal<User[]>([]);
-  selectedNewReviewerUserId = '';
   selectedReassignUserIds: string[] = [];
 
-  pageStatusOptions: MenuItem[] = [
+  pageStatusOptions = [
     { label: 'Pending', value: 'PENDING' },
     { label: 'Extracted', value: 'EXTRACTED' },
     { label: 'Translated', value: 'TRANSLATED' },
@@ -150,28 +157,36 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   ];
 
   constructor() {
-    this.chatService.contentAccepted$.subscribe((content) => {
-      const pageId = this.pageData()?.id;
-      const segmentId = this.state.activeSegmentId();
-      if (pageId && segmentId) {
-        this.projectService.savePageEdit(pageId, segmentId, content).subscribe({
-          next: () => {
-            this.messageService.add({ severity: 'success', summary: 'Applied', detail: 'AI translation applied.', life: 1500 });
-            this.state.setActiveSegment(null);
-            this.loadEdits(pageId);
-          },
-          error: (err: any) => {
-            const detail = err?.error?.message || 'Failed to apply translation.';
-            this.messageService.add({ severity: 'error', summary: 'Error', detail });
-          },
-        });
-      }
-    });
+    this.chatService.contentAccepted$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((content) => {
+        const pageId = this.currentPageId();
+        const segmentId = this.state.activeSegmentId();
+        if (pageId && segmentId) {
+          this.projectService.savePageEdit(pageId, segmentId, content).subscribe({
+            next: () => {
+              this.messageService.add({ severity: 'success', summary: 'Applied', detail: 'AI translation applied.', life: 1500 });
+              this.state.setActiveSegment(null);
+              this.loadEdits(pageId);
+            },
+            error: (err: any) => {
+              const detail = err?.error?.message || 'Failed to apply translation.';
+              this.messageService.add({ severity: 'error', summary: 'Error', detail });
+            },
+          });
+        }
+      });
 
     effect(() => {
       const segId = this.state.activeSegmentId();
       const sourceText = this.state.activeSourceText();
-      if (!segId) return;
+      if (!segId) {
+        this.state.segmentCorrections.set([]);
+        if (this.state.rightPanelMode() === 'segment-reviews') {
+          this.state.rightPanelMode.set('chat');
+        }
+        return;
+      }
 
       const pageId = untracked(() => this.pageData()?.id);
 
@@ -196,6 +211,25 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
       ].join('\n');
 
       this.aiChat?.reset(greeting);
+
+      // Load segment corrections for master/admin
+      if (pageId && this.isMasterOrAdmin()) {
+        this.state.isLoadingSegmentCorrections.set(true);
+        this.state.segmentCorrections.set([]);
+        this.submissionsService.getSegmentCorrections(pageId, segId).subscribe({
+          next: (res) => {
+            this.state.segmentCorrections.set(res.data);
+            this.state.isLoadingSegmentCorrections.set(false);
+          },
+          error: () => {
+            this.state.segmentCorrections.set([]);
+            this.state.isLoadingSegmentCorrections.set(false);
+          },
+        });
+        if (this.state.rightPanelMode() !== 'submissions') {
+          this.state.rightPanelMode.set('segment-reviews');
+        }
+      }
     }, { allowSignalWrites: true });
   }
 
@@ -205,9 +239,14 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     if (id) {
       this.loadPageData(id);
     }
+    this.apiService.getUsers().subscribe({
+      next: (users) => this.allUsers.set(users),
+      error: () => {},
+    });
   }
 
   loadPageData(pageId: string) {
+    this.loadingPageId = pageId;
     this.loading.set(true);
     this.imageLoadError.set(false);
     this.edits.set([]);
@@ -220,9 +259,16 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
       )
     ).subscribe({
       next: ({ page, project }) => {
-        const baseSourceHtml = page.originalHtml || '';
+        if (this.loadingPageId !== pageId) return;
+
+        const approvals: Record<string, boolean> = (page as any).segmentApprovals ?? {};
+        this.state.approvedSegmentIds.set(
+          new Set(Object.entries(approvals).filter(([, v]) => v).map(([k]) => k))
+        );
+
         const baseTargetHtml = page.translatedHtml || '';
         this.baseTargetHtml.set(baseTargetHtml);
+        this.currentPageId.set(page.id);
 
         this.pageData.set({
           id: page.id,
@@ -235,18 +281,19 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
           sourceLang: project.sourceLang,
           targetLang: project.targetLang,
           reviewers: page.reviewers || [],
-          sourceHtml: this.sanitizer.bypassSecurityTrustHtml(baseSourceHtml),
+          sourceHtml: this.sanitizer.bypassSecurityTrustHtml(page.originalHtml || ''),
           targetHtml: this.sanitizer.bypassSecurityTrustHtml(baseTargetHtml),
         });
 
         this.loadEdits(pageId, baseTargetHtml);
         this.loadPageErrors(pageId);
-        this.loadSegmentApprovals(pageId);
+        this.loadSubmissions(pageId);
         this.selectedModel.set(project.translationModel || '');
         this.loading.set(false);
         this.loadSiblings(page.id);
       },
       error: (err) => {
+        if (this.loadingPageId !== pageId) return;
         faro.api?.pushError(new Error('Failed to load page in workbench'), { context: { error: String(err) } });
         this.loading.set(false);
       },
@@ -273,22 +320,16 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     this.apiService.getPageErrors(pageId).subscribe({
       next: (errors) => {
         this.state.pageErrors.set(errors);
-        this.errorPanelCollapsed = false;
+        this.errorPanelCollapsed.set(false);
+        // Auto-open the issues panel when errors are found
+        if (errors.length > 0 && this.state.rightPanelMode() !== 'submissions') {
+          this.openIssuesPanel();
+        }
       },
-      error: (err) => faro.api?.pushError(new Error('Failed to load page errors'), { context: { pageId, error: String(err) } }),
-    });
-  }
-
-  loadSegmentApprovals(pageId: string) {
-    this.apiService.getPage(pageId).subscribe({
-      next: (detail) => {
-        this.state.totalSegmentCount.set(detail.segments?.length ?? 0);
-        const approvedIds = new Set<string>(
-          (detail.segments ?? []).filter(s => s.isApproved).map(s => s.id)
-        );
-        this.state.approvedSegmentIds.set(approvedIds);
+      error: (err) => {
+        faro.api?.pushError(new Error('Failed to load page errors'), { context: { pageId, error: String(err) } });
+        this.messageService.add({ severity: 'warn', summary: 'Warning', detail: 'Could not load page quality issues.' });
       },
-      error: () => {},
     });
   }
 
@@ -310,6 +351,15 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
 
   private readonly INLINE_DIFF_THRESHOLD = 3;
 
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   compileHtml(baseHtml: string, edits: { segmentId: string; editedText: string }[]): string {
     if (!edits.length) return baseHtml;
     const parser = new DOMParser();
@@ -322,16 +372,16 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
         const changedCount = diffs.filter((p: any) => p.added || p.removed).length;
 
         if (changedCount > this.INLINE_DIFF_THRESHOLD) {
-          el.innerHTML = `<span class="diff-stacked"><span class="diff-stacked-original">${original}</span><span class="diff-stacked-edited">${edit.editedText}</span></span>`;
+          el.innerHTML = `<span class="diff-stacked"><span class="diff-stacked-original">${this.escapeHtml(original)}</span><span class="diff-stacked-edited">${this.escapeHtml(edit.editedText)}</span></span>`;
         } else {
           let newHtml = '';
           diffs.forEach((part: any) => {
             if (part.added) {
-              newHtml += `<ins class="diff-added">${part.value}</ins>`;
+              newHtml += `<ins class="diff-added">${this.escapeHtml(part.value)}</ins>`;
             } else if (part.removed) {
-              newHtml += `<del class="diff-removed">${part.value}</del>`;
+              newHtml += `<del class="diff-removed">${this.escapeHtml(part.value)}</del>`;
             } else {
-              newHtml += `<span>${part.value}</span>`;
+              newHtml += `<span>${this.escapeHtml(part.value)}</span>`;
             }
           });
           el.innerHTML = newHtml;
@@ -351,7 +401,16 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     });
   }
 
+  private guardNavigation(): boolean {
+    if (this.state.editingSegmentId()) {
+      this.messageService.add({ severity: 'warn', summary: 'Finish editing', detail: 'Please save or cancel your current edit before navigating.' });
+      return false;
+    }
+    return true;
+  }
+
   goToPrevPage() {
+    if (!this.guardNavigation()) return;
     const id = this.state.prevPageId();
     if (id) {
       this.loadPageData(id);
@@ -359,6 +418,7 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   }
 
   goToNextPage() {
+    if (!this.guardNavigation()) return;
     const id = this.state.nextPageId();
     if (id) {
       this.loadPageData(id);
@@ -366,6 +426,7 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   }
 
   onSidebarPageSelect(pageId: string) {
+    if (!this.guardNavigation()) return;
     this.loadPageData(pageId);
   }
 
@@ -478,8 +539,6 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     });
   }
 
-  ngAfterViewInit() {}
-
   toggleRightPanel() {
     this.state.rightPanelCollapsed.update(v => !v);
   }
@@ -502,8 +561,6 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
       next: (res) => {
         if (res.nextPageId) {
           this.router.navigate(['/review', res.nextPageId]);
-          this.loadPageData(res.nextPageId);
-          this.isQueueMode.set(true);
         } else {
           this.messageService.add({ severity: 'info', summary: 'Queue empty', detail: 'No more pages in the review queue.' });
           this.router.navigate(['/queue']);
@@ -518,16 +575,33 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   completePage() {
     const pageId = this.pageData()?.id;
     if (!pageId) return;
-    this.isCompleting.set(true);
+    this.isApproving.set(true);
     this.apiService.approvePage(pageId).subscribe({
       next: () => {
-        this.isCompleting.set(false);
+        this.isApproving.set(false);
         this.messageService.add({ severity: 'success', summary: 'Approved', detail: 'Page approved.' });
         this.skipPage();
       },
       error: () => {
-        this.isCompleting.set(false);
+        this.isApproving.set(false);
         this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to approve page.' });
+      },
+    });
+  }
+
+  revokePage() {
+    const pageId = this.pageData()?.id;
+    if (!pageId) return;
+    this.isRevoking.set(true);
+    this.apiService.revokePage(pageId).subscribe({
+      next: (page) => {
+        this.isRevoking.set(false);
+        this.pageData.update(p => p ? { ...p, status: page.status } : p);
+        this.messageService.add({ severity: 'info', summary: 'Revoked', detail: 'Approval revoked.' });
+      },
+      error: () => {
+        this.isRevoking.set(false);
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to revoke approval.' });
       },
     });
   }
@@ -535,15 +609,15 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
   submitForReview() {
     const pageId = this.pageData()?.id;
     if (!pageId) return;
-    this.isCompleting.set(true);
+    this.isSubmittingPage.set(true);
     this.apiService.submitPageForReview(pageId).subscribe({
       next: (page) => {
-        this.isCompleting.set(false);
+        this.isSubmittingPage.set(false);
         this.pageData.update(p => p ? { ...p, submittedAt: (page as any).submittedAt } : p);
         this.messageService.add({ severity: 'success', summary: 'Submitted', detail: 'Page submitted for master review.' });
       },
       error: () => {
-        this.isCompleting.set(false);
+        this.isSubmittingPage.set(false);
         this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to submit page.' });
       },
     });
@@ -582,27 +656,15 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
     });
   }
 
-  openAddReviewer() {
-    if (!this.allUsers().length) {
-      this.apiService.getUsers().subscribe({
-        next: (users) => this.allUsers.set(users),
-        error: () => {},
-      });
-    }
-    this.selectedNewReviewerUserId = '';
-    this.showAddReviewerDialog = true;
-  }
-
-  submitAddReviewer() {
+  submitAddReviewer(userId: string) {
     const pageId = this.pageData()?.id;
-    if (!pageId || !this.selectedNewReviewerUserId) return;
-    this.apiService.addReviewer(pageId, this.selectedNewReviewerUserId).subscribe({
+    if (!pageId || !userId) return;
+    this.apiService.addReviewer(pageId, userId).subscribe({
       next: (page) => {
-        this.showAddReviewerDialog = false;
         this.pageData.update(p => p ? { ...p, reviewers: (page as any).reviewers || p.reviewers } : p);
         this.messageService.add({ severity: 'success', summary: 'Reviewer added', life: 1500 });
       },
-      error: (err) => {
+      error: () => {
         this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to add reviewer.' });
       },
     });
@@ -632,5 +694,214 @@ export class WorkbenchComponent implements OnInit, AfterViewInit {
         this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to reassign reviewers.' });
       },
     });
+  }
+
+  removeReviewerFromPage(userId: string) {
+    const pageId = this.pageData()?.id;
+    if (!pageId) return;
+    this.apiService.removeReviewer(pageId, userId).subscribe({
+      next: () => {
+        this.pageData.update(p => p ? { ...p, reviewers: p.reviewers.filter(r => r.userId !== userId) } : p);
+        this.messageService.add({ severity: 'success', summary: 'Removed', detail: 'Reviewer removed.', life: 1500 });
+      },
+      error: () => {
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove reviewer.' });
+      },
+    });
+  }
+
+  // ─── Review Submissions ─────────────────────────────────────────────
+
+  loadSubmissions(pageId: string) {
+    this.submissionsService.getSubmissions(pageId).subscribe({
+      next: (res) => {
+        this.state.submissions.set(res.data);
+      },
+      error: (err) => {
+        faro.api?.pushError(new Error('Failed to load submissions'), { context: { pageId, error: String(err) } });
+      },
+    });
+  }
+
+  submitReview() {
+    const pageId = this.pageData()?.id;
+    if (!pageId) return;
+    this.isSubmittingReview.set(true);
+    this.submissionsService.submitReview(pageId).subscribe({
+      next: (submission) => {
+        this.isSubmittingReview.set(false);
+        this.pageData.update(p => p ? { ...p, submittedAt: submission.createdAt } : p);
+        this.state.submissions.update((subs) => [submission, ...subs]);
+        this.loadEdits(pageId);
+        this.messageService.add({ severity: 'success', summary: 'Submitted', detail: 'Your corrections have been submitted for master review.' });
+      },
+      error: (err: any) => {
+        this.isSubmittingReview.set(false);
+        const detail = err?.error?.message || 'Failed to submit review.';
+        this.messageService.add({ severity: 'error', summary: 'Error', detail });
+      },
+    });
+  }
+
+  unsubmitReview(submissionId: string) {
+    const pageId = this.pageData()?.id;
+    if (!pageId) return;
+    this.isUnsubmitting.set(true);
+    this.submissionsService.unsubmitReview(pageId, submissionId).subscribe({
+      next: () => {
+        this.isUnsubmitting.set(false);
+        this.state.submissions.update((subs) => subs.filter((s) => s.id !== submissionId));
+        this.loadEdits(pageId);
+        this.loadSubmissions(pageId);
+        this.messageService.add({ severity: 'info', summary: 'Unsubmitted', detail: 'Your submission has been withdrawn.' });
+      },
+      error: (err: any) => {
+        this.isUnsubmitting.set(false);
+        const detail = err?.error?.message || 'Failed to unsubmit review.';
+        this.messageService.add({ severity: 'error', summary: 'Error', detail });
+      },
+    });
+  }
+
+  approveSubmission(submissionId: string) {
+    const pageId = this.pageData()?.id;
+    if (!pageId) return;
+    this.isApprovingSubmission.set(true);
+    this.submissionsService.approveSubmission(pageId, submissionId).subscribe({
+      next: () => {
+        this.isApprovingSubmission.set(false);
+        this.loadSubmissions(pageId);
+        this.loadEdits(pageId);
+        this.messageService.add({ severity: 'success', summary: 'Approved', detail: 'Submission approved and corrections applied.' });
+      },
+      error: (err: any) => {
+        this.isApprovingSubmission.set(false);
+        const detail = err?.error?.message || 'Failed to approve submission.';
+        this.messageService.add({ severity: 'error', summary: 'Error', detail });
+      },
+    });
+  }
+
+  rejectSubmission(submissionId: string) {
+    const pageId = this.pageData()?.id;
+    if (!pageId) return;
+    this.isRejectingSubmission.set(true);
+    this.submissionsService.rejectSubmission(pageId, submissionId).subscribe({
+      next: (submission) => {
+        this.isRejectingSubmission.set(false);
+        this.state.submissions.update((subs) => subs.map((s) => (s.id === submissionId ? { ...s, status: 'REJECTED' } : s)));
+        this.messageService.add({ severity: 'info', summary: 'Rejected', detail: 'Submission rejected.' });
+      },
+      error: (err: any) => {
+        this.isRejectingSubmission.set(false);
+        const detail = err?.error?.message || 'Failed to reject submission.';
+        this.messageService.add({ severity: 'error', summary: 'Error', detail });
+      },
+    });
+  }
+
+  previewSubmission(submissionId: string) {
+    const current = this.state.activeSubmissionId();
+    if (current === submissionId) {
+      this.state.activeSubmissionId.set(null);
+      this.loadEdits(this.pageData()?.id || '');
+      return;
+    }
+    this.state.activeSubmissionId.set(submissionId);
+    const submission = this.state.submissions().find((s) => s.id === submissionId);
+    if (submission?.items) {
+      const mapped = submission.items.map((item) => ({ segmentId: item.segmentId, editedText: item.editedText }));
+      this.edits.set(mapped);
+      this.state.pageEdits.set(mapped);
+      const html = this.baseTargetHtml();
+      if (html) {
+        const compiled = this.compileHtml(html, mapped);
+        this.pageData.update((p) => (p ? { ...p, targetHtml: this.sanitizer.bypassSecurityTrustHtml(compiled) } : p));
+      }
+    }
+  }
+
+  onSegmentCorrectionUse(correction: SegmentReviewCorrection) {
+    const pageId = this.pageData()?.id;
+    const segId = this.state.activeSegmentId();
+    if (!pageId || !segId) return;
+    this.projectService.savePageEdit(pageId, segId, correction.editedText).subscribe({
+      next: () => {
+        this.messageService.add({ severity: 'success', summary: 'Applied', detail: "Reviewer's correction applied.", life: 1500 });
+        this.loadEdits(pageId);
+      },
+      error: (err: any) => {
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: err?.error?.message || 'Failed to apply correction.' });
+      },
+    });
+  }
+
+  openSubmissionsPanel() {
+    this.state.rightPanelCollapsed.set(false);
+    this.state.rightPanelMode.set('submissions');
+  }
+
+  openChatPanel() {
+    this.state.rightPanelCollapsed.set(false);
+    this.state.rightPanelMode.set('chat');
+  }
+
+  openIssuesPanel() {
+    this.state.rightPanelCollapsed.set(false);
+    this.state.rightPanelMode.set('issues');
+  }
+
+  // ─── Segment Keyboard Navigation ───────────────────────────────
+  @HostListener('window:keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent) {
+    // Don't intercept during text input or content editing
+    const target = event.target as HTMLElement;
+    if (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable ||
+      this.state.editingSegmentId()
+    ) return;
+
+    switch (true) {
+      case event.key === 'j' && !event.metaKey && !event.ctrlKey:
+        event.preventDefault();
+        this.navigateSegment('next');
+        break;
+      case event.key === 'k' && !event.metaKey && !event.ctrlKey:
+        event.preventDefault();
+        this.navigateSegment('prev');
+        break;
+      case event.key === 'Escape':
+        this.state.setActiveSegment(null);
+        break;
+      case (event.metaKey || event.ctrlKey) && event.key === '/':
+        event.preventDefault();
+        this.openChatPanel();
+        break;
+    }
+  }
+
+  navigateSegment(direction: 'next' | 'prev') {
+    const segments = Array.from(
+      document.querySelectorAll('.target-col .segment')
+    ) as HTMLElement[];
+    if (!segments.length) return;
+
+    const currentId = this.state.activeSegmentId();
+    if (!currentId) {
+      const first = segments[0];
+      if (first?.id) this.state.setActiveSegment(first.id);
+      return;
+    }
+
+    const idx = segments.findIndex(s => s.id === currentId);
+    const nextIdx = direction === 'next' ? idx + 1 : idx - 1;
+    const next = segments[nextIdx];
+    if (next?.id) {
+      const sourceEl = document.querySelector(`.source-col #${CSS.escape(next.id)}`);
+      this.state.activeSourceText.set(sourceEl?.textContent?.trim() || '');
+      this.state.setActiveSegment(next.id);
+    }
   }
 }

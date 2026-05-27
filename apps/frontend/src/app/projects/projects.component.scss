@@ -162,7 +162,7 @@ tr:hover .row-actions {
   }
 
   &.danger:hover {
-    background-color: rgba(239, 68, 68, 0.1);
+    background-color: var(--error-soft);
     color: #ef4444;
   }
 }

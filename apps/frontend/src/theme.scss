@@ -33,6 +33,11 @@
   --accent-danger: #f43f5e;         /* Danger Rose status */
   --accent-danger-bg: #fff1f2;      /* Light rose capsule fill */
 
+  /* Aliases & Shorthand (prevent silent transparent fallbacks) */
+  --accent-primary-bg: #fff1f2;     /* Rose tint fill — active/selected states */
+  --accent-warn: #f59e0b;           /* Short alias for --accent-warning */
+  --primary-color-weak: rgba(244, 63, 94, 0.15); /* PrimeNG focus ring tint */
+
   --accent-highlight: #fde047;      /* Bright yellow for active text focus */
   --accent-highlight-text: #000000;
 }
@@ -70,6 +75,11 @@ html.dark {
 
   --accent-danger: #f43f5e;         /* Rose-red text */
   --accent-danger-bg: #4c0519;      /* Deep rose capsule fill */
+
+  /* Aliases & Shorthand (prevent silent transparent fallbacks) */
+  --accent-primary-bg: #4c0519;     /* Rose tint fill — active/selected states (dark) */
+  --accent-warn: #fbbf24;           /* Short alias for --accent-warning (dark) */
+  --primary-color-weak: rgba(244, 63, 94, 0.20); /* PrimeNG focus ring tint (dark) */
 
   --accent-highlight: #facc15;      /* Optimized yellow for dark contrast */
   --accent-highlight-text: #000000;

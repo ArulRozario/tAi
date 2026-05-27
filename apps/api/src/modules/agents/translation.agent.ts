@@ -69,16 +69,6 @@ export class TranslationAgent {
     const styleGuideContent = project.styleGuide.currentVersion?.content || 'Standard theological formal register.';
     const styleGuideName = project.styleGuide?.name || 'Project Style Guide';
 
-    const glossaryTerms = await this.prisma.glossaryTerm.findMany({
-      where: { styleGuideId: project.styleGuideId },
-      take: 50,
-      orderBy: { sourceTerm: 'asc' },
-    });
-
-    const glossaryBlock = glossaryTerms
-      .map((term) => `- ${term.sourceTerm} → ${term.targetTerm}${term.context ? ` (${term.context})` : ''}`)
-      .join('\n');
-
     const pages = await this.prisma.page.findMany({
       where: { id: { in: pageIds } },
       orderBy: { pageNumber: 'asc' },
@@ -153,7 +143,6 @@ export class TranslationAgent {
         .replace(/\{\{styleGuideName\}\}/g, styleGuideName)
         .replace(/\{\{#if styleGuideDescription\}\}([\s\S]*?)\{\{\/if\}\}/g, styleGuideDescription ? '$1' : '')
         .replace(/\{\{styleGuideContent\}\}/g, styleGuideContent)
-        .replace(/\{\{glossaryBlock\}\}/g, glossaryBlock || 'No glossary terms defined.')
         .replace(/\{\{pageCount\}\}/g, String(batchSize))
         .replace(/\{\{batchSizeMinusOne\}\}/g, String(batchSize - 1))
         .replace(/\{\{pageDescriptions\}\}/g, pageDescriptions)

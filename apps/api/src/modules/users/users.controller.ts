@@ -9,7 +9,8 @@ import {
   UseGuards,
   ParseUUIDPipe,
   HttpCode,
-  HttpStatus
+  HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import {
@@ -83,13 +84,15 @@ export class UsersController {
   }
 
   /**
-   * Creates a new user with a temporary password that must be changed on first login.
-   * Authorized: ADMIN tier only.
+   * Creates a new user. ADMIN can create any role; MASTER can create REVIEWER/MASTER only.
    */
   @Post()
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MASTER')
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createUserDto: CreateUserDto) {
+  async create(@Body() createUserDto: CreateUserDto, @CurrentUser() currentUser: any) {
+    if (currentUser.role === 'MASTER' && createUserDto.role === 'ADMIN') {
+      throw new ForbiddenException('MASTER cannot create ADMIN accounts');
+    }
     return this.usersService.create(
       createUserDto.name,
       createUserDto.email,
@@ -98,25 +101,27 @@ export class UsersController {
   }
 
   /**
-   * Modifies an existing user's details.
-   * Authorized: ADMIN tier only.
+   * Modifies an existing user's details. MASTER cannot promote/demote to ADMIN.
    */
   @Patch(':id')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MASTER')
   @HttpCode(HttpStatus.OK)
   async update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateUserDto: UpdateUserDto
+    @Body() updateUserDto: UpdateUserDto,
+    @CurrentUser() currentUser: any
   ) {
+    if (currentUser.role === 'MASTER' && updateUserDto.role === 'ADMIN') {
+      throw new ForbiddenException('MASTER cannot assign ADMIN role');
+    }
     return this.usersService.update(id, updateUserDto);
   }
 
   /**
    * Administratively resets a user's credentials and kills active sessions.
-   * Authorized: ADMIN tier only.
    */
   @Post(':id/reset-password')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MASTER')
   @HttpCode(HttpStatus.NO_CONTENT)
   async resetPassword(@Param('id', ParseUUIDPipe) id: string) {
     await this.usersService.resetPassword(id);
@@ -124,10 +129,9 @@ export class UsersController {
 
   /**
    * Deactivates a user, preventing login and revoking all sessions.
-   * Authorized: ADMIN tier only.
    */
   @Post(':id/deactivate')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MASTER')
   @HttpCode(HttpStatus.OK)
   async deactivate(
     @Param('id', ParseUUIDPipe) id: string,
@@ -138,10 +142,9 @@ export class UsersController {
 
   /**
    * Reactivates a deactivated user.
-   * Authorized: ADMIN tier only.
    */
   @Post(':id/reactivate')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MASTER')
   @HttpCode(HttpStatus.OK)
   async reactivate(@Param('id', ParseUUIDPipe) id: string) {
     return this.usersService.reactivate(id);

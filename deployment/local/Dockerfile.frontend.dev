@@ -1,0 +1,23 @@
+FROM node:24-bookworm-slim
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@10
+
+# Copy workspace config and manifests first (layer-cache friendly)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml nx.json tsconfig.base.json ./
+
+# Copy app source so pnpm can resolve workspace packages
+COPY apps/ ./apps/
+
+# Install all dependencies (node_modules baked into the image layer)
+RUN pnpm install --frozen-lockfile
+
+EXPOSE 4200
+
+# Use the Docker-specific proxy config so /api is forwarded to the api container
+CMD ["pnpm", "nx", "serve", "frontend", \
+     "--port", "4200", \
+     "--host", "0.0.0.0", \
+     "--proxy-config", "apps/frontend/proxy.conf.docker.json"]

@@ -33,7 +33,7 @@ export interface ModelOption {
   styles: [`
     :host { display: inline-block; }
     :host ::ng-deep .model-picker-select {
-      min-width: 160px;
+      min-width: 140px;
     }
   `]
 })

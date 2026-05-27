@@ -36,8 +36,8 @@
     }
   }
 
-  /* Variant: Primary (Default Rose Branding) */
-  &:not(.p-button-secondary):not(.p-button-text):not(.p-button-outlined):not(.p-button-success):not(.p-button-danger):not(.p-button-warning):not(.p-button-info) {
+  /* Variant: Primary (Default — no severity attribute set) */
+  &:not([data-p-severity]):not(.p-button-text):not(.p-button-outlined) {
     background: var(--accent-primary);
     border-color: var(--accent-primary);
     color: var(--accent-primary-text);
@@ -122,7 +122,6 @@
   background-color: var(--border-color);
   border-radius: 3px;
   overflow: hidden;
-  max-width: 110px;
   width: 100%;
   .p-progressbar-value { background-color: var(--accent-primary); border-radius: 3px; transition: width 0.3s ease; }
   &.progress-complete .p-progressbar-value { background-color: var(--accent-success); }
@@ -188,10 +187,6 @@
   &.menu-collapsed {
     .p-submenu-header, .p-menu-submenu-header, .p-menu-submenu-label {
       display: none;
-      padding: 0;
-      margin: 0;
-      height: 0;
-      overflow: hidden;
     }
   }
 }
@@ -208,7 +203,6 @@
     color: var(--text-muted);
     padding: 10px 16px;
     border: none;
-    border-bottom: 2px solid transparent;
     transition: color 0.15s ease;
 
     &:hover { color: var(--text-main); }
@@ -216,7 +210,6 @@
     &[aria-selected="true"],
     &.p-tab-active {
       color: var(--accent-primary);
-      border-bottom-color: var(--accent-primary);
     }
   }
 }
@@ -233,25 +226,13 @@
   .p-breadcrumb-separator { color: var(--text-disabled); font-size: 13px; }
 }
 
-/* 10. PrimeNG Password (.p-password) */
+/* 10. PrimeNG Password (.p-password) — PrimeNG v21 uses .p-password-input */
 .p-password {
   display: block;
   width: 100%;
 
   .p-password-input {
     width: 100%;
-  }
-
-  .p-icon-field {
-    width: 100%;
-  }
-
-  .p-input-icon-right {
-    width: 100%;
-
-    > input {
-      width: 100%;
-    }
   }
 }
 
@@ -312,7 +293,6 @@
   display: inline-block;
   padding: 0;
   min-width: 6px;
-  height: 6px;
 
   /* Tag overrides to make it a dot */
   .p-tag-label { display: none; }
@@ -361,4 +341,311 @@
     color: var(--text-muted);
     font-weight: 500;
   }
+}
+
+/* ── Style Guide Card Wrapper ───────────────────────────────── */
+.tai-style-guide-card {
+  .p-card {
+    height: 100%;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background-color: var(--bg-card);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transform: translateY(-2px);
+    }
+  }
+
+  .p-card-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 16px;
+  }
+
+  .p-card-content {
+    padding: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* ── p-select Compact Modifier (32px height) ────────────────── */
+.p-select--compact.p-select,
+.p-select--compact .p-select {
+  height: 32px;
+
+  .p-select-label {
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 30px;
+    font-size: 13px;
+  }
+}
+
+/* ── Field Select (settings inline selects) ─────────────────── */
+.field-select.p-select,
+.field-select .p-select {
+  height: 32px;
+  min-width: 130px;
+
+  .p-select-label {
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 30px;
+    font-size: 13px;
+  }
+}
+
+/* ── Progress Spinner Size Modifiers ────────────────────────── */
+.sm-spinner .p-progressspinner-circle { width: 24px; height: 24px; }
+.xs-spinner .p-progressspinner-circle { width: 16px; height: 16px; }
+
+/* ── Progress Bar Variant Rules ─────────────────────────────── */
+
+/* Mini bars in feed rows and small table cells */
+.mini-bar .p-progressbar,
+.p-progressbar.mini-bar {
+  height: 5px;
+  border-radius: 3px;
+}
+
+/* Quality column bars */
+.quality-bar .p-progressbar,
+.p-progressbar.quality-bar {
+  height: 4px;
+  border-radius: 2px;
+  width: 60px;
+  margin-top: 0;
+}
+
+/* Chapter-level progress bars (full-width, tight) */
+.chapter-bar .p-progressbar {
+  height: 5px;
+  border-radius: 3px;
+  max-width: none;
+  width: 100%;
+}
+
+/* Named colour variants for progress bar fill */
+.bar-success .p-progressbar-value { background-color: var(--accent-success); }
+.bar-warn    .p-progressbar-value { background-color: var(--accent-warning); }
+.bar-danger  .p-progressbar-value { background-color: var(--accent-danger); }
+
+.chapter-bar-done .p-progressbar-value        { background-color: var(--accent-success); }
+.chapter-bar-in-progress .p-progressbar-value { background-color: var(--accent-warning); }
+.chapter-bar-queued .p-progressbar-value      { background-color: var(--text-disabled); }
+
+/* Active/paused state animation (translation job progress) */
+.tpb-active .p-progressbar-value,
+.progress-active .p-progressbar-value {
+  background: var(--accent);
+  animation: progressbar-pulse 2s ease-in-out infinite;
+}
+
+.tpb-paused .p-progressbar-value,
+.progress-paused .p-progressbar-value {
+  background: var(--warning);
+}
+
+@keyframes progressbar-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.65; }
+}
+
+/* ── Named Avatar Size Overrides ────────────────────────────── */
+
+/* Reviewer stacked avatars (26×26 with overlap) */
+.reviewer-avatar.p-avatar,
+.reviewer-avatar .p-avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 9px;
+  font-weight: 700;
+  border: 2px solid var(--bg-card);
+  border-radius: 50%;
+  margin-right: -6px;
+}
+
+/* Activity feed avatars */
+.act-avatar.p-avatar,
+.act-avatar .p-avatar {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+
+  .p-avatar-text { font-size: 10px; font-weight: 700; }
+}
+
+/* Members table: detail (brand) avatar */
+.detail-avatar.p-avatar,
+.detail-avatar .p-avatar {
+  background: var(--accent-primary);
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+/* Members table: member (neutral) avatars */
+.member-avatar.p-avatar,
+.member-avatar .p-avatar {
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+
+  .p-avatar-text { font-size: 10px; font-weight: 700; }
+}
+
+/* ── Tag Compact Variants ────────────────────────────────────── */
+
+/* Priority chips and queue badges */
+.priority-chip .p-tag,
+.priority-tag .p-tag {
+  font-size: 10px;
+  padding: 2px 7px;
+  font-weight: 700;
+  border-radius: 4px;
+}
+
+/* Chapter heading tags */
+.chapter-tag .p-tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* ── Transparent DataTable Variant ──────────────────────────── */
+
+/* Used in profile sessions table */
+.sessions-table.p-datatable,
+.sessions-table .p-datatable {
+  background: transparent;
+
+  .p-datatable-wrapper,
+  .p-datatable-table { background: transparent; }
+
+  .p-datatable-tbody > tr {
+    background: transparent;
+    border: none;
+
+    &:hover { background: var(--bg-hover); }
+
+    > td {
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border-color);
+      background: transparent;
+    }
+
+    &:last-child > td { border-bottom: none; }
+  }
+}
+
+/* ── Members Table (users admin drawer) ─────────────────────── */
+.members-table .p-datatable-header-row > th {
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-disabled);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.members-table .p-datatable-tbody > tr > td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13px;
+}
+
+.members-table .p-datatable-tbody > tr:last-child > td {
+  border-bottom: none;
+}
+
+/* ── Drawer No-Padding Content ──────────────────────────────── */
+.p-drawer.p-drawer--no-pad .p-drawer-content { padding: 0; }
+
+/* ── Workbench Toolbar Overlay Overrides ────────────────────── */
+
+/* Reviewer popover panel */
+.tb-reviewer-panel.p-popover {
+  min-width: 260px;
+  .p-popover-content { padding: 0; }
+}
+
+/* Reviewer "add" select inside the popover */
+.tbr-user-select .p-select {
+  width: 100%;
+  height: 32px;
+  font-size: 12px;
+}
+
+.tbr-user-select .p-select-label {
+  font-size: 12px;
+  padding: 0 8px;
+  line-height: 30px;
+}
+
+/* Status select minimum width */
+.tb-status-select.p-select { min-width: 110px; }
+
+/* ── Compact Button Context (e.g. style-guide toolbar) ──────── */
+app-style-guide-detail .toolbar-right .p-button {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+/* ── Submissions Panel Compact Actions ──────────────────────── */
+app-submissions-panel .submission-actions .p-button {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.75rem;
+}
+
+/* ── Project Detail: Pill-Shaped Inline Selects ─────────────── */
+.style-guide-select-custom .p-select,
+.model-select-custom .p-select {
+  height: 32px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+
+  &:not(.p-disabled):hover {
+    border-color: var(--text-disabled);
+    background: var(--bg-hover);
+  }
+
+  .p-select-label {
+    padding: 0 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-main);
+  }
+
+  .p-select-dropdown {
+    width: 24px;
+    color: var(--text-disabled);
+  }
+}
+
+.model-select-custom .p-select { min-width: 160px; }
+
+/* ── Project Detail: Flex-Stretch Page Grid Card ────────────── */
+.page-grid-card .p-card-body,
+.page-grid-card .p-card-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
 }

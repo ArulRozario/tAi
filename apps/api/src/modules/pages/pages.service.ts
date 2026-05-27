@@ -106,7 +106,7 @@ export class PagesService {
     };
   }
 
-  async patchSegmentApproval(pageId: string, segmentId: string, isApproved: boolean) {
+  async patchSegmentApproval(pageId: string, segmentId: string, isApproved: boolean, user: any) {
     const page = await this.prisma.page.findUnique({ where: { id: pageId } });
     if (!page) throw new NotFoundException(`Page ${pageId} not found`);
 
@@ -116,6 +116,17 @@ export class PagesService {
     const updated = await this.prisma.page.update({
       where: { id: pageId },
       data: { translationMetadata: { ...meta, segmentApprovals: approvals } },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        action: isApproved ? 'segment.approved' : 'segment.unapproved',
+        entityType: 'page',
+        entityId: pageId,
+        entityHref: `/workbench/${pageId}`,
+        details: { segmentId, isApproved },
+      },
     });
 
     const updatedMeta = (updated.translationMetadata as any) ?? {};
@@ -762,6 +773,10 @@ export class PagesService {
   }
 
   async saveEdit(pageId: string, segmentId: string, editedText: string, user: any) {
+    const MAX_SEGMENT_LENGTH = 10_000;
+    if (editedText.length > MAX_SEGMENT_LENGTH) {
+      throw new BadRequestException(`Segment text cannot exceed ${MAX_SEGMENT_LENGTH} characters`);
+    }
     return this.prisma.pageEdit.upsert({
       where: { pageId_segmentId: { pageId, segmentId } },
       create: { pageId, segmentId, editedText, editedById: user.id },
@@ -787,6 +802,6 @@ export class PagesService {
     modelOverride: string | undefined,
     user: any,
   ) {
-    throw new Error('Segment retranslation not implemented yet');
+    throw new BadRequestException('Segment retranslation is not yet available');
   }
 }
