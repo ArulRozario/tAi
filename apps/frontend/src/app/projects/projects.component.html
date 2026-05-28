@@ -1,136 +1,249 @@
+<p-toast position="top-right" />
+
 <!-- Page Title Row -->
 <div class="page-header-row">
   <div class="title-meta">
     <h1 class="page-title">Projects</h1>
     <p class="page-subtitle">
       @if (isReviewer()) {
-        {{ totalProjects() }} {{ totalProjects() === 1 ? 'project' : 'projects' }} assigned to you
+        {{ filteredProjects().length }} {{ filteredProjects().length === 1 ? 'project' : 'projects' }} assigned to you
       } @else {
-        {{ totalProjects() }} {{ totalProjects() === 1 ? 'project' : 'projects' }} &bull; {{ totalPages() }} total pages
+        {{ filteredProjects().length }} {{ filteredProjects().length === 1 ? 'project' : 'projects' }}
+        @if (selectedCollectionId() !== null) {
+          <span class="collection-breadcrumb"> in
+            <span class="collection-breadcrumb-name">{{ selectedCollectionName() }}</span>
+          </span>
+        }
+        &bull; {{ totalPages() }} total pages
       }
     </p>
   </div>
 
   <div class="header-controls">
-    <!-- PrimeNG Icon Field & Search text input -->
     <p-iconField iconPosition="left" class="search-box-wrapper">
       <p-inputIcon class="pi pi-search"></p-inputIcon>
-      <input type="text" pInputText placeholder="Search projects" class="projects-search" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" />
+      <input type="text" pInputText placeholder="Search projects" class="projects-search"
+        [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" />
     </p-iconField>
 
-    <!-- PrimeNG Filter Select Dropdown -->
     <div class="select-wrapper">
-      <p-select [options]="filterOptions" [(ngModel)]="selectedFilter" optionLabel="label" optionValue="value" class="filter-select"></p-select>
+      <p-select [options]="filterOptions" [(ngModel)]="selectedFilter"
+        optionLabel="label" optionValue="value" class="filter-select"></p-select>
     </div>
 
     @if (canCreateProject()) {
-      <p-button label="New project" icon="pi pi-plus" (click)="createModal.show()" class="new-project-btn-prime"></p-button>
+      <p-button label="New project" icon="pi pi-plus"
+        (click)="createModal.show()" class="new-project-btn-prime"></p-button>
     }
   </div>
 </div>
 
-<!-- Dynamic data grid mapping our projects dataset using PrimeNG p-table -->
-<div class="table-card">
-  <p-table [value]="filteredProjects()" [loading]="loading()" class="projects-table">
-    <ng-template pTemplate="header">
-      <tr>
-        <th style="width: 30%">PROJECT</th>
-        <th style="width: 8%">CHAPTERS</th>
-        <th style="width: 8%">PAGES</th>
-        <th style="width: 20%">PROGRESS</th>
-        <th style="width: 8%">QUALITY</th>
-        <th style="width: 12%">STATUS</th>
-        <th style="width: 8%">OWNER</th>
-        <th style="width: 6%"></th>
-      </tr>
-    </ng-template>
-    <ng-template pTemplate="body" let-project>
-      <tr (click)="navigateToProject(project.id)" style="cursor: pointer;">
-        <td>
-          <div class="project-identity">
-            <div class="project-name">{{ project.name }}</div>
-            <div class="project-languages">{{ getLanguageString(project) }}</div>
-          </div>
-        </td>
-        <td><span class="num-val">{{ project.chapters?.length || 0 }}</span></td>
-        <td><span class="num-val">{{ project._count?.pages || 0 }}</span></td>
-        <td>
-          @if (translationStatus()[project.id]; as ts) {
+<!-- Body: sidebar + table -->
+<div class="projects-body">
+
+  <!-- Collection sidebar -->
+  <app-collection-panel
+    [selectedId]="selectedCollectionId()"
+    (selectionChange)="onCollectionSelect($event)"
+    (treeChange)="onTreeChange()">
+  </app-collection-panel>
+
+  <!-- Table card -->
+  <div class="table-card">
+    <p-table [value]="filteredProjects()" [loading]="loading()" class="projects-table"
+      [sortMode]="'single'" [defaultSortOrder]="-1">
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="name" style="width: 46%">
+            PROJECT <p-sortIcon field="name" />
+          </th>
+          <th pSortableColumn="_count.pages" style="width: 6%">
+            PAGES <p-sortIcon field="_count.pages" />
+          </th>
+          <th style="width: 16%">PROGRESS</th>
+          <th style="width: 6%">QUALITY</th>
+          <th pSortableColumn="status" style="width: 10%">
+            STATUS <p-sortIcon field="status" />
+          </th>
+          <th style="width: 9%">OWNER</th>
+          <th style="width: 7%"></th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-project>
+        <tr (click)="navigateToProject(project.id)"
+            (keydown)="handleRowKeydown($event, project.id)"
+            tabindex="0"
+            role="row"
+            style="cursor: pointer;">
+          <td>
+            <div class="project-identity">
+              <div class="project-name">{{ project.name }}</div>
+              <div class="project-languages">{{ getLanguageString(project) }}</div>
+              @if (project.collection && selectedCollectionId() === null) {
+                <div class="project-collection-tag"
+                  [style.background]="hexToAlpha(project.collection.color, 0.12)"
+                  [style.color]="project.collection.color ?? 'var(--primary-color)'">
+                  @for (col of collectionPathFor(project.collection.id); track col.id; let last = $last) {
+                    <span>{{ col.icon ?? '📁' }} {{ col.name }}</span>
+                    @if (!last) { <span class="collection-path-sep">/</span> }
+                  }
+                </div>
+              }
+            </div>
+          </td>
+          <td><span class="num-val">{{ project._count?.pages || 0 }}</span></td>
+          <td>
             <div class="translation-progress-cell">
               <div class="translation-progress-bar-wrap">
-                <p-progressBar [value]="ts.percent" [showValue]="false"
-                  [styleClass]="ts.isPaused ? 'tpb-paused' : 'tpb-active'" />
+                <p-progressBar
+                  [value]="getProgressValue(project)"
+                  [showValue]="false"
+                  [styleClass]="getProgressClass(project)" />
               </div>
-              <span class="translation-progress-pct">{{ ts.percent }}%</span>
-            </div>
-          } @else {
-            <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
-              <p-progressBar [value]="project.stats?.approved && project._count?.pages ? (project.stats!.approved / project._count!.pages) * 100 : 0" [showValue]="false" />
-              <span class="num-val font-medium" style="font-size: 13px; color: var(--text-disabled); min-width: 34px;">
-                {{ project.stats?.approved && project._count?.pages ? ((project.stats!.approved / project._count!.pages) * 100 | number:'1.0-0') : 0 }}%
+              <span class="translation-progress-pct" [class.pct-idle]="!isProgressActive(project)">
+                {{ getProgressValue(project) | number:'1.0-0' }}%
               </span>
             </div>
-          }
-        </td>
-        <td>
-          <span class="quality-label font-medium">{{ project.stats?.avgQuality ? (project.stats!.avgQuality | number:'1.0-0') + '%' : '—' }}</span>
-        </td>
-        <td>
-          @if (translationStatus()[project.id]; as ts) {
-            @if (ts.isPaused) {
-              <p-tag severity="warn" value="Paused" [icon]="'pi pi-pause'" />
-            } @else {
-              <p-tag severity="info" styleClass="translating-tag">
-                <span class="translating-tag-inner">
-                  <i class="pi pi-spin pi-spinner" style="font-size: 11px;"></i>
-                  Translating
-                </span>
-              </p-tag>
-            }
-          } @else if (project.status === 'PROCESSING') {
-            <p-tag severity="info" value="Processing" />
-          } @else if (project.status === 'REVIEW') {
-            <p-tag severity="info" value="Translated" />
-          } @else if (project.status === 'COMPLETED') {
-            <p-tag severity="success" value="Complete" />
-          } @else if (project.status === 'DRAFT') {
-            <p-tag severity="secondary" value="Draft" />
-          } @else if (project.status === 'PAUSED') {
-            <p-tag severity="warn" value="Paused" />
-          } @else if (project.status === 'ARCHIVED') {
-            <p-tag severity="secondary" value="Archived" />
-          } @else {
-            <p-tag severity="secondary" [value]="project.status" />
-          }
-        </td>
-        <td>
-          <div class="owner-avatar" [title]="project.owner?.name || ''">
-            <img *ngIf="project.owner?.avatarUrl" [src]="project.owner!.avatarUrl!" class="owner-avatar-img" [alt]="project.owner!.name" />
-            <span *ngIf="!project.owner?.avatarUrl">{{ getInitials(project.owner?.name) }}</span>
-          </div>
-        </td>
-        <td class="text-right">
-          <div class="row-actions" (click)="$event.stopPropagation()">
-            @if (canCreateProject()) {
-              @if (isActive(project)) {
-                <button class="row-action-btn" title="Pause" (click)="pauseProject($event, project)"><i class="pi pi-pause"></i></button>
-              } @else if (isPaused(project)) {
-                <button class="row-action-btn" title="Resume" (click)="resumeProject($event, project)"><i class="pi pi-play"></i></button>
+          </td>
+          <td>
+            <span class="quality-label font-medium">
+              {{ project.stats?.avgQuality ? (project.stats!.avgQuality | number:'1.0-0') + '%' : '—' }}
+            </span>
+          </td>
+          <td>
+            @if (translationStatus()[project.id]; as ts) {
+              @if (ts.isPaused) {
+                <p-tag severity="warn" value="Paused" [icon]="'pi pi-pause'" />
+              } @else {
+                <p-tag severity="info" styleClass="translating-tag">
+                  <span class="translating-tag-inner">
+                    <i class="pi pi-spin pi-spinner" style="font-size: 11px;"></i>
+                    Translating
+                  </span>
+                </p-tag>
               }
-              <button class="row-action-btn danger" title="Delete" (click)="deleteProject($event, project)"><i class="pi pi-trash"></i></button>
+            } @else if (project.status === 'PROCESSING') {
+              <p-tag severity="info" value="Processing" />
+            } @else if (project.status === 'REVIEW') {
+              <p-tag severity="info" value="Translated" />
+            } @else if (project.status === 'COMPLETED') {
+              <p-tag severity="success" value="Complete" />
+            } @else if (project.status === 'DRAFT') {
+              <p-tag severity="secondary" value="Draft" />
+            } @else if (project.status === 'PAUSED') {
+              <p-tag severity="warn" value="Paused" />
+            } @else if (project.status === 'ARCHIVED') {
+              <p-tag severity="secondary" value="Archived" />
+            } @else {
+              <p-tag severity="secondary" [value]="project.status" />
             }
-          </div>
-        </td>
-      </tr>
-    </ng-template>
-    <ng-template pTemplate="emptymessage">
-      <tr>
-        <td colspan="8" style="text-align: center; padding: 3rem; color: var(--text-disabled);">
-          No projects found. Click "New project" to get started.
-        </td>
-      </tr>
-    </ng-template>
-  </p-table>
+          </td>
+          <td>
+            <div class="owner-avatar"
+              [style.background]="getAvatarColor(project.owner?.name)"
+              [title]="project.owner?.name || ''">
+              <img *ngIf="project.owner?.avatarUrl" [src]="project.owner!.avatarUrl!"
+                class="owner-avatar-img" [alt]="project.owner!.name" />
+              <span *ngIf="!project.owner?.avatarUrl">{{ getInitials(project.owner?.name) }}</span>
+            </div>
+          </td>
+          <td class="text-right">
+            <div class="row-actions" (click)="$event.stopPropagation()">
+              @if (canCreateProject()) {
+                <button class="row-action-btn" aria-label="Move to collection"
+                  title="Move to collection"
+                  (click)="openAssignDialog($event, project)">
+                  <i class="pi pi-folder"></i>
+                </button>
+                @if (isTranslationRunning(project)) {
+                  <button class="row-action-btn" aria-label="Pause translation"
+                    title="Pause translation"
+                    (click)="pauseProject($event, project)">
+                    <i class="pi pi-pause"></i>
+                  </button>
+                } @else if (isTranslationPaused(project)) {
+                  <button class="row-action-btn" aria-label="Resume translation"
+                    title="Resume translation"
+                    (click)="resumeProject($event, project)">
+                    <i class="pi pi-play"></i>
+                  </button>
+                }
+                <button class="row-action-btn danger" aria-label="Delete project"
+                  title="Delete"
+                  (click)="deleteProject($event, project)">
+                  <i class="pi pi-trash"></i>
+                </button>
+              }
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 3rem; color: var(--text-disabled);">
+            @if (selectedCollectionId() !== null) {
+              No projects in this collection.
+            } @else {
+              No projects found. Click "New project" to get started.
+            }
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
 </div>
 
-<app-create-project-modal #createModal (projectCreated)="loadProjects()"></app-create-project-modal>
+<!-- Delete confirmation dialog -->
+<p-dialog header="Delete project?"
+  [visible]="deleteDialogVisible()"
+  (visibleChange)="deleteDialogVisible.set($event)"
+  [modal]="true"
+  [style]="{ width: '400px' }"
+  [draggable]="false">
+
+  <p style="font-size: 13px; color: var(--text-secondary); margin: 0; line-height: 1.6;">
+    Are you sure you want to delete
+    <strong>{{ pendingDeleteProject()?.name }}</strong>?
+    This action cannot be undone.
+  </p>
+
+  <ng-template pTemplate="footer">
+    <p-button severity="secondary" label="Cancel"
+      (click)="deleteDialogVisible.set(false)" />
+    <p-button severity="danger" label="Delete" icon="pi pi-trash"
+      (click)="confirmDeleteProject()" />
+  </ng-template>
+</p-dialog>
+
+<!-- Assign-to-collection dialog -->
+<p-dialog header="Move to collection"
+  [visible]="assignDialogVisible()"
+  (visibleChange)="assignDialogVisible.set($event)"
+  [modal]="true"
+  [style]="{ width: '380px' }"
+  [draggable]="false">
+
+  <p style="font-size:13px; color:var(--text-secondary); margin-bottom:12px;">
+    Choose a collection for <strong>{{ assigningProject()?.name }}</strong>:
+  </p>
+
+  <p-select
+    [options]="collectionFlatOptions()"
+    [(ngModel)]="assignCollectionId"
+    optionLabel="label"
+    optionValue="value"
+    appendTo="body"
+    style="width:100%">
+  </p-select>
+
+  <ng-template pTemplate="footer">
+    <p-button severity="secondary" label="Cancel"
+      (click)="assignDialogVisible.set(false)" />
+    <p-button label="Move" [loading]="assignSaving()"
+      (click)="saveAssign()" />
+  </ng-template>
+</p-dialog>
+
+<app-create-project-modal #createModal
+  (projectCreated)="loadProjects()">
+</app-create-project-modal>

@@ -32,7 +32,6 @@ import { SubmissionsService, SegmentReviewCorrection } from './services/submissi
 import { PageContentRendererComponent } from './components/page-content-renderer/page-content-renderer.component';
 import { WorkbenchToolbarComponent } from './components/workbench-toolbar/workbench-toolbar.component';
 import { SubmissionsPanelComponent } from './components/submissions-panel/submissions-panel.component';
-import { SegmentReviewsComponent } from './components/segment-reviews/segment-reviews.component';
 
 @Component({
   selector: 'app-workbench',
@@ -56,7 +55,6 @@ import { SegmentReviewsComponent } from './components/segment-reviews/segment-re
     PageContentRendererComponent,
     WorkbenchToolbarComponent,
     SubmissionsPanelComponent,
-    SegmentReviewsComponent,
   ],
   providers: [
     UnifiedChatService,
@@ -84,6 +82,11 @@ export class WorkbenchComponent implements OnInit {
   edits = signal<{ segmentId: string; editedText: string }[]>([]);
   baseTargetHtml = signal<string>('');
   pageErrors = signal<{ segmentId: string; severity: string; message: string }[]>([]);
+
+  /** Text of the currently active translated segment (kept in sync by the segment effect) */
+  activeTranslationText = signal<string>('');
+  /** Controls whether the inline corrections strip is expanded */
+  correctionsExpanded = signal<boolean>(true);
 
   private loadingPageId = '';
   private currentPageId = signal<string | null>(null);
@@ -180,11 +183,16 @@ export class WorkbenchComponent implements OnInit {
     effect(() => {
       const segId = this.state.activeSegmentId();
       const sourceText = this.state.activeSourceText();
+      // Also react when the chat panel becomes visible so the greeting fires
+      // even if the panel was collapsed when the segment was first selected.
+      const panelOpen = !this.state.rightPanelCollapsed();
+      const isChat = this.state.rightPanelMode() === 'chat';
+
       if (!segId) {
-        this.state.segmentCorrections.set([]);
-        if (this.state.rightPanelMode() === 'segment-reviews') {
-          this.state.rightPanelMode.set('chat');
-        }
+        untracked(() => {
+          this.state.segmentCorrections.set([]);
+          this.activeTranslationText.set('');
+        });
         return;
       }
 
@@ -193,12 +201,13 @@ export class WorkbenchComponent implements OnInit {
       const translationEl = document.querySelector(`.target-col [id="${CSS.escape(segId)}"]`);
       const translationText = translationEl?.textContent?.trim() || '';
 
-      this.unifiedChat.configure({
-        context: 'workbench',
-        entityId: pageId,
-        segmentId: segId,
-        currentContent: translationText,
-      });
+      untracked(() => this.activeTranslationText.set(translationText));
+
+      // Build the greeting — include a note about corrections if any exist
+      const corrections = untracked(() => this.state.segmentCorrections());
+      const correctionNote = corrections.length
+        ? `\n\n*${corrections.length} reviewer correction${corrections.length === 1 ? '' : 's'} available above.*`
+        : '';
 
       const greeting = [
         '**Segment selected**',
@@ -207,28 +216,54 @@ export class WorkbenchComponent implements OnInit {
         '',
         `**Current translation:** ${translationText || '—'}`,
         '',
-        'How would you like to refine this translation?',
+        'How would you like to refine this translation?' + correctionNote,
       ].join('\n');
 
-      this.aiChat?.reset(greeting);
+      // Configure the chat service with full context
+      this.unifiedChat.configure({
+        context: 'workbench',
+        entityId: pageId,
+        segmentId: segId,
+        currentContent: translationText,
+        reviewerCorrections: corrections.map(c => ({
+          reviewer: c.submittedBy.name || c.submittedBy.email,
+          text: c.editedText,
+        })),
+      });
 
-      // Load segment corrections for master/admin
+      // Only reset the chat greeting when the panel is actually visible —
+      // if collapsed, this effect will re-run when the panel opens (because
+      // rightPanelCollapsed is read above).
+      if (panelOpen && isChat) {
+        this.aiChat?.reset(greeting);
+      }
+
+      // Load segment corrections for master/admin (no tab auto-switch)
       if (pageId && this.isMasterOrAdmin()) {
         this.state.isLoadingSegmentCorrections.set(true);
         this.state.segmentCorrections.set([]);
+        this.correctionsExpanded.set(true);
         this.submissionsService.getSegmentCorrections(pageId, segId).subscribe({
           next: (res) => {
             this.state.segmentCorrections.set(res.data);
             this.state.isLoadingSegmentCorrections.set(false);
+            // Re-configure with the now-loaded corrections
+            this.unifiedChat.configure({
+              context: 'workbench',
+              entityId: untracked(() => this.pageData()?.id),
+              segmentId: segId,
+              currentContent: translationText,
+              reviewerCorrections: res.data.map(c => ({
+                reviewer: c.submittedBy.name || c.submittedBy.email,
+                text: c.editedText,
+              })),
+            });
           },
           error: () => {
             this.state.segmentCorrections.set([]);
             this.state.isLoadingSegmentCorrections.set(false);
           },
         });
-        if (this.state.rightPanelMode() !== 'submissions') {
-          this.state.rightPanelMode.set('segment-reviews');
-        }
       }
     }, { allowSignalWrites: true });
   }
@@ -834,6 +869,19 @@ export class WorkbenchComponent implements OnInit {
         this.messageService.add({ severity: 'error', summary: 'Error', detail: err?.error?.message || 'Failed to apply correction.' });
       },
     });
+  }
+
+  private readonly AVATAR_COLORS = [
+    '#6366f1', '#ec4899', '#f59e0b', '#10b981',
+    '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6',
+  ];
+
+  getCorrectionAvatarColor(userId: string): string {
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+      hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return this.AVATAR_COLORS[Math.abs(hash) % this.AVATAR_COLORS.length];
   }
 
   openSubmissionsPanel() {

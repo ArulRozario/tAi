@@ -19,6 +19,7 @@ import { QueueModule } from '../modules/queue/queue.module';
 import { AdminModule } from '../modules/admin/admin.module';
 import { HealthModule } from '../modules/health/health.module';
 import { ReviewSubmissionsModule } from '../modules/review-submissions/review-submissions.module';
+import { CollectionsModule } from '../modules/collections/collections.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -52,6 +53,7 @@ import { AppService } from './app.service';
     AdminModule,
     HealthModule,
     ReviewSubmissionsModule,
+    CollectionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

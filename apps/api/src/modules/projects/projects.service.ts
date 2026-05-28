@@ -118,6 +118,9 @@ export class ProjectsService {
           styleGuide: {
             select: { id: true, name: true },
           },
+          collection: {
+            select: { id: true, name: true, icon: true, color: true, parentId: true },
+          },
           _count: {
             select: { pages: true },
           },
@@ -149,6 +152,9 @@ export class ProjectsService {
         },
         styleGuide: {
           select: { id: true, name: true },
+        },
+        collection: {
+          select: { id: true, name: true, icon: true, color: true, parentId: true },
         },
         pages: {
           orderBy: { pageNumber: 'asc' },
@@ -362,23 +368,38 @@ export class ProjectsService {
   }
 
   /**
-   * Cancels all pending/queued/paused jobs for the project.
+   * Cancels all pending/queued/paused jobs for the project and resets
+   * project status to a stable state:
+   *   - REVIEW  if at least one page has been extracted (status beyond PENDING/RENDERING)
+   *   - DRAFT   if no extracted pages exist (e.g. extraction was cancelled mid-run)
    */
   async cancelJobs(id: string): Promise<void> {
     await this.findOne(id); // Ensure project exists
 
-    await this.prisma.job.updateMany({
+    const extractedPageCount = await this.prisma.page.count({
       where: {
         projectId: id,
-        status: {
-          in: [JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED],
-        },
-      },
-      data: {
-        status: JobStatus.CANCELLED,
-        completedAt: new Date(),
+        status: { notIn: [PageStatus.PENDING, PageStatus.RENDERING] },
       },
     });
+    const newStatus =
+      extractedPageCount > 0 ? ProjectStatus.REVIEW : ProjectStatus.DRAFT;
+
+    await this.prisma.$transaction([
+      this.prisma.job.updateMany({
+        where: {
+          projectId: id,
+          status: { in: [JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.PAUSED] },
+        },
+        data: { status: JobStatus.CANCELLED, completedAt: new Date() },
+      }),
+      this.prisma.project.update({
+        where: { id },
+        data: { status: newStatus },
+      }),
+    ]);
+
+    this.logger.log(`Project jobs cancelled: ${id}, status reset to ${newStatus}`);
   }
 
   /**

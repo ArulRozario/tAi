@@ -1,0 +1,180 @@
+<div class="collection-panel">
+
+  <!-- Header -->
+  <div class="panel-header">
+    <span class="panel-title">Collections</span>
+    @if (canManage()) {
+      <button class="add-root-btn" pButton pTooltip="New root collection"
+        tooltipPosition="right" (click)="openCreate(null)">
+        <i class="pi pi-plus"></i>
+      </button>
+    }
+  </div>
+
+  <!-- All projects shortcut -->
+  <div class="tree-node root-entry"
+    [class.selected]="selectedId === null"
+    (click)="select(null)">
+    <span class="node-icon">🗂️</span>
+    <span class="node-name">All projects</span>
+  </div>
+
+  <div class="tree-divider"></div>
+
+  <!-- Tree -->
+  @if (loading()) {
+    <div class="panel-loading"><i class="pi pi-spin pi-spinner"></i></div>
+  } @else if (tree().length === 0) {
+    <p class="panel-empty">No collections yet</p>
+  } @else {
+    <ng-container
+      *ngTemplateOutlet="treeNodeTpl; context: { $implicit: tree(), depth: 0 }">
+    </ng-container>
+  }
+
+</div>
+
+<!-- ── Recursive node template ──────────────────────────────────────────── -->
+<ng-template #treeNodeTpl let-nodes let-depth="depth">
+  @for (node of nodes; track node.id) {
+    <div class="tree-entry">
+
+      <!-- Node row -->
+      <div class="tree-node"
+        [class.selected]="selectedId === node.id"
+        [style.padding-left.px]="16 + depth * 16"
+        (click)="select(node.id)">
+
+        <!-- Expand caret — click to collapse/expand children -->
+        <span class="caret" [class.has-children]="node.children.length > 0"
+          (click)="node.children.length > 0 ? toggleCollapse(node.id, $event) : null">
+          @if (node.children.length > 0) {
+            <i class="pi pi-chevron-down caret-icon"
+              [class.caret-collapsed]="collapsedIds().has(node.id)"
+              [attr.aria-label]="collapsedIds().has(node.id) ? 'Expand' : 'Collapse'"></i>
+          } @else {
+            <span class="caret-spacer"></span>
+          }
+        </span>
+
+        <!-- Colour dot + icon -->
+        <span class="node-dot" [style.background]="node.color ?? '#6366f1'"></span>
+        <span class="node-icon">{{ node.icon ?? '📁' }}</span>
+        <span class="node-name">{{ node.name }}</span>
+        <span class="node-count">{{ node._count.projects }}</span>
+
+        @if (canManage()) {
+          <span class="node-actions" (click)="$event.stopPropagation()">
+            <button class="icon-btn" pTooltip="Add sub-collection"
+              aria-label="Add sub-collection"
+              tooltipPosition="top" (click)="openCreate(node.id)">
+              <i class="pi pi-plus"></i>
+            </button>
+            <button class="icon-btn" pTooltip="Edit collection"
+              aria-label="Edit collection"
+              tooltipPosition="top" (click)="openEdit(node, $event)">
+              <i class="pi pi-pencil"></i>
+            </button>
+            <button class="icon-btn danger" pTooltip="Delete collection"
+              aria-label="Delete collection"
+              tooltipPosition="top" (click)="confirmDelete(node, $event)">
+              <i class="pi pi-trash"></i>
+            </button>
+          </span>
+        }
+      </div>
+
+      <!-- Children: hidden when this node is collapsed -->
+      @if (node.children.length > 0 && !collapsedIds().has(node.id)) {
+        <ng-container
+          *ngTemplateOutlet="treeNodeTpl; context: { $implicit: node.children, depth: depth + 1 }">
+        </ng-container>
+      }
+
+    </div>
+  }
+</ng-template>
+
+<!-- ── Create / Edit dialog ─────────────────────────────────────────────── -->
+<p-dialog
+  [header]="dialogMode() === 'create' ? 'New Collection' : 'Edit Collection'"
+  [visible]="dialogVisible()"
+  (visibleChange)="dialogVisible.set($event)"
+  [modal]="true"
+  [style]="{ width: '440px' }"
+  [draggable]="false">
+
+  <div class="form-grid">
+
+    <label class="form-label">Name <span class="req">*</span></label>
+    <input pInputText class="form-input"
+      [ngModel]="formName()" (ngModelChange)="formName.set($event)"
+      placeholder="e.g. New Testament" />
+
+    <label class="form-label">Description</label>
+    <input pInputText class="form-input"
+      [ngModel]="formDescription()" (ngModelChange)="formDescription.set($event)"
+      placeholder="Optional description" />
+
+    <label class="form-label">Icon (emoji)</label>
+    <input pInputText class="form-input emoji-input"
+      [ngModel]="formIcon()" (ngModelChange)="formIcon.set($event)"
+      placeholder="📁" maxlength="4" />
+
+    <label class="form-label">Colour</label>
+    <div class="palette-row">
+      @for (c of palette; track c) {
+        <button class="palette-dot"
+          [style.background]="c"
+          [class.active]="formColor() === c"
+          (click)="formColor.set(c)">
+        </button>
+      }
+      <input type="color" class="color-custom"
+        [ngModel]="formColor()" (ngModelChange)="formColor.set($event)" />
+    </div>
+
+    <label class="form-label">Parent collection</label>
+    <p-select
+      [options]="flatOptions()"
+      [ngModel]="formParentId()"
+      (ngModelChange)="formParentId.set($event)"
+      optionLabel="label"
+      optionValue="value"
+      appendTo="body"
+      class="form-select">
+    </p-select>
+
+  </div>
+
+  <ng-template pTemplate="footer">
+    <p-button severity="secondary" label="Cancel"
+      (click)="dialogVisible.set(false)" />
+    <p-button label="Save" [loading]="formSaving()"
+      [disabled]="!formName().trim()"
+      (click)="save()" />
+  </ng-template>
+
+</p-dialog>
+
+<!-- ── Delete confirm ────────────────────────────────────────────────────── -->
+<p-dialog
+  header="Delete collection?"
+  [visible]="deleteDialogVisible()"
+  (visibleChange)="deleteDialogVisible.set($event)"
+  [modal]="true"
+  [style]="{ width: '380px' }"
+  [draggable]="false">
+
+  <p class="delete-msg">
+    <strong>{{ deletingNode()?.name }}</strong> will be deleted.
+    Sub-collections will be moved to its parent. Projects inside will be ungrouped.
+  </p>
+
+  <ng-template pTemplate="footer">
+    <p-button severity="secondary" label="Cancel"
+      (click)="deleteDialogVisible.set(false)" />
+    <p-button severity="danger" label="Delete" (click)="executeDelete()" />
+  </ng-template>
+
+</p-dialog>

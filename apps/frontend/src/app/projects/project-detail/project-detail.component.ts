@@ -1,4 +1,4 @@
-import { Component, signal, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, signal, computed, inject, OnInit, OnDestroy } from '@angular/core';
 import { Observable } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
@@ -17,10 +17,13 @@ import { CardModule } from 'primeng/card';
 import { DividerModule } from 'primeng/divider';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { ProjectService, Project, Page, PageReviewer } from '../projects.service';
+import { CollectionsService, CollectionNode } from '../collections.service';
 import { ApiService, User } from '../../core/services/api.service';
 import { AuthService } from '../../auth/auth.service';
 
 const ACTIVE_STATUSES = new Set(['PENDING', 'RENDERING', 'TRANSLATING', 'REVIEWING']);
+
+export type TranslationState = 'idle' | 'running' | 'pausing' | 'paused' | 'stopping';
 
 @Component({
   selector: 'app-project-detail',
@@ -39,15 +42,42 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private projectService = inject(ProjectService);
+  private collectionsService = inject(CollectionsService);
   private apiService = inject(ApiService);
   private authService = inject(AuthService);
   private messageService = inject(MessageService);
 
   project = signal<Project | null>(null);
+  /** Flat map of all collections, keyed by id — used to resolve ancestor paths. */
+  private collectionMap = signal<Map<string, CollectionNode>>(new Map());
+
+  /** Ordered ancestor chain from root → immediate parent for the current project's collection. */
+  readonly collectionPath = computed<CollectionNode[]>(() => {
+    const col = this.project()?.collection;
+    if (!col) return [];
+    const map = this.collectionMap();
+    if (map.size === 0) return [];
+
+    const path: CollectionNode[] = [];
+    let current = map.get(col.id);
+    while (current) {
+      path.unshift(current);
+      current = current.parentId ? map.get(current.parentId) : undefined;
+    }
+    return path;
+  });
   loadError = signal<string | null>(null);
   projectId = signal<string | null>(null);
   selectedModel = signal('');
-  translationState = signal<'idle' | 'running' | 'paused'>('idle');
+
+  // Translation state machine
+  translationState = signal<TranslationState>('idle');
+  /** Which action is currently in-flight (disables buttons to prevent double-submit) */
+  actionInFlight = signal<null | 'pause' | 'resume' | 'stop'>(null);
+  /** Progress counts sourced from getTranslationProgress, not derived from page statuses */
+  txDone = signal(0);
+  txTotal = signal(0);
+
   isReviewing = signal(false);
 
   // Reviewer assignment
@@ -68,6 +98,8 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   bulkSingleReviewerId = '';
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Dedicated lightweight poll for translation progress (job counts + page counts only) */
+  private txPollTimer: ReturnType<typeof setTimeout> | null = null;
 
   exportItems: MenuItem[] = [
     { label: 'Export as DOCX', icon: 'pi pi-file-word', command: () => this.exportProject('docx') },
@@ -84,12 +116,10 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       this.pages.some(p => p.status === 'READY' || p.status === 'TRANSLATION_ERROR');
   }
 
-  get translationDone(): number {
-    return this.pages.filter(p => ['TRANSLATED', 'HUMAN_REVIEW', 'APPROVED'].includes(p.status)).length;
-  }
-
-  get translationTotal(): number {
-    return this.pages.filter(p => !['PENDING', 'RENDERING', 'READY', 'TRANSLATION_ERROR'].includes(p.status)).length;
+  /** True while any translation activity is visible (running/pausing/paused) */
+  get isTranslationActive(): boolean {
+    const s = this.translationState();
+    return s === 'running' || s === 'pausing' || s === 'paused';
   }
 
   get reviewerOptions(): { label: string; value: string }[] {
@@ -103,10 +133,25 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (id) {
       this.projectId.set(id);
       this.loadProject();
+      this.loadCollectionMap();
+      // Hydrate translation state from actual job records — not page statuses
+      this.syncTranslationState();
       if (this.isMasterOrAdmin()) {
         this.loadReviewers();
       }
     }
+  }
+
+  private loadCollectionMap() {
+    this.collectionsService.getTree().subscribe({
+      next: (tree) => {
+        const flat = this.collectionsService.flattenTree(tree);
+        const map = new Map<string, CollectionNode>();
+        for (const node of flat) map.set(node.id, node);
+        this.collectionMap.set(map);
+      },
+      error: () => { /* non-critical — breadcrumb just won't show ancestors */ },
+    });
   }
 
   loadProject() {
@@ -115,15 +160,53 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
       next: (p) => {
         this.project.set(p);
         this.loadError.set(null);
-        const isTranslating = p.pages?.some(pg => pg.status === 'TRANSLATING') ?? false;
-        if (isTranslating && this.translationState() === 'idle') {
-          this.translationState.set('running');
-        } else if (!isTranslating && this.translationState() === 'running') {
-          this.translationState.set('idle');
-        }
         this.schedulePoll(p);
       },
       error: (err) => this.loadError.set(err?.error?.message || 'Failed to load project.'),
+    });
+  }
+
+  /**
+   * Calls getTranslationProgress and updates:
+   *  - translationState (idle/running/pausing/paused)
+   *  - txDone / txTotal progress counters
+   *
+   * Schedules itself to re-run while translation is active so the state
+   * stays in sync without a full project reload.
+   */
+  private syncTranslationState() {
+    const id = this.projectId();
+    if (!id) return;
+
+    this.projectService.getTranslationProgress(id).subscribe({
+      next: (prog) => {
+        this.txDone.set(prog.progress.done);
+        this.txTotal.set(prog.progress.total);
+
+        const { running, queued, paused } = prog.active;
+
+        if (running > 0 && paused > 0) {
+          // Some batches still running while others are paused — draining
+          this.translationState.set('pausing');
+        } else if (running > 0 || queued > 0) {
+          this.translationState.set('running');
+        } else if (paused > 0) {
+          this.translationState.set('paused');
+        } else {
+          this.translationState.set('idle');
+        }
+
+        // Keep a lightweight poll running while translation is active
+        if (prog.active.isActive) {
+          this.clearTxPoll();
+          this.txPollTimer = setTimeout(() => this.syncTranslationState(), 2000);
+        }
+      },
+      error: () => {
+        // Back-off and retry — don't crash the page on a transient error
+        this.clearTxPoll();
+        this.txPollTimer = setTimeout(() => this.syncTranslationState(), 5000);
+      },
     });
   }
 
@@ -150,6 +233,13 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
       this.pollTimer = null;
+    }
+  }
+
+  private clearTxPoll() {
+    if (this.txPollTimer) {
+      clearTimeout(this.txPollTimer);
+      this.txPollTimer = null;
     }
   }
 
@@ -264,7 +354,7 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ── Navigation ─────────────────────────────────────────────────────────────
+  // ── Translation actions ────────────────────────────────────────────────────
 
   startTranslation() {
     const id = this.projectId();
@@ -275,7 +365,9 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
           this.messageService.add({ severity: 'info', summary: 'Nothing to translate', detail: 'No pages are ready for translation.' });
           return;
         }
-        this.translationState.set('running');
+        // Sync immediately so state + counters are accurate
+        this.clearTxPoll();
+        this.syncTranslationState();
         this.clearPoll();
         this.pollTimer = setTimeout(() => this.loadProject(), 500);
       },
@@ -286,36 +378,65 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
   pauseTranslation() {
     const id = this.projectId();
     if (!id) return;
+    this.actionInFlight.set('pause');
     this.projectService.pauseProject(id).subscribe({
-      next: () => this.translationState.set('paused'),
-      error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to pause.' }),
+      next: () => {
+        this.actionInFlight.set(null);
+        // Re-sync from server: may be 'pausing' if batches still running, or 'paused' if all drained
+        this.clearTxPoll();
+        this.syncTranslationState();
+      },
+      error: () => {
+        this.actionInFlight.set(null);
+        this.syncTranslationState(); // re-sync so UI matches actual job state
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to pause.' });
+      },
     });
   }
 
   resumeTranslation() {
     const id = this.projectId();
     if (!id) return;
+    this.actionInFlight.set('resume');
     this.projectService.resumeProject(id).subscribe({
       next: () => {
-        this.translationState.set('running');
+        this.actionInFlight.set(null);
+        this.clearTxPoll();
+        this.syncTranslationState();
         this.clearPoll();
         this.pollTimer = setTimeout(() => this.loadProject(), 500);
       },
-      error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to resume.' }),
+      error: () => {
+        this.actionInFlight.set(null);
+        this.syncTranslationState();
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to resume.' });
+      },
     });
   }
 
   stopTranslation() {
+    if (!window.confirm('Cancel all translation jobs? Pages already translated will be kept, but queued batches will be discarded and cannot be recovered.')) {
+      return;
+    }
     const id = this.projectId();
     if (!id) return;
+    this.actionInFlight.set('stop');
     this.projectService.cancelProjectJobs(id).subscribe({
       next: () => {
+        this.actionInFlight.set(null);
         this.translationState.set('idle');
+        this.clearTxPoll();
         this.loadProject();
       },
-      error: () => this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to stop.' }),
+      error: () => {
+        this.actionInFlight.set(null);
+        this.syncTranslationState();
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'Failed to stop.' });
+      },
     });
   }
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
 
   startReview() {
     const id = this.projectId();
@@ -378,5 +499,6 @@ export class ProjectDetailComponent implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.clearPoll();
+    this.clearTxPoll();
   }
 }

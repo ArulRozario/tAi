@@ -21,13 +21,14 @@ export class PromptBuilder {
       segmentId?: string;
       currentContent?: string;
       mode?: string;
+      reviewerCorrections?: Array<{ reviewer: string; text: string }>;
     }
   ): Promise<PromptContext> {
     switch (context) {
       case 'styleGuide':
         return this.buildStyleGuidePrompt(prompt, options);
       case 'segment':
-        return this.buildSegmentPrompt(prompt, options);
+        return this.buildSegmentPrompt(prompt, options as any);
       case 'pageReview':
         return this.buildPageReviewPrompt(prompt, options);
       case 'general':
@@ -95,7 +96,11 @@ export class PromptBuilder {
 
   private async buildSegmentPrompt(
     prompt: string,
-    options: { entityId?: string; segmentId?: string }
+    options: {
+      entityId?: string;
+      segmentId?: string;
+      reviewerCorrections?: Array<{ reviewer: string; text: string }>;
+    }
   ): Promise<PromptContext> {
     if (!options.entityId || !options.segmentId) {
       return {
@@ -157,9 +162,17 @@ Instructions:
 - Follow the style guide "${styleGuideName}" and use glossary terms precisely.
 `;
 
+    const correctionsBlock = options.reviewerCorrections?.length
+      ? `\nReviewer Corrections (${options.reviewerCorrections.length} suggestion${options.reviewerCorrections.length === 1 ? '' : 's'} from human reviewers):\n` +
+        options.reviewerCorrections
+          .map((c, i) => `  ${i + 1}. ${c.reviewer}: "${c.text}"`)
+          .join('\n') +
+        '\n\nConsider these reviewer suggestions when refining the translation.\n'
+      : '';
+
     const userPrompt = `Source text: """${sourceText}"""
 Current translation: """${currentTranslation || '[none]'}"""
-
+${correctionsBlock}
 User instruction: ${prompt}
 
 Provide only the improved translation for this segment.`;

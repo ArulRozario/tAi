@@ -11,17 +11,20 @@ export class UnifiedChatService extends AiChatService {
   private entityId?: string;
   private segmentId?: string;
   private currentContent?: string;
+  private reviewerCorrections?: Array<{ reviewer: string; text: string }>;
 
   override configure(options: {
     context: string;
     entityId?: string;
     segmentId?: string;
     currentContent?: string;
+    reviewerCorrections?: Array<{ reviewer: string; text: string }>;
   }) {
     this.context = options.context;
     this.entityId = options.entityId;
     this.segmentId = options.segmentId;
     this.currentContent = options.currentContent;
+    this.reviewerCorrections = options.reviewerCorrections;
   }
 
   sendPrompt(prompt: string, model: string, chat: AiChatComponent): void {
@@ -45,6 +48,7 @@ export class UnifiedChatService extends AiChatService {
       model,
       mode: chat.planMode ? 'plan' : 'direct',
       currentContent: liveContent,
+      reviewerCorrections: this.reviewerCorrections?.length ? this.reviewerCorrections : undefined,
       history,
     };
 

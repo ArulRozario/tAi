@@ -10,6 +10,7 @@ export interface Project {
   sourceLang: string;
   targetLang: string;
   styleGuideId: string;
+  collectionId?: string | null;
   status: string;
   ownerId?: string;
   sourceFileId?: string;
@@ -32,6 +33,13 @@ export interface Project {
     icon?: string;
     color?: string;
   };
+  collection?: {
+    id: string;
+    name: string;
+    icon: string | null;
+    color: string | null;
+    parentId: string | null;
+  } | null;
   stats?: ProjectStats;
   pages?: Page[];
 }

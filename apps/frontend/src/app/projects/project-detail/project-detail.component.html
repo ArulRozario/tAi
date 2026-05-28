@@ -16,6 +16,14 @@
     </a>
     <span class="sep">/</span>
     <a routerLink="/projects" class="crumb-link">Projects</a>
+    @for (col of collectionPath(); track col.id) {
+      <span class="sep">/</span>
+      <a routerLink="/projects" class="crumb-link crumb-collection">
+        <span class="crumb-collection-dot"
+          [style.background]="col.color ?? '#6366f1'"></span>
+        <span>{{ col.icon ?? '📁' }} {{ col.name }}</span>
+      </a>
+    }
     <span class="sep">/</span>
     <span class="crumb-current">{{ project()!.name }}</span>
   </div>
@@ -37,15 +45,62 @@
       <tai-model-picker [showDefault]="true" (modelChange)="selectedModel.set($event)" />
 
       <div class="project-actions">
-        @if (translationState() === 'running') {
+        <!-- Progress label: visible whenever translation is active (running, pausing, or paused) -->
+        @if (isTranslationActive) {
           <span class="translation-progress-label">
-            {{ translationDone }} / {{ translationTotal }} translated
+            {{ txDone() }} / {{ txTotal() }} translated
           </span>
-          <p-button label="Pause" icon="pi pi-pause" severity="warn" (onClick)="pauseTranslation()" />
-          <p-button label="Stop" icon="pi pi-stop" severity="danger" [outlined]="true" (onClick)="stopTranslation()" />
+        }
+
+        @if (translationState() === 'running') {
+          <p-button
+            label="Pause"
+            icon="pi pi-pause"
+            severity="warn"
+            [loading]="actionInFlight() === 'pause'"
+            [disabled]="actionInFlight() !== null"
+            (onClick)="pauseTranslation()"
+          />
+          <p-button
+            label="Stop"
+            icon="pi pi-stop"
+            severity="danger"
+            [outlined]="true"
+            [loading]="actionInFlight() === 'stop'"
+            [disabled]="actionInFlight() !== null"
+            (onClick)="stopTranslation()"
+          />
+        } @else if (translationState() === 'pausing') {
+          <span class="translation-pausing-label">
+            <i class="pi pi-spin pi-spinner"></i> Pausing…
+          </span>
+          <p-button
+            label="Stop"
+            icon="pi pi-stop"
+            severity="danger"
+            [outlined]="true"
+            [loading]="actionInFlight() === 'stop'"
+            [disabled]="actionInFlight() !== null"
+            (onClick)="stopTranslation()"
+          />
         } @else if (translationState() === 'paused') {
-          <p-button label="Resume" icon="pi pi-play" severity="success" (onClick)="resumeTranslation()" />
-          <p-button label="Stop" icon="pi pi-stop" severity="danger" [outlined]="true" (onClick)="stopTranslation()" />
+          <p-button
+            label="Resume"
+            icon="pi pi-play"
+            severity="success"
+            [loading]="actionInFlight() === 'resume'"
+            [disabled]="actionInFlight() !== null"
+            (onClick)="resumeTranslation()"
+          />
+          <p-button
+            label="Stop"
+            icon="pi pi-stop"
+            severity="danger"
+            [outlined]="true"
+            [loading]="actionInFlight() === 'stop'"
+            [disabled]="actionInFlight() !== null"
+            (onClick)="stopTranslation()"
+          />
         } @else {
           @if (canTranslate) {
             <p-button label="Translate" icon="pi pi-sparkles" severity="primary" (onClick)="startTranslation()" />

@@ -388,7 +388,7 @@ export class AuthService {
 
   async deleteAvatar(userId: string): Promise<void> {
     const key = `avatars/${userId}.jpg`;
-    await this.minioService.deleteFile(key).catch(() => {});
+    await this.minioService.deleteFile(key).catch((_err) => { /* ignore missing file */ });
     await this.prisma.user.update({ where: { id: userId }, data: { avatarUrl: null } });
     this.logger.log(`Avatar deleted for user ${userId}`);
   }

@@ -314,6 +314,7 @@ export class ChatService {
       model?: string;
       mode?: string;
       currentContent?: string;
+      reviewerCorrections?: Array<{ reviewer: string; text: string }>;
       history?: Array<{ role: string; content: string }>;
     },
     res: Response
@@ -337,6 +338,7 @@ export class ChatService {
         segmentId: body.segmentId,
         currentContent: body.currentContent,
         mode: body.mode,
+        reviewerCorrections: body.reviewerCorrections,
       }
     );
 

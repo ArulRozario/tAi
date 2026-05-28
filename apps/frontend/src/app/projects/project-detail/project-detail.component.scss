@@ -37,6 +37,20 @@
     &:hover { color: var(--text-main); }
   }
 
+  .crumb-collection {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .crumb-collection-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
   .crumb-current {
     color: var(--text-main);
     font-weight: 600;
@@ -128,6 +142,17 @@
     font-weight: 600;
     color: var(--text-muted);
     white-space: nowrap;
+  }
+
+  .translation-pausing-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--yellow-600, #ca8a04);
+    white-space: nowrap;
+    opacity: 0.9;
   }
 }
 

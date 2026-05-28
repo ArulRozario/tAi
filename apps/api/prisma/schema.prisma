@@ -81,22 +81,42 @@ model StyleGuideVersion {
   currentForStyleGuide StyleGuide? @relation("CurrentVersion")
 }
 
+// ─── ProjectCollection ────────────────────────────────────────────────────────
+
+model ProjectCollection {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  icon        String?  // emoji or icon identifier
+  color       String?  // hex color
+  parentId    String?
+  parent      ProjectCollection?  @relation("CollectionTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    ProjectCollection[] @relation("CollectionTree")
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projects    Project[]
+}
+
 // ─── Project ─────────────────────────────────────────────────────────────────
 
 model Project {
-  id          String        @id @default(uuid())
-  name        String
-  description String?
-  sourceLang  String
-  targetLang  String
-  styleGuideId     String
-  styleGuide       StyleGuide         @relation(fields: [styleGuideId], references: [id])
-  status      ProjectStatus @default(DRAFT)
-  ownerId     String?
-  owner       User?         @relation("ProjectOwner", fields: [ownerId], references: [id])
-  sourceFileId String?      // MinIO object key
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  sourceLang     String
+  targetLang     String
+  styleGuideId   String
+  styleGuide     StyleGuide         @relation(fields: [styleGuideId], references: [id])
+  collectionId   String?
+  collection     ProjectCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+  status         ProjectStatus @default(DRAFT)
+  ownerId        String?
+  owner          User?         @relation("ProjectOwner", fields: [ownerId], references: [id])
+  sourceFileId   String?      // MinIO object key
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   chapters    Chapter[]
   pages       Page[]

@@ -158,10 +158,6 @@
                   <span class="panel-tab-badge">{{ state.pendingSubmissionCount() }}</span>
                 }
               </button>
-              <button class="panel-tab" [class.active]="state.rightPanelMode() === 'segment-reviews'"
-                      (click)="state.rightPanelMode.set('segment-reviews')" title="Per-segment corrections">
-                <i class="pi pi-pencil"></i> Segment
-              </button>
             }
             @if (state.pageErrors().length > 0) {
               <button class="panel-tab panel-tab--warn" [class.active]="state.rightPanelMode() === 'issues'"
@@ -184,11 +180,6 @@
                 (preview)="previewSubmission($event)"
                 (approve)="approveSubmission($event)"
                 (reject)="rejectSubmission($event)" />
-            }
-            @case ('segment-reviews') {
-              <app-segment-reviews
-                [corrections]="state.segmentCorrections()"
-                (useText)="onSegmentCorrectionUse($event)" />
             }
             @case ('issues') {
               <div class="issues-panel">
@@ -220,6 +211,69 @@
               </div>
             }
             @default {
+              <!-- ── Segment context strip (shown when a segment is active) ── -->
+              @if (state.activeSegmentId()) {
+                <div class="seg-ctx-strip">
+                  <div class="seg-ctx-row">
+                    <span class="seg-ctx-label">SOURCE</span>
+                    <span class="seg-ctx-text">{{ state.activeSourceText() || '—' }}</span>
+                  </div>
+                  <div class="seg-ctx-row">
+                    <span class="seg-ctx-label">CURRENT</span>
+                    <span class="seg-ctx-text">{{ activeTranslationText() || '—' }}</span>
+                  </div>
+
+                  @if (isMasterOrAdmin()) {
+                    @if (state.isLoadingSegmentCorrections()) {
+                      <div class="seg-ctx-loading">
+                        <i class="pi pi-spin pi-spinner"></i> Loading corrections…
+                      </div>
+                    } @else if (state.segmentCorrections().length > 0) {
+                      <div class="seg-ctx-corrections">
+                        <button class="seg-ctx-corr-toggle"
+                                (click)="correctionsExpanded.set(!correctionsExpanded())">
+                          <i class="pi pi-users"></i>
+                          {{ state.segmentCorrections().length }}
+                          reviewer correction{{ state.segmentCorrections().length === 1 ? '' : 's' }}
+                          <i class="pi"
+                             [class.pi-chevron-down]="!correctionsExpanded()"
+                             [class.pi-chevron-up]="correctionsExpanded()"></i>
+                        </button>
+                        @if (correctionsExpanded()) {
+                          <div class="seg-ctx-corr-list">
+                            @for (corr of state.segmentCorrections(); track corr.submissionId) {
+                              <div class="seg-ctx-corr-card">
+                                <div class="seg-ctx-corr-header">
+                                  <span class="seg-ctx-corr-avatar"
+                                        [style.background]="getCorrectionAvatarColor(corr.submittedBy.id)">
+                                    {{ (corr.submittedBy.name || corr.submittedBy.email).charAt(0).toUpperCase() }}
+                                  </span>
+                                  <span class="seg-ctx-corr-name">
+                                    {{ corr.submittedBy.name || corr.submittedBy.email }}
+                                  </span>
+                                  @if (corr.status === 'PENDING') {
+                                    <button class="seg-ctx-corr-use"
+                                            (click)="onSegmentCorrectionUse(corr)">
+                                      <i class="pi pi-check"></i> Use
+                                    </button>
+                                  } @else {
+                                    <span class="seg-ctx-corr-status" [attr.data-status]="corr.status">
+                                      {{ corr.status | lowercase }}
+                                    </span>
+                                  }
+                                </div>
+                                <p class="seg-ctx-corr-text">{{ corr.editedText }}</p>
+                              </div>
+                            }
+                          </div>
+                        }
+                      </div>
+                    }
+                  }
+                </div>
+              }
+
+              <!-- ── AI Chat ── -->
               <app-ai-chat
                 #aiChat
                 title="Translation assistant"
