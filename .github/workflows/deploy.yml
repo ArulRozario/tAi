@@ -18,9 +18,9 @@ jobs:
       - name: Trigger Render deploy
         run: curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
 
-  # ── Frontend → Cloudflare Pages ─────────────────────────────────────────────
+  # ── Frontend → Vercel ───────────────────────────────────────────────────────
   deploy-frontend:
-    name: Deploy frontend to Cloudflare Pages
+    name: Deploy frontend to Vercel
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
@@ -43,15 +43,12 @@ jobs:
       - name: Build
         run: pnpm nx build frontend --configuration=production
 
-      - name: Inject API proxy rule
-        # Cloudflare Pages rewrites /api/* → your Render API URL
+      - name: Deploy to Vercel
         run: |
-          echo "/api/* ${{ secrets.RENDER_API_URL }}/api/:splat 200" \
-            > dist/apps/frontend/browser/_redirects
-
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist/apps/frontend/browser --project-name=tai --branch=${{ github.event.workflow_run.head_branch }}
+          npx vercel deploy dist/apps/frontend/browser \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --prod \
+            --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
